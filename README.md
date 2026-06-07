@@ -9,8 +9,12 @@ Official code release for the paper: **GLINT: Modeling Scene-Scale Transparency 
 _<sup>1</sup>KAIST, <sup>2</sup>NAVER LABS_
 
 ## News
-- **[2026-04-09]**: 🎉 Our paper has been selected as an Oral presentation at CVPR 2026.
-- **[2026-03-30]**: Initial code release.
+
+* **[2026-06-07]**: Updates with bug fixes and minor improvements are coming soon.
+* **[2026-06-07]**: 🎉 Our paper has been selected as an Award Candidate!
+* **[2026-04-09]**: 🎉 Our paper has been selected for an Oral presentation at CVPR 2026.
+* **[2026-03-30]**: Initial code release.
+
 
 ## Overview
 
