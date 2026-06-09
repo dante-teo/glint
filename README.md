@@ -1,227 +1,104 @@
-# GLINT: Modeling Scene-Scale Transparency via Gaussian Radiance Transport
+# Glint
 
-[![arXiv](https://img.shields.io/badge/arXiv-2603.26181-b31b1b.svg)](https://arxiv.org/abs/2603.26181) [![GLINT](https://img.shields.io/badge/GLINT-Project%20Page-blue.svg)](https://youngju-na.github.io/GLINT) [![Dataset](https://img.shields.io/badge/Dataset-Download-green.svg)](https://drive.google.com/drive/folders/1NB_AuBQ5lP3pkdS9M-x9o0oqRrXP4S6a?usp=sharing)
+中文 · [English](README.en.md)
 
-Official code release for the paper: **GLINT: Modeling Scene-Scale Transparency via Gaussian Radiance Transport**.
+为 AI 代理打造的精致 macOS 终端。底层基于 [Ghostty](https://ghostty.org),界面用 SwiftUI + AppKit。
 
-[Youngju Na](https://youngju-na.github.io/)<sup>1,2,*</sup>, [Jaeseong Yun](mailto:jaeseong.yun@naverlabs.com)<sup>2</sup>, [Soohyun Ryu](mailto:soohyun.ryu@naverlabs.com)<sup>2</sup>, [Hyunsu Kim](https://blandocs.github.io/)<sup>2</sup>, [Sung-Eui Yoon](https://sgvr.kaist.ac.kr/~sungeui/)<sup>1</sup>, [Suyong Yeon](mailto:suyong.yeon@naverlabs.com)<sup>2</sup>
+## 安装
 
-_<sup>1</sup>KAIST, <sup>2</sup>NAVER LABS_
-
-## News
-
-* **[2026-06-07]**: Updates with bug fixes and minor improvements are coming soon.
-* **[2026-06-07]**: 🎉 Our paper has been selected as an Award Candidate!
-* **[2026-04-09]**: 🎉 Our paper has been selected for an Oral presentation at CVPR 2026.
-* **[2026-03-30]**: Initial code release.
-
-
-## Overview
-
-GLINT is a method for modeling large-scale transparent and reflective scenes with Gaussian radiance transport.
-
-## Installation
-
-1. **Clone the repository and setup environment:**
+### Homebrew(推荐)
 
 ```bash
-conda create -n glint python=3.11 -y
-conda activate glint
+brew tap chenbstack/glint
+brew install --cask glint
 ```
 
-2. **Install PyTorch:**
+Tap 仓库在 `github.com/chenbstack/homebrew-glint`,Cask formula 由 release 工作流自动生成,详见下文 [发布流程](#发布流程)。
 
-Install PyTorch matching your CUDA version (see [PyTorch website](https://pytorch.org/get-started/locally/) for the correct command). Example for CUDA 11.8:
+### 手动下载
+
+从 [Releases](https://github.com/chenbstack/glint/releases) 页面下载最新的 `Glint-x.y.z.dmg`,双击挂载后把 `Glint.app` 拖进 `/Applications` 即可。
+
+如果系统提示"无法打开,因为无法验证开发者",这是因为 Glint 当前还未做苹果公证。在终端里跑一次:
 
 ```bash
-pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cu118
+xattr -dr com.apple.quarantine /Applications/Glint.app
 ```
 
-3. **Install dependencies:**
+之后正常打开即可。Cask 安装方式会自动帮你做这一步。
+
+## 升级
 
 ```bash
-cat requirements.txt | sed -e '/^\s*-.*$/d' -e '/^\s*#.*$/d' -e '/^\s*$/d' | \
-  awk '{split($0, a, "#"); if (length(a) > 1) print a[1]; else print $0;}' | \
-  awk '{split($0, a, "@"); if (length(a) > 1) print a[2]; else print $0;}' | \
-  xargs -n 1 pip install
-
-pip install -e . --no-build-isolation --no-deps
+brew upgrade --cask glint
 ```
 
-4. **Install submodules:**
+如果在 Glint 设置里开启了自动检查更新(Sparkle),app 启动时会自己提示新版本,点击安装即可。
+
+## 卸载
 
 ```bash
-git submodule update --init --recursive
-pip install -v submodules/diff-surfel-tracing
-pip install \
-  submodules/diff-surfel-rasterizations/diff-surfel-rasterization-wet \
-  submodules/diff-surfel-rasterizations/diff-surfel-rasterization-wet-ch06 \
-  submodules/diff-surfel-rasterizations/diff-surfel-rasterization-wet-ch08
+brew uninstall --cask glint
 ```
 
-## Data Preparation
+会一并清理 `~/Library/Application Support/Glint` 和偏好设置。
 
-The `ref-dl3dv` and `3D-FRONT-T` dataset used in our paper is available for download:
+## 从源码构建
 
-**[Download Dataset (Google Drive)](https://drive.google.com/drive/folders/1NB_AuBQ5lP3pkdS9M-x9o0oqRrXP4S6a?usp=sharing)**
-
-GLINT expects datasets in the EasyVolcap-style format.
-At minimum, each scene should provide:
-
-```
-<scene>/
-├── images/
-├── intri.yml
-├── extri.yml
-└── sparse/
-```
-
-For the G-buffer guidance, each scene also contains priors obtained from [DiffusionRenderer](https://arxiv.org/abs/2501.18590). You may also consider using other useful priors (e.g., [TransNormal](https://longxiang-ai.github.io/TransNormal/), [Video Depth Anything](https://github.com/DepthAnything/Video-Depth-Anything), etc.). Please refer to these if you want to build your custom datasets:
-
-```text
-<scene>/
-├── images/
-├── intri.yml
-├── extri.yml
-├── sparse/
-├── envs/
-│   └── points3D.ply
-├── normals/
-│   └── <view_id>/000000.jpg
-└── diffrens/
-    ├── normal/<view_id>/000000.png
-    ├── depth/<view_id>/000000.png
-    ├── diffuse_albedo/<view_id>/000000.png
-    ├── basecolor/<view_id>/000000.png
-    ├── roughness/<view_id>/000000.png
-    └── metallic/<view_id>/000000.png
-```
-
-The `diffusion-renderer` prior maps must be placed under `diffrens/`.
-
-For training and evaluation, `<scene>` should match the dataset directory name and the config filename in `configs/exps/glint/ref-dl3dv/`.
-
-<details>
-<summary>Scene list used in our dl3dv-10k subset (ref-dl3dv).</summary>
-
-```text
-194defaa605986166d52ae703b1d44d1a557794698386becaaa5f688f4fb026b
-3712b8fdcb94128c92c2e2c30fb529851e3231cdc7c4451bc6c784f923386e93
-52410f0264d14bde6acd695c637aaa274833be8afcf05ef4fd6a51176ad2dbd2
-543b6607de9318e3a0c68b267a4b616fdc5849a140ba184807d5e70e567f8ec0
-5454b71d612cc2b020e60bd2d8a018dc33d62b5fbd5c041b55a752480a8a97ba
-6b42314a2f8a18a193826e2b58e45729453e74524078283f740b8f8d330c3d2f
-b65e86833c1ae29714ce881bb9d14d3ed1256a08ab944fd9e75d6b29c674346d
-b9df30d6e6078880acc88acb01872c65d337f84b9dba44a23fa29c9861d7e23b
-```
-
-</details>
-
-If you want to prepare your own data from COLMAP outputs, see the preprocessing scripts in `scripts/preprocess/`.
-
-## Training
-
-Example training command:
+需要 Xcode 16+ 和 macOS 14+。
 
 ```bash
-evc-train -c configs/exps/glint/ref-dl3dv/<scene>.yaml \
-  exp_name=glint/ref-dl3dv/<run_name>/<scene>
+git clone https://github.com/chenbstack/glint.git
+cd glint
+# Ghostty 的 xcframework 体积约 500 MB,没有入库。
+# 自己 host 一个,或者把 GHOSTTYKIT_URL 指向某个 release 资产。
+export GHOSTTYKIT_URL='https://…/GhosttyKit.xcframework.tar.gz'
+bash scripts/fetch-ghosttykit.sh
+open Glint.xcodeproj
 ```
 
-For example, to train the scene `6b42314a2f8a18a193826e2b58e45729453e74524078283f740b8f8d330c3d2f`:
+## 发布流程
+
+在 `main` 上打 `vX.Y.Z` 标签后,`.github/workflows/release.yml` 会:
+
+1. 把版本号写入 `Info.plist`
+2. 编译 Release 配置,导出 `Glint.app`
+3.(可选)用 Developer ID 签名 + `notarytool` 公证
+4. 打成 `.dmg`
+5.(可选)用 Sparkle 的 EdDSA 私钥签名,把新 `<item>` 追加进 `appcast.xml`
+6. 发布 GitHub Release,带上 dmg 和 appcast
+7. 把更新后的 `appcast.xml` 回推到 `main`
+
+### 必需 secret
+
+| Secret | 用途 |
+|---|---|
+| `GHOSTTYKIT_URL` | `GhosttyKit.xcframework.tar.gz`(或 `.tar.xz` / `.zip`)的公开 URL |
+
+### 可选 secret —— 启用签名 + Sparkle
+
+不配这些就出 ad-hoc 包,用户照样能通过 Cask 安装(postinstall 会自动去除 quarantine)。等你买了 Apple 开发者账号($99/年)再加。
+
+| Secret | 用途 |
+|---|---|
+| `APPLE_CERT_P12_BASE64` | Developer ID Application `.p12` 的 base64 |
+| `APPLE_CERT_PASSWORD` | 导出 `.p12` 时设的密码 |
+| `APPLE_NOTARY_ID` | 用于公证的 Apple ID |
+| `APPLE_NOTARY_PASSWORD` | 从 appleid.apple.com 申请的 app-specific password |
+| `APPLE_NOTARY_TEAM_ID` | 10 位字符的 team identifier |
+| `SPARKLE_ED_PRIV_KEY` | Sparkle `generate_keys` 生成的 EdDSA 私钥;对应的公钥写到 `Info.plist` 的 `SUPublicEDKey` |
+
+### Sparkle 密钥初始化
 
 ```bash
-evc-train -c configs/exps/glint/ref-dl3dv/6b42314a2f8a18a193826e2b58e45729453e74524078283f740b8f8d330c3d2f.yaml \
-  exp_name=glint/ref-dl3dv/<run_name>/6b42314a2f8a18a193826e2b58e45729453e74524078283f740b8f8d330c3d2f
+# 本地跑一次:
+curl -fsSL https://github.com/sparkle-project/Sparkle/releases/download/2.6.4/Sparkle-2.6.4.tar.xz | tar -xJ
+./Sparkle-2.6.4/bin/generate_keys
+# 私钥存进 Keychain,会打印对应的公钥。
+# 把私钥复制进仓库 secret SPARKLE_ED_PRIV_KEY,
+# 把公钥粘进 Glint/Resources/Info.plist 的 SUPublicEDKey。
 ```
 
-In this scene config, training uses `dataloader_cfg.dataset_cfg.view_sample`, which contains all view indices except multiples of 8.
+## 协议
 
-The default hyperparameters are defined in [`configs/models/glint.yaml`](configs/models/glint.yaml). Key parameters you may want to adjust depending on your scene:
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `render_reflection_start_iter` | `3000` | Iteration to start reflection rendering |
-| `render_transmission_start_iter` | `1000` | Iteration to start transmission rendering |
-| `depth_discrepancy_threshold` | `0.005` | Depth discrepancy threshold (scene-scale dependent) |
-| `trans_map_reg_loss_weight` | `0.01` | Transmission map regularization weight |
-| `trans_guidance_loss_weight` | `0.01` | Transmission guidance loss weight |
-
-## Evaluation
-
-Example evaluation command:
-
-```bash
-evc-test -c configs/exps/glint/ref-dl3dv/<scene>.yaml \
-  exp_name=glint/ref-dl3dv/<run_name>/<scene>
-```
-
-For the same scene:
-
-```bash
-evc-test -c configs/exps/glint/ref-dl3dv/6b42314a2f8a18a193826e2b58e45729453e74524078283f740b8f8d330c3d2f.yaml \
-  exp_name=glint/ref-dl3dv/<run_name>/6b42314a2f8a18a193826e2b58e45729453e74524078283f740b8f8d330c3d2f
-```
-
-Evaluation uses `val_dataloader_cfg.dataset_cfg.view_sample`. For `6b42314a2f8a18a193826e2b58e45729453e74524078283f740b8f8d330c3d2f`, this is:
-
-```text
-[0, 8, 16, 24, ..., 320]
-```
-
-So this scene follows an every-8th-view evaluation split: 41 evaluation views and the remaining 282 views for training.
-
-## Custom Rendering
-Example interpolation video rendering:
-
-```bash
-bash scripts/render_interp_video.sh \
-  --config configs/exps/glint/ref-dl3dv/<scene>.yaml \
-  --exp_name glint/ref-dl3dv/<run_name>/<scene> \
-  --cam_idx1 0 \
-  --cam_idx2 8 \
-  --n_frames 60
-```
-
-## Repository Structure
-- `easyvolcap/` — Core framework and GLINT model implementation
-- `configs/` — Model, dataset, and experiment configurations
-- `scripts/` — Preprocessing, training utilities, and rendering scripts
-- `submodules/` — Required custom CUDA and tracing dependencies
-
-## Roadmap
-
-- [x] Release source code.
-- [ ] Release `3D-FRONT-T` Blender files for downstream applications.
-
-## Acknowledgements
-
-This codebase is built on top of [EasyVolcap](https://github.com/zju3dv/EasyVolcap) and the 2D Gaussian ray tracer from [EnvGS](https://github.com/zju3dv/EnvGS). We sincerely thank the authors and contributors of these projects.
-You may also want to check out the related works listed below.
-
-## Related Work
-
-- [TSGS: Improving Gaussian Splatting for Transparent Surface Reconstruction via Normal and De-lighting Priors](https://github.com/longxiang-ai/TSGS)
-- [TransparentGS: Fast Inverse Rendering of Transparent Objects with Gaussians](https://letianhuang.github.io/transparentgs/)
-- [DiffusionRenderer: Neural Inverse and Forward Rendering with Video Diffusion Models](https://github.com/nv-tlabs/diffusion-renderer)
-- [TransNormal: Dense Visual Semantics for Diffusion-based Transparent Object Normal Estimation](https://github.com/longxiang-ai/TransNormal)
-
-## Citation
-
-If you find this repository useful, please consider citing our paper:
-
-```bibtex
-@misc{na2026glint,
-  title={GLINT: Modeling Scene-Scale Transparency via Gaussian Radiance Transport},
-  author={Youngju Na and Jaeseong Yun and Soohyun Ryu and Hyunsu Kim and Sung-Eui Yoon and Suyong Yeon},
-  year={2026},
-  eprint={2603.26181},
-  archivePrefix={arXiv},
-  primaryClass={cs.CV},
-  url={https://arxiv.org/abs/2603.26181},
-}
-```
-
-## License
-
-This project is released under the [MIT License](LICENSE).
+MIT — 详见 [LICENSE](LICENSE)。
