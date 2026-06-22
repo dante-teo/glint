@@ -1,41 +1,45 @@
 # Glint
 
-中文 · [English](README.en.md)
+A polished macOS terminal made for AI agents. SwiftUI + AppKit, with [Ghostty](https://ghostty.org) under the hood.
 
-为 AI 代理打造的精致 macOS 终端。底层基于 [Ghostty](https://ghostty.org),界面用 SwiftUI + AppKit。
+![Glint screenshot](docs/screenshot.png)
 
-![Glint 截图](docs/screenshot.png)
+![Workspace state overview](docs/screenshot-sidebar.png)
 
-![工作区状态一览](docs/screenshot-sidebar.png)
+## Install
 
-## 安装
-
-### Homebrew(推荐)
+### Homebrew (recommended)
 
 ```bash
 brew tap dante-teo/tap
 brew install --cask glint
 ```
 
-### 手动下载
+### Manual Download
 
-从 [Releases](https://github.com/dante-teo/glint/releases) 页面下载最新的 `Glint-x.y.z.dmg`,挂载后把 `Glint.app` 拖进 `/Applications`。
+Grab the latest `Glint-x.y.z.dmg` from the [Releases](https://github.com/dante-teo/glint/releases) page, mount it, and drag `Glint.app` into `/Applications`.
 
-如果提示"无法打开,因为无法验证开发者",在终端里跑一次:
+If macOS refuses to open it with "developer cannot be verified", run once:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/Glint.app
 ```
 
-Cask 安装方式会自动帮你做这一步。
+The Homebrew Cask does this automatically.
 
-## 升级与卸载
+## Appearance
+
+Glint supports Auto, Light, and Dark appearance modes. Auto follows macOS and keeps the app chrome and Ghostty terminal colors in sync. Liquid Glass chrome and terminal translucency are configurable from Settings.
+
+Developer notes and regression checks live in [docs/appearance.md](docs/appearance.md).
+
+## Upgrade & Uninstall
 
 ```bash
-brew update && brew upgrade --cask glint
+brew upgrade --cask glint
 brew uninstall --cask glint
 ```
 
-## 协议
+## License
 
-MIT — 详见 [LICENSE](LICENSE)。
+MIT - see [LICENSE](LICENSE).

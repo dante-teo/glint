@@ -70,7 +70,10 @@ final class GhosttyManager {
     private func observeColorScheme() {
         pushColorScheme()
         appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
-            self?.pushColorScheme()
+            DispatchQueue.main.async {
+                self?.pushColorScheme()
+                WorkspaceStore.current?.systemAppearanceChanged()
+            }
         }
     }
 
@@ -92,8 +95,12 @@ final class GhosttyManager {
     /// (The Metal renderer already produces an alpha IOSurface; without these
     /// AppKit signals the compositor still draws an opaque backing behind it.)
     var terminalIsTransparent: Bool {
-        let o = (UserDefaults.standard.object(forKey: "glint.terminalOpacity") as? Double) ?? 1.0
-        return o < 1.0
+        Self.terminalOpacity() < 1.0
+    }
+
+    static func terminalOpacity(defaults: UserDefaults = .standard) -> Double {
+        (defaults.object(forKey: "glint.terminalOpacity") as? Double)
+            ?? WorkspaceStore.defaultTerminalOpacity
     }
 
     /// Opaque flash-guard color for the surface/container layer in the NON
@@ -106,16 +113,40 @@ final class GhosttyManager {
         NSColor(ThemeProvider.shared.current.background)
     }
 
+    struct TerminalBackingStyle {
+        let isOpaque: Bool
+        let layerOpacity: Float
+        let backgroundColor: NSColor
+    }
+
+    static func terminalBackingStyle(terminalOpacity: Double,
+                                     backgroundColor: NSColor) -> TerminalBackingStyle {
+        let opacity = Float(max(0, min(1, terminalOpacity)))
+        let transparent = opacity < 1
+        let layerOpacity: Float = {
+            guard opacity < 0.98 else { return 1 }
+            return 1 - ((1 - opacity) * 0.25)
+        }()
+        return TerminalBackingStyle(
+            isOpaque: !transparent,
+            layerOpacity: transparent ? layerOpacity : 1,
+            backgroundColor: transparent ? .clear : backgroundColor
+        )
+    }
+
     /// Stamp the opaque/clear backing onto a layer behind (or hosting) the
-    /// terminal surface. Single implementation shared by the surface view's
-    /// IOSurfaceLayer and the pane container so the two can't diverge — clear +
-    /// non-opaque when translucent, theme-bg + opaque otherwise.
-    func applyTerminalBacking(to layer: CALayer?) {
+    /// terminal surface. Ghostty's own `background-opacity` remains the real
+    /// transparency control; the surface layer receives only a gentle host-side
+    /// fallback below 98% because applying the slider value directly makes the
+    /// entire terminal, including text, fade far too aggressively. Containers
+    /// stay alpha 1 so the surface isn't faded twice.
+    func applyTerminalBacking(to layer: CALayer?, appliesContentOpacity: Bool = true) {
         guard let layer else { return }
-        let transparent = terminalIsTransparent
-        layer.isOpaque = !transparent
-        layer.backgroundColor = transparent ? NSColor.clear.cgColor
-                                            : currentBackgroundColor.cgColor
+        let style = Self.terminalBackingStyle(terminalOpacity: Self.terminalOpacity(),
+                                              backgroundColor: currentBackgroundColor)
+        layer.isOpaque = style.isOpaque
+        layer.opacity = appliesContentOpacity ? style.layerOpacity : 1
+        layer.backgroundColor = style.backgroundColor.cgColor
     }
 
     /// Ask ghostty to install the NSVisualEffectView-backed window blur. This
@@ -124,7 +155,8 @@ final class GhosttyManager {
     /// translucent and a blur radius is set.
     func applyWindowEffects() {
         guard let app else { return }
-        let blur = (UserDefaults.standard.object(forKey: "glint.backgroundBlur") as? Double) ?? 0
+        let blur = (UserDefaults.standard.object(forKey: "glint.backgroundBlur") as? Double)
+            ?? WorkspaceStore.defaultBackgroundBlur
         guard terminalIsTransparent, blur > 0 else { return }
         for window in NSApp.windows {
             ghostty_set_window_background_blur(app, Unmanaged.passUnretained(window).toOpaque())
@@ -176,18 +208,23 @@ final class GhosttyManager {
             let v = defaults.integer(forKey: "glint.terminalScrollback")
             return v == 0 ? 10_000 : v
         }()
-        // 透明度 / 模糊(与配色正交,follow 模式也注入)。默认 1.0 / 0 = 不透明无模糊。
-        let termOpacity = (defaults.object(forKey: "glint.terminalOpacity") as? Double) ?? 1.0
-        let blurRadius = Int((((defaults.object(forKey: "glint.backgroundBlur") as? Double) ?? 0)).rounded())
+        // Transparency and blur are independent of color theme. The defaults
+        // intentionally keep both terminal and chrome translucent so Liquid
+        // Glass has real content to refract immediately on first launch.
+        let termOpacity = (defaults.object(forKey: "glint.terminalOpacity") as? Double)
+            ?? WorkspaceStore.defaultTerminalOpacity
+        let blurRadius = Int(((defaults.object(forKey: "glint.backgroundBlur") as? Double)
+                              ?? WorkspaceStore.defaultBackgroundBlur).rounded())
 
         // Note: the per-surface `viewport-top-offset` reserves an inset above
         // the grid that the renderer paints scrollback rows up into (instead
         // of the dead-padding behavior of `window-padding-y`). It's set in
         // GhosttySurfaceView.createSurface, not here, because only the
         // top-aligned pane needs the inset; split children don't.
-        // 配色来自当前主题(§3.2);cursor/selection 仍由 accentName 驱动(accent 可覆盖主题默认)。
-        // 布局(font/padding/cursor-style/scrollback)与主题正交,始终注入。
-        // follow-ghostty 主题跳过配色块 → 终端配色交回用户的 ghostty config(字体仍由 Glint 注入)。
+        // Colors come from the active theme. Cursor/selection still follow the
+        // accent setting, while layout settings are injected for every theme.
+        // follow-ghostty skips the color block so the user's Ghostty config
+        // owns terminal colors.
         let theme = ThemeProvider.shared.current
         var colorBlock = ""
         if theme.id != "follow-ghostty" {

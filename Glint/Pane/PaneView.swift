@@ -11,7 +11,8 @@ struct PaneView: View {
     /// When the terminal is translucent every SwiftUI fill behind the surface
     /// must be clear — an opaque `Theme.bgPane` here sits *between* the alpha
     /// IOSurface and the clear window and re-opacifies the pane (the original
-    /// "终端没透" bug). At full opacity we keep bgPane as a flash-guard.
+    /// "terminal isn't transparent" bug). At full opacity we keep bgPane as a
+    /// flash guard.
     private var paneBacking: Color {
         store.isTerminalTransparent ? Color.clear : Theme.bgPane
     }

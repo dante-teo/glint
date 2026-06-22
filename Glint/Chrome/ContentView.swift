@@ -54,17 +54,6 @@ struct ContentView: View {
             .overlay(alignment: .top) {
                 if floatingHeader {
                     ToolbarHeader()
-                        // Semi-transparent theme-color scrim behind the
-                        // floating islands. The fork scrolls real (sometimes
-                        // stale, dark-themed) scrollback up into the strip
-                        // under the header; without a scrim that reads as a
-                        // harsh black band on a light theme. A 0.6 theme-bg
-                        // wash pulls whatever is back there toward the current
-                        // theme while keeping a hint of see-through.
-                        .background(
-                            Theme.bgPane.opacity(0.6)
-                                .ignoresSafeArea(edges: .top)
-                        )
                 }
             }
         }
@@ -161,7 +150,7 @@ struct ToolbarHeader: View {
                         .transition(.opacity.combined(with: .move(edge: .leading)))
                 }
             }
-            .liquidGlass(enabled: floating, cornerRadius: 19, tint: Theme.glassTint)
+            .liquidGlass(enabled: floating, cornerRadius: 19, tint: Theme.glassTint, interactive: true)
             .arrowPointer()
 
             // Tabs ride in the otherwise-empty middle of the header, centered
@@ -184,9 +173,10 @@ struct ToolbarHeader: View {
             // Tahoe-style grouped toolbar cluster: the two trailing buttons
             // share one resting glass capsule (38pt tall → radius 19). Pre-26
             // or glass-off, the buttons stay bare as before.
-            .liquidGlass(enabled: store.glassEffect, cornerRadius: 19, tint: Theme.glassTint)
+            .liquidGlass(enabled: store.glassEffect, cornerRadius: 19, tint: Theme.glassTint, interactive: true)
             .arrowPointer()
         }
+        .liquidGlassGroup(enabled: store.glassEffect)
         // Traffic lights take ~78pt when sidebar is collapsed; otherwise the
         // sidebar reserves that gutter for us. In full screen there are no
         // traffic lights at all.
@@ -218,9 +208,7 @@ struct ToolbarHeader: View {
                             Theme.toolbarTint
                         }
                     } else {
-                        // Flat — slightly lighter than sidebar so toolbar
-                        // still reads as its own band.
-                        Color(red: 0.118, green: 0.118, blue: 0.149)
+                        Theme.toolbarTint.opacity(store.chromeOpacity)
                     }
                 }
             }
@@ -313,7 +301,7 @@ struct TabBar: View {
         // and radius as the leading/trailing islands, with the chip pills
         // (radius 15) concentric to the capsule's 19.
         .padding(glassCluster ? 4 : 0)
-        .liquidGlass(enabled: glassCluster, cornerRadius: 19, tint: Theme.glassTint)
+        .liquidGlass(enabled: glassCluster, cornerRadius: 19, tint: Theme.glassTint, interactive: true)
         .arrowPointer()
         .fixedSize()
         .frame(maxWidth: .infinity, maxHeight: .infinity)

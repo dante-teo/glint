@@ -40,7 +40,7 @@ struct CommandPalette: View {
             // built to refract. Glass draws its own rim light, so the manual
             // hairline stroke lives only in the fallback.
             .liquidGlass(enabled: store.glassEffect, cornerRadius: 14,
-                         tint: Theme.glassTint) {
+                         tint: Theme.glassTint, interactive: true) {
                 ZStack {
                     VisualEffectBackground(material: .menu)
                     LinearGradient(
@@ -57,6 +57,7 @@ struct CommandPalette: View {
                         .strokeBorder(Theme.overlay(0.08), lineWidth: 0.5)
                 )
             }
+            .liquidGlassGroup(enabled: store.glassEffect)
             .shadow(color: Color.black.opacity(0.5), radius: 30, y: 12)
             .padding(.top, -80) // bias slightly above center
         }

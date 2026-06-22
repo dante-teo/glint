@@ -34,7 +34,11 @@ struct GlintApp: App {
         // clears the override so macOS falls back to the user's OS-level
         // language. Any explicit choice writes into `AppleLanguages`,
         // which is what NSBundle reads to resolve localized strings.
-        let stored = UserDefaults.standard.string(forKey: "glint.preferredLanguage") ?? "system"
+        let storedRaw = UserDefaults.standard.string(forKey: "glint.preferredLanguage")
+        let stored = WorkspaceStore.normalizedPreferredLanguage(storedRaw)
+        if stored != storedRaw {
+            UserDefaults.standard.set(stored, forKey: "glint.preferredLanguage")
+        }
         if stored == "system" {
             UserDefaults.standard.removeObject(forKey: "AppleLanguages")
         } else {
@@ -49,7 +53,7 @@ struct GlintApp: App {
                 .environmentObject(updater)
                 .environmentObject(usage)
                 .frame(minWidth: 980, minHeight: 600)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(workspaceStore.appearanceMode.preferredColorScheme)
                 // Live language switching: AppleLanguages (set in init) only
                 // applies on the next launch; this env value re-resolves
                 // LocalizedStringKey lookups immediately when the user picks

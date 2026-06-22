@@ -238,8 +238,9 @@ struct SidebarView: View {
                 .foregroundStyle(Theme.text1)
                 .focused($searchFocused)
                 .overlay(alignment: .leading) {
-                    // 自绘占位符:系统 placeholder 由 tertiaryLabel 渲染,亮色下偏淡
-                    // 且不可控;用 Theme.text3 让明暗两侧都清晰。
+                    // Custom placeholder: the system tertiaryLabel color is
+                    // too faint in light mode, so Theme.text3 keeps both
+                    // appearances readable.
                     if searchText.isEmpty {
                         Text("Search")
                             .font(.system(size: 12))
@@ -299,7 +300,7 @@ struct SidebarView: View {
         .padding(.bottom, 4)
     }
 
-    /// Workspaces header with an inline "已归档" text toggle on the right
+    /// Workspaces header with an inline "Archived" text toggle on the right.
     /// when there's at least one archived workspace (variant B from the
     /// archive prototypes). Active count sits in the usual mono slot, the
     /// toggle replaces what would normally be that count when archived
@@ -591,7 +592,7 @@ private struct WorkspaceCard: View {
     /// glow, pulsing dots/borders, mascot animation) render as static states.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let ws: Workspace
-    /// When true the card renders the archived variant: same chrome, "已归档"
+    /// When true the card renders the archived variant: same chrome, "Archived"
     /// badge in the secondary row instead of tab/pane counts, no ⌘ shortcut
     /// badge, no reorder gesture, and the context menu offers Unarchive
     /// instead of Archive. Defaults to false so the active-list call sites
