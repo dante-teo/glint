@@ -1,4 +1,6 @@
 import XCTest
+import AppKit
+import ImageIO
 @testable import Glint
 
 final class MascotAssetTests: XCTestCase {
@@ -35,6 +37,46 @@ final class MascotAssetTests: XCTestCase {
 
     func testDevinFailed() {
         XCTAssertEqual(MascotAsset.devin(for: .failed), "DevinFailed")
+    }
+
+    func testDevinStatusAssetsAreAnimatedPNGs() throws {
+        let assetNames = [
+            "DevinIdle",
+            "DevinThinking",
+            "DevinToolCall",
+            "DevinCompressing",
+            "DevinNeedsPermission",
+            "DevinDone",
+            "DevinFailed",
+        ]
+
+        for assetName in assetNames {
+            let data = try XCTUnwrap(NSDataAsset(name: assetName)?.data, "\(assetName) should exist")
+            let source = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, nil), "\(assetName) should decode")
+
+            XCTAssertEqual(CGImageSourceGetType(source) as String?, "public.png")
+            XCTAssertGreaterThan(CGImageSourceGetCount(source), 1, "\(assetName) should be animated")
+            XCTAssertEqual(CGImageSourceCreateImageAtIndex(source, 0, nil)?.width, 128)
+            XCTAssertEqual(CGImageSourceCreateImageAtIndex(source, 0, nil)?.height, 128)
+        }
+    }
+
+    func testDevinMarkKeepsStaticRasterSizes() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let assetRoot = repoRoot
+            .appendingPathComponent("Glint/Resources/Assets.xcassets/DevinMark.imageset")
+
+        let oneXData = try Data(contentsOf: assetRoot.appendingPathComponent("devin24.png"))
+        let twoXData = try Data(contentsOf: assetRoot.appendingPathComponent("devin48.png"))
+        let oneX = try XCTUnwrap(NSBitmapImageRep(data: oneXData))
+        let twoX = try XCTUnwrap(NSBitmapImageRep(data: twoXData))
+
+        XCTAssertEqual(oneX.pixelsWide, 24)
+        XCTAssertEqual(oneX.pixelsHigh, 24)
+        XCTAssertEqual(twoX.pixelsWide, 48)
+        XCTAssertEqual(twoX.pixelsHigh, 48)
     }
 
     // MARK: Existing agents (regression)
