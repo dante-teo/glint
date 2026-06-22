@@ -13,13 +13,13 @@
 ### Homebrew(推荐)
 
 ```bash
-brew tap chenbstack/glint
+brew tap dante-teo/tap
 brew install --cask glint
 ```
 
 ### 手动下载
 
-从 [Releases](https://github.com/chenbstack/glint/releases) 页面下载最新的 `Glint-x.y.z.dmg`,挂载后把 `Glint.app` 拖进 `/Applications`。
+从 [Releases](https://github.com/dante-teo/glint/releases) 页面下载最新的 `Glint-x.y.z.dmg`,挂载后把 `Glint.app` 拖进 `/Applications`。
 
 如果提示"无法打开,因为无法验证开发者",在终端里跑一次:
 

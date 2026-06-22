@@ -35,11 +35,11 @@
 	<string>NSApplication</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
+	<key>SUFeedURL</key>
+	<string>https://raw.githubusercontent.com/dante-teo/glint/main/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>vtzYS/UbY0ClcdG7rowviJn9tr4BIfekEhtdcaEB35c=</string>
 	<key>SUScheduledCheckInterval</key>
 	<integer>3600</integer>
-	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/chenbstack/glint/main/appcast.xml</string>
-	<key>SUPublicEDKey</key>
-	<string>H8aS+y7VAi2SyldeYcNAHur5C4JqM4eLetjOXKYOaQc=</string>
 </dict>
 </plist>

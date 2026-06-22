@@ -1,0 +1,239 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  APP_NAME: Glint
+  BUNDLE_ID: app.glint.Glint
+  REPO: dante-teo/glint
+  TAP_REPO: dante-teo/homebrew-tap
+  SPARKLE_VERSION: 2.6.4
+  SPARKLE_SHA256: 50612a06038abc931f16011d7903b8326a362c1074dabccb718404ce8e585f0b
+
+jobs:
+  release:
+    name: Build, publish, and update Homebrew
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Install GhosttyKit
+        run: scripts/setup-ghosttykit.sh
+
+      - name: Prepare release metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          build_number="$(date -u +%Y%m%d%H%M)"
+          prerelease=false
+          if [[ "$version" == *-* ]]; then
+            prerelease=true
+          fi
+
+          {
+            echo "tag=$tag"
+            echo "version=$version"
+            echo "build_number=$build_number"
+            echo "prerelease=$prerelease"
+            echo "dmg_name=${APP_NAME}-${version}.dmg"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Stamp bundle version
+        run: |
+          set -euo pipefail
+          plutil -replace CFBundleShortVersionString -string "${{ steps.meta.outputs.version }}" Glint/Resources/Info.plist
+          plutil -replace CFBundleVersion -string "${{ steps.meta.outputs.build_number }}" Glint/Resources/Info.plist
+
+      - name: Archive app
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project Glint.xcodeproj \
+            -scheme Glint \
+            -configuration Release \
+            -destination "generic/platform=macOS" \
+            -archivePath "$RUNNER_TEMP/${APP_NAME}.xcarchive" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            SKIP_INSTALL=NO \
+            ARCHS=arm64 \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=""
+
+      - name: Copy app
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          ditto "$RUNNER_TEMP/${APP_NAME}.xcarchive/Products/Applications/${APP_NAME}.app" "dist/${APP_NAME}.app"
+
+      - name: Sign and notarize app
+        id: codesign
+        env:
+          APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_NOTARY_ID: ${{ secrets.APPLE_NOTARY_ID }}
+          APPLE_NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
+          APPLE_NOTARY_TEAM_ID: ${{ secrets.APPLE_NOTARY_TEAM_ID }}
+          BUNDLE_ID: ${{ env.BUNDLE_ID }}
+        run: |
+          set -euo pipefail
+          if [ -n "${APPLE_CERT_P12_BASE64:-}" ] \
+            && [ -n "${APPLE_CERT_PASSWORD:-}" ] \
+            && [ -n "${APPLE_NOTARY_ID:-}" ] \
+            && [ -n "${APPLE_NOTARY_PASSWORD:-}" ] \
+            && [ -n "${APPLE_NOTARY_TEAM_ID:-}" ]; then
+            scripts/sign-and-notarize.sh "dist/${APP_NAME}.app"
+            echo "mode=developer-id" >> "$GITHUB_OUTPUT"
+          else
+            codesign --force --deep --options runtime --sign - "dist/${APP_NAME}.app"
+            codesign --verify --deep --strict --verbose=2 "dist/${APP_NAME}.app"
+            echo "mode=adhoc" >> "$GITHUB_OUTPUT"
+            echo "::warning::Apple signing secrets are not configured. The DMG will be installable but not Developer ID notarized."
+          fi
+
+      - name: Create DMG
+        id: dmg
+        run: |
+          set -euo pipefail
+          dmg="dist/${{ steps.meta.outputs.dmg_name }}"
+          hdiutil create \
+            -volname "$APP_NAME" \
+            -srcfolder "dist/${APP_NAME}.app" \
+            -ov \
+            -format UDZO \
+            "$dmg"
+          sha256="$(shasum -a 256 "$dmg" | awk '{print $1}')"
+          {
+            echo "path=$dmg"
+            echo "sha256=$sha256"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install Sparkle tools
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/sparkle"
+          curl -fsSL "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz" \
+            -o "$RUNNER_TEMP/Sparkle.tar.xz"
+          actual="$(shasum -a 256 "$RUNNER_TEMP/Sparkle.tar.xz" | awk '{print $1}')"
+          if [ "$actual" != "$SPARKLE_SHA256" ]; then
+            echo "Sparkle sha256 mismatch: expected $SPARKLE_SHA256, got $actual" >&2
+            exit 1
+          fi
+          tar -xJf "$RUNNER_TEMP/Sparkle.tar.xz" -C "$RUNNER_TEMP/sparkle" --strip-components=1
+
+      - name: Sign update for Sparkle
+        id: sparkle
+        env:
+          SPARKLE_ED_PRIV_KEY: ${{ secrets.SPARKLE_ED_PRIV_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SPARKLE_ED_PRIV_KEY:-}" ]; then
+            echo "sig_line=" >> "$GITHUB_OUTPUT"
+            echo "::warning::SPARKLE_ED_PRIV_KEY is not configured. The appcast item will not include a Sparkle signature."
+            exit 0
+          fi
+          sig_line="$(printf '%s' "$SPARKLE_ED_PRIV_KEY" | "$RUNNER_TEMP/sparkle/bin/sign_update" --ed-key-file - "${{ steps.dmg.outputs.path }}")"
+          {
+            echo "sig_line<<EOF"
+            echo "$sig_line"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Update appcast
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          BUILD_NUMBER: ${{ steps.meta.outputs.build_number }}
+          DMG_PATH: ${{ steps.dmg.outputs.path }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          REPO: ${{ env.REPO }}
+          SIG_LINE: ${{ steps.sparkle.outputs.sig_line }}
+          RELEASE_NOTES_MD: ${{ runner.temp }}/release-notes.md
+        run: scripts/update-appcast.sh
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.dmg.outputs.path }}
+          body_path: ${{ runner.temp }}/release-notes.md
+          prerelease: ${{ steps.meta.outputs.prerelease }}
+
+      - name: Push appcast update
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- appcast.xml; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add appcast.xml
+          git commit -m "release: update appcast for ${{ steps.meta.outputs.tag }}"
+          git push origin "HEAD:main"
+
+      - name: Update Homebrew cask
+        if: ${{ steps.meta.outputs.prerelease == 'false' }}
+        env:
+          HOMEBREW_TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          SHA256: ${{ steps.dmg.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${HOMEBREW_TAP_DEPLOY_KEY:-}" ]; then
+            echo "::warning::HOMEBREW_TAP_DEPLOY_KEY is not configured. Skipped Homebrew cask update."
+            exit 0
+          fi
+
+          eval "$(ssh-agent -s)"
+          ssh-add - <<< "$HOMEBREW_TAP_DEPLOY_KEY"
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+          git clone "git@github.com:${TAP_REPO}.git" "$RUNNER_TEMP/homebrew-tap"
+          cd "$RUNNER_TEMP/homebrew-tap"
+          mkdir -p Casks
+          cat > Casks/glint.rb <<RUBY
+          cask "glint" do
+            version "$VERSION"
+            sha256 "$SHA256"
+
+            url "https://github.com/dante-teo/glint/releases/download/v#{version}/Glint-#{version}.dmg"
+            name "Glint"
+            desc "Polished macOS terminal for AI agents"
+            homepage "https://github.com/dante-teo/glint"
+
+            auto_updates true
+            depends_on arch: :arm64
+            depends_on macos: ">= :sonoma"
+
+            app "Glint.app"
+
+            zap trash: [
+              "~/Library/Application Support/Glint",
+              "~/Library/Preferences/app.glint.Glint.plist",
+            ]
+          end
+          RUBY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/glint.rb
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "glint $VERSION"
+          git push origin HEAD:main

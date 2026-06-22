@@ -12,6 +12,7 @@ xcuserdata/
 # Swift Package Manager
 .build/
 Package.resolved
+!Glint.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 .swiftpm/
 
 # Build output of scripts/setup-ghosttykit.sh (zig builds it from the
@@ -35,6 +36,9 @@ dist/
 sparkle_priv.key
 .sparkle/
 
+# Local release credentials — NEVER commit
+.secrets/
+
 # Design exploration sandbox — local-only mockups, not part of the repo
 design/
 _design/
@@ -43,6 +47,7 @@ _design/
 # Local-only docs drafts (proposals, integration notes). Already-tracked
 # docs like external-pane-control.md are unaffected — ignore never untracks.
 docs/*.md
+!docs/releasing.md
 
 # Local-only marketing / social assets (cover shots, WeChat & 小红书 cards).
 # Generated for promo, not part of the app or release.

@@ -2,7 +2,7 @@
 # Generate (or reuse) a Sparkle EdDSA keypair for Glint and wire it up:
 #   * write the public key into Glint/Resources/Info.plist as SUPublicEDKey
 #   * export the private key and offer to upload it to the
-#     SPARKLE_ED_PRIV_KEY GitHub secret on chenbstack/glint, so the release
+#     SPARKLE_ED_PRIV_KEY GitHub secret on dante-teo/glint, so the release
 #     workflow can sign update DMGs.
 #
 # The private key is stored in the macOS login Keychain by `generate_keys`
@@ -31,9 +31,10 @@ fi
 SPARKLE_DIR="$ROOT/.sparkle"
 GEN_KEYS="$SPARKLE_DIR/bin/generate_keys"
 INFO_PLIST="Glint/Resources/Info.plist"
-REPO="${SPARKLE_REPO:-chenbstack/glint}"
-PRIV_TMP="$(mktemp -t sparkle-priv.XXXXXX)"
-trap 'rm -f "$PRIV_TMP"' EXIT
+REPO="${SPARKLE_REPO:-dante-teo/glint}"
+PRIV_TMP_DIR="$(mktemp -d -t sparkle-priv.XXXXXX)"
+PRIV_TMP="$PRIV_TMP_DIR/sparkle_priv.key"
+trap 'rm -rf "$PRIV_TMP_DIR"' EXIT
 
 # 1. Fetch Sparkle's tools if missing. Download to a temp file and verify
 # the pinned sha256 before extracting — never stream untrusted bytes
@@ -41,7 +42,7 @@ trap 'rm -f "$PRIV_TMP"' EXIT
 if [ ! -x "$GEN_KEYS" ]; then
   echo "Downloading Sparkle ${SPARKLE_VERSION}..."
   SPARKLE_TARBALL="$(mktemp -t sparkle-dist.XXXXXX)"
-  trap 'rm -f "$PRIV_TMP" "$SPARKLE_TARBALL"' EXIT
+  trap 'rm -rf "$PRIV_TMP_DIR"; rm -f "$SPARKLE_TARBALL"' EXIT
   curl -fsSL "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz" \
     -o "$SPARKLE_TARBALL"
   ACTUAL_SHA256="$(shasum -a 256 "$SPARKLE_TARBALL" | awk '{print $1}')"
@@ -94,11 +95,11 @@ if command -v gh >/dev/null 2>&1; then
     echo "Uploaded SPARKLE_ED_PRIV_KEY."
   else
     echo "Skipped. To upload later:"
-    echo "  gh secret set SPARKLE_ED_PRIV_KEY --repo $REPO < <(this script with --print-priv)"
+    echo "  Re-run this script and answer y, or export the private key with Sparkle's generate_keys tool."
   fi
 else
   echo "gh CLI not on PATH — cannot push secret automatically."
-  echo "Set it manually: chenbstack/glint → Settings → Secrets → SPARKLE_ED_PRIV_KEY"
+  echo "Set it manually: dante-teo/glint → Settings → Secrets → SPARKLE_ED_PRIV_KEY"
 fi
 
 echo
