@@ -20,6 +20,37 @@ private func setPosixPermissions(_ mode: Int, atPath path: String) {
     try? FileManager.default.setAttributes([.posixPermissions: mode], ofItemAtPath: path)
 }
 
+/// Strip Glint-owned hook entries (recognised by `glint-report.sh` in the
+/// command) from events that are NOT in `currentEvents`. Returns the cleaned
+/// hooks dict and whether any changes were made. Shared by Claude, Codex,
+/// and Devin merge functions so stale hooks from previous Glint versions
+/// (e.g. StopFailure removed in v0.1.26) don't linger across upgrades.
+/// User-authored hooks under the same event key are preserved.
+private func hooksStrippingStaleEntries(
+    _ hooks: [String: Any],
+    currentEvents: Set<String>
+) -> (cleaned: [String: Any], changed: Bool) {
+    var hooks = hooks
+    var changed = false
+    for (event, bucket) in hooks where !currentEvents.contains(event) {
+        guard let arr = bucket as? [Any] else { continue }
+        let filtered = arr.filter { entry in
+            guard let group = entry as? [String: Any],
+                  let inner = group["hooks"] as? [[String: Any]] else { return true }
+            return !inner.contains { ($0["command"] as? String)?.contains("glint-report.sh") == true }
+        }
+        if filtered.count != arr.count {
+            changed = true
+            if filtered.isEmpty {
+                hooks.removeValue(forKey: event)
+            } else {
+                hooks[event] = filtered
+            }
+        }
+    }
+    return (hooks, changed)
+}
+
 /// Best-effort detection of whether a CLI agent is actually present on this
 /// Mac. Used to avoid offering (or auto-installing) hooks for agents the
 /// user doesn't have. We trust the agent's config/state directory first —
@@ -247,7 +278,7 @@ enum AgentHookInstaller {
                 return !inner.contains { ($0["command"] as? String)?.contains("glint-report.sh") == true }
             }
             let ours: [String: Any] = [
-                "matcher": "*",
+                "matcher": "",
                 "hooks": [[
                     "type": "command",
                     "command": "\(scriptPath) \(event)",
@@ -259,6 +290,11 @@ enum AgentHookInstaller {
                 changed = true
             }
         }
+
+        let (cleaned, staleChanged) = hooksStrippingStaleEntries(
+            hooks, currentEvents: Set(hookEvents)
+        )
+        if staleChanged { hooks = cleaned; changed = true }
 
         if !changed { return }
 
@@ -358,7 +394,7 @@ enum AgentHookInstaller {
 ///     {
 ///       "hooks": {
 ///         "<EventName>": [
-///           { "matcher": "*", "hooks": [{ "type": "command", "command": "…" }] }
+///           { "matcher": "", "hooks": [{ "type": "command", "command": "…" }] }
 ///         ]
 ///       }
 ///     }
@@ -503,7 +539,7 @@ enum CodexHookInstaller {
                 return !inner.contains { ($0["command"] as? String)?.contains("glint-report.sh") == true }
             }
             let ours: [String: Any] = [
-                "matcher": "*",
+                "matcher": "",
                 "hooks": [[
                     "type": "command",
                     "command": "\(scriptPath) \(event) codex",
@@ -515,6 +551,11 @@ enum CodexHookInstaller {
                 changed = true
             }
         }
+
+        let (cleaned, staleChanged) = hooksStrippingStaleEntries(
+            hooks, currentEvents: Set(hookEvents)
+        )
+        if staleChanged { hooks = cleaned; changed = true }
 
         if !changed { return }
         root["hooks"] = hooks
@@ -937,9 +978,10 @@ enum ShellKeybindInstaller {
 /// Unlike Claude/Codex, Devin's config file may contain non-hook keys
 /// (`version`, `agent`, `permissions`, …) which must be preserved.
 enum DevinHookInstaller {
-    /// Events Glint reacts to. Subset of Devin's supported lifecycle hooks
-    /// (differs from Claude/Codex — Devin lacks StopFailure, PreCompact).
-    private static let hookEvents: [String] = [
+    /// Events Glint reacts to. Subset of Devin's supported lifecycle hooks.
+    /// Differs from Claude/Codex: Devin lacks StopFailure and PreCompact,
+    /// but adds SessionEnd and PostCompaction.
+    static let hookEvents: [String] = [
         "SessionStart",
         "SessionEnd",
         "UserPromptSubmit",
@@ -949,6 +991,15 @@ enum DevinHookInstaller {
         "PostCompaction",
         "Stop",
     ]
+
+    /// Thin wrapper around the file-level `hooksStrippingStaleEntries` so
+    /// tests can call it via `DevinHookInstaller.hooksStrippingStaleEvents`.
+    static func hooksStrippingStaleEvents(
+        _ hooks: [String: Any],
+        currentEvents: Set<String>
+    ) -> (cleaned: [String: Any], changed: Bool) {
+        hooksStrippingStaleEntries(hooks, currentEvents: currentEvents)
+    }
 
     static func isInstalled() -> Bool {
         let url = FileManager.default.homeDirectoryForCurrentUser
@@ -1069,7 +1120,7 @@ enum DevinHookInstaller {
                 return !inner.contains { ($0["command"] as? String)?.contains("glint-report.sh") == true }
             }
             let ours: [String: Any] = [
-                "matcher": "*",
+                "matcher": "",
                 "hooks": [[
                     "type": "command",
                     "command": "\(scriptPath) \(event) devin",
@@ -1081,6 +1132,11 @@ enum DevinHookInstaller {
                 changed = true
             }
         }
+
+        let (cleaned, staleChanged) = hooksStrippingStaleEntries(
+            hooks, currentEvents: Set(hookEvents)
+        )
+        if staleChanged { hooks = cleaned; changed = true }
 
         if !changed { return }
         root["hooks"] = hooks
