@@ -403,12 +403,33 @@ final class WorkspaceStore: ObservableObject {
         sidebarSearchFocusTick &+= 1
     }
 
-    /// Preferred UI language identifier. `"system"` follows the OS; any
-    /// other value is a BCP-47 tag (e.g. `"en"`, `"zh-Hans"`). Persists
-    /// across launches via UserDefaults so the choice survives quits.
-    @Published var preferredLanguage: String = UserDefaults.standard.string(forKey: "glint.preferredLanguage") ?? "system" {
+    /// Preferred UI language identifier. `"system"` follows the OS; `"en"`
+    /// forces English. Persists across launches via UserDefaults.
+    @Published var preferredLanguage: String =
+        WorkspaceStore.normalizedPreferredLanguage(UserDefaults.standard.string(forKey: "glint.preferredLanguage")) {
         didSet {
+            let normalized = Self.normalizedPreferredLanguage(preferredLanguage)
+            if normalized != preferredLanguage {
+                preferredLanguage = normalized
+                return
+            }
             UserDefaults.standard.set(preferredLanguage, forKey: "glint.preferredLanguage")
+        }
+    }
+
+    nonisolated static let languageOptions: [(value: String, label: String)] = [
+        (value: "system", label: "Follow system"),
+        (value: "en", label: "English"),
+    ]
+
+    nonisolated static func normalizedPreferredLanguage(_ value: String?) -> String {
+        switch value {
+        case "en":
+            return "en"
+        case "system":
+            return "system"
+        default:
+            return "system"
         }
     }
 
@@ -505,26 +526,42 @@ final class WorkspaceStore: ObservableObject {
 
     var accent: Color { Theme.accent(named: accentName) }
 
-    /// 当前主题 id(见 GlintTheme/ThemeRegistry)。改变时:持久化 → 更新 ThemeProvider
-    /// → 重注入 ghostty 终端配色 → bump themeRevision 触发 chrome 刷新。默认 glint-dark。
-    @Published var themeName: String = UserDefaults.standard.string(forKey: "glint.themeName") ?? "glint-dark" {
+    @Published var appearanceMode: AppAppearanceMode = {
+        let raw = UserDefaults.standard.string(forKey: "glint.appearanceMode") ?? ""
+        return AppAppearanceMode(rawValue: raw) ?? .system
+    }() {
         didSet {
-            UserDefaults.standard.set(themeName, forKey: "glint.themeName")
-            ThemeProvider.shared.current = ThemeRegistry.theme(id: themeName)
-            GhosttyManager.shared.reloadConfig()
-            GhosttyManager.shared.syncWindowAppearance()   // 浅/暗主题 → 玻璃材质跟随
-            themeRevision &+= 1
+            UserDefaults.standard.set(appearanceMode.rawValue, forKey: "glint.appearanceMode")
+            applyResolvedTheme()
         }
     }
 
-    /// 单调计数器,主题切换时 bump。chrome 根容器依赖它来强制整树重新求值——因为
-    /// Theme.xxx 是 computed,SwiftUI 不会自动感知 ThemeProvider 内部的变化。
+    @Published var themeName: String = UserDefaults.standard.string(forKey: "glint.themeName") ?? "glint-dark" {
+        didSet {
+            UserDefaults.standard.set(themeName, forKey: "glint.themeName")
+            applyResolvedTheme()
+        }
+    }
+
+    /// Incremented when computed theme colors need SwiftUI views to refresh.
     @Published var themeRevision: Int = 0
 
-    /// 临时套用某主题做「实时预览」——**不写 UserDefaults、不改 themeName**,只动
-    /// ThemeProvider.current + 重注入终端 + bump 刷新 chrome。主题浏览器用方向键/hover
-    /// 扫过列表时调它,让整窗即时变样;关闭时若未确认,用 `previewTheme(id: themeName)`
-    /// 还原回已确认的真值即可(themeName 全程没被动过)。
+    func applyResolvedTheme() {
+        ThemeProvider.shared.update(themeID: themeName, mode: appearanceMode, systemIsDark: Self.systemAppearanceIsDark)
+        GhosttyManager.shared.reloadConfig()
+        GhosttyManager.shared.syncWindowAppearance()
+        themeRevision &+= 1
+    }
+
+    func systemAppearanceChanged() {
+        guard appearanceMode == .system else { return }
+        applyResolvedTheme()
+    }
+
+    static var systemAppearanceIsDark: Bool {
+        (NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) ?? .aqua) == .darkAqua
+    }
+
     func previewTheme(id: String) {
         ThemeProvider.shared.current = ThemeRegistry.theme(id: id)
         GhosttyManager.shared.reloadConfig()
@@ -532,40 +569,37 @@ final class WorkspaceStore: ObservableObject {
         themeRevision &+= 1
     }
 
-    // MARK: 透明度与模糊
-    //
-    // 终端区和 chrome(侧栏/工具栏)各一条透明度,可分开调:让桌面从背后透出。
-    // 窗口本身已是 isOpaque=false(AppDelegate),所以这里只需让各背景层带上 opacity,
-    // 并给 ghostty 注入 background-opacity / background-blur。默认全 1.0 / 0 = 现状不变。
+    func restoreResolvedTheme() {
+        applyResolvedTheme()
+    }
 
-    /// 终端区透明度(ghostty 背景 + 终端 pane 的 Glint 兜底背景)。0.3…1.0。
+    // MARK: Transparency and blur
+
+    nonisolated static let defaultTerminalOpacity: Double = 0.90
+    nonisolated static let defaultChromeOpacity: Double = 0.72
+    nonisolated static let defaultBackgroundBlur: Double = 24
+
     @Published var terminalOpacity: Double =
-        (UserDefaults.standard.object(forKey: "glint.terminalOpacity") as? Double) ?? 1.0 {
+        (UserDefaults.standard.object(forKey: "glint.terminalOpacity") as? Double) ?? WorkspaceStore.defaultTerminalOpacity {
         didSet {
             UserDefaults.standard.set(terminalOpacity, forKey: "glint.terminalOpacity")
-            GhosttyManager.shared.reloadConfig()   // 重注入 background-opacity
-            themeRevision &+= 1                     // 刷新 Glint 终端背景层
+            GhosttyManager.shared.reloadConfig()
+            themeRevision &+= 1
         }
     }
 
-    /// 终端是否透明(opacity < 1)。SwiftUI 侧的单一判定来源 —— 视图不再各自
-    /// 内联 `terminalOpacity < 1.0`。AppKit 侧(GhosttySurfaceView / 容器层)走
-    /// `GhosttyManager.terminalIsTransparent`,两者都以「opacity < 1」为唯一阈值,
-    /// 且都最终从已写入的 `glint.terminalOpacity` 派生,稳态下恒一致。
     var isTerminalTransparent: Bool { terminalOpacity < 1.0 }
 
-    /// 侧栏 / 工具栏透明度。0.3…1.0。不动 ghostty,只刷新 chrome 背景层。
     @Published var chromeOpacity: Double =
-        (UserDefaults.standard.object(forKey: "glint.chromeOpacity") as? Double) ?? 1.0 {
+        (UserDefaults.standard.object(forKey: "glint.chromeOpacity") as? Double) ?? WorkspaceStore.defaultChromeOpacity {
         didSet {
             UserDefaults.standard.set(chromeOpacity, forKey: "glint.chromeOpacity")
             themeRevision &+= 1
         }
     }
 
-    /// 背景模糊半径(ghostty background-blur)。0 = 关。把透出的桌面磨砂虚化。
     @Published var backgroundBlur: Double =
-        (UserDefaults.standard.object(forKey: "glint.backgroundBlur") as? Double) ?? 0 {
+        (UserDefaults.standard.object(forKey: "glint.backgroundBlur") as? Double) ?? WorkspaceStore.defaultBackgroundBlur {
         didSet {
             UserDefaults.standard.set(backgroundBlur, forKey: "glint.backgroundBlur")
             GhosttyManager.shared.reloadConfig()
@@ -945,6 +979,7 @@ final class WorkspaceStore: ObservableObject {
         }
         self.sidebarCollapsed = loaded.sidebarCollapsed
         Self.current = self
+        applyResolvedTheme()
 
         // Debounced autosave: any @Published change → save 0.5s later.
         saveCancellable = objectWillChange
@@ -2208,16 +2243,16 @@ enum AppIconPreset: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .default: return "默认"
-        case .sunrise: return "日出"
-        case .classic: return "经典"
-        case .aurora: return "极光"
-        case .arctic: return "极地"
-        case .steel: return "钢蓝"
-        case .ultraviolet: return "紫罗兰"
-        case .jade: return "翡翠"
-        case .ember: return "余烬"
-        case .graphite: return "石墨"
+        case .default: return "Default"
+        case .sunrise: return "Sunrise"
+        case .classic: return "Classic"
+        case .aurora: return "Aurora"
+        case .arctic: return "Arctic"
+        case .steel: return "Steel"
+        case .ultraviolet: return "Ultraviolet"
+        case .jade: return "Jade"
+        case .ember: return "Ember"
+        case .graphite: return "Graphite"
         }
     }
 }

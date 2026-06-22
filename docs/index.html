@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Glint · 为 vibe coding 而生的 macOS 终端</title>
-<meta name="description" content="一个人,指挥一队 AI。Glint 是为 vibe coding 打造的精致 macOS 终端,底层基于 Ghostty,侧边栏一眼看清每个 AI 代理:谁在跑、谁等你、谁跑完了。">
+<title>Glint · a macOS terminal built for vibe coding</title>
+<meta name="description" content="One person, a whole crew of AI. Glint is a refined macOS terminal built for vibe coding, powered by Ghostty, with a sidebar that shows which agents are running, waiting, or done.">
 <link rel="icon" href="./glint-logo.png">
-<meta property="og:title" content="Glint · 一个人,指挥一队 AI">
-<meta property="og:description" content="为 vibe coding 而生的精致 macOS 终端,底层基于 Ghostty。">
+<meta property="og:title" content="Glint · one person, a whole crew of AI">
+<meta property="og:description" content="A refined macOS terminal built for vibe coding, powered by Ghostty.">
 <meta property="og:image" content="./screenshot.png">
 <style>
   :root{
@@ -21,7 +21,7 @@
     --panel:rgba(255,255,255,.03);
     --amber:#FFBD2E; --red:#FF5E57; --green:#29C740; --cyan:#43B8DB;
     --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace;
-    --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI",sans-serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
   html{scroll-behavior:smooth;}
@@ -57,12 +57,6 @@
     color:#fff;font-weight:600;font-size:14px;border-radius:10px;padding:9px 16px;
     box-shadow:0 6px 20px rgba(124,108,240,.35);transition:transform .15s,box-shadow .15s;}
   .cta:hover{transform:translateY(-1px);box-shadow:0 10px 28px rgba(124,108,240,.5);}
-  .lang{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;
-    font-size:12.5px;font-family:var(--mono);}
-  .lang button{background:transparent;color:var(--ink-3);border:0;padding:7px 10px;cursor:pointer;transition:.15s;}
-  .lang button:hover{color:var(--ink-2);}
-  .lang button.on{background:rgba(124,108,240,.16);color:var(--ink);}
-
   /* ---------- hero ---------- */
   header{padding:86px 0 30px;text-align:center;}
   .eyebrow{display:inline-block;color:var(--accent);font-weight:700;font-size:13px;
@@ -240,46 +234,43 @@
   <div class="wrap">
     <a class="brand" href="#top"><img src="./glint-logo.png" alt="Glint">Glint</a>
     <div class="links">
-      <a href="#features" data-i18n="nav_features">功能</a>
-      <a href="#stats" data-i18n="nav_stats">数据</a>
-      <a href="#install" data-i18n="nav_download">下载</a>
+      <a href="#features" data-i18n="nav_features">Features</a>
+      <a href="#stats" data-i18n="nav_stats">Stats</a>
+      <a href="#install" data-i18n="nav_download">Download</a>
     </div>
     <div class="right">
-      <div class="lang" role="group" aria-label="language">
-        <button data-lang="zh">中</button><button data-lang="en">EN</button>
-      </div>
       <a class="ghbtn" href="https://github.com/chenbstack/glint" target="_blank" rel="noopener">
         <span class="star">★</span><span>Star</span><b id="nav-stars">35</b>
       </a>
-      <a class="cta" href="#install" data-i18n="cta">下载</a>
+      <a class="cta" href="#install" data-i18n="cta">Download</a>
     </div>
   </div>
 </nav>
 
 <header id="top">
   <div class="wrap">
-    <span class="eyebrow" data-i18n="eyebrow">VIBE CODING · 多 AGENT 工作流</span>
-    <h1><span data-i18n="h1_a">一个人,</span><br><span class="grad" data-i18n="h1_b">指挥一队 AI</span></h1>
-    <p class="sub" data-i18n="sub">为 vibe coding 而生的精致 macOS 终端。底层基于 Ghostty,侧边栏一眼看清每个 AI 代理 —— 谁在跑、谁等你、谁跑完了。</p>
+    <span class="eyebrow" data-i18n="eyebrow">VIBE CODING · MULTI-AGENT WORKFLOW</span>
+    <h1><span data-i18n="h1_a">One person,</span><br><span class="grad" data-i18n="h1_b">a whole crew of AI</span></h1>
+    <p class="sub" data-i18n="sub">A refined macOS terminal built for vibe coding. Powered by Ghostty, the sidebar shows every AI agent at a glance: who is running, who needs you, and who is done.</p>
     <div class="actions">
-      <a class="btn-lg btn-primary" href="#install" data-i18n="dl_macos">↓ 下载 for macOS</a>
-      <a class="btn-lg btn-ghost" href="https://github.com/chenbstack/glint" target="_blank" rel="noopener" data-i18n="view_gh">在 GitHub 上查看</a>
+      <a class="btn-lg btn-primary" href="#install" data-i18n="dl_macos">↓ Download for macOS</a>
+      <a class="btn-lg btn-ghost" href="https://github.com/chenbstack/glint" target="_blank" rel="noopener" data-i18n="view_gh">View on GitHub</a>
     </div>
     <div class="hero-meta">
       <span class="pill"><span class="star" style="color:var(--amber)">★</span> <b id="hero-stars">35</b> stars</span>
-      <span class="pill">↓ <b id="hero-downloads">234</b> <span data-i18n="pill_dl">次下载</span></span>
-      <span class="pill"><span data-i18n="pill_latest">最新稳定版</span> <b id="hero-version">v0.1.21</b></span>
-      <span class="pill" data-i18n="pill_mit">MIT 开源</span>
+      <span class="pill">↓ <b id="hero-downloads">234</b> <span data-i18n="pill_dl">downloads</span></span>
+      <span class="pill"><span data-i18n="pill_latest">Latest stable</span> <b id="hero-version">v0.1.21</b></span>
+      <span class="pill" data-i18n="pill_mit">MIT licensed</span>
     </div>
 
     <div class="shotwrap">
-      <img class="shot" src="./screenshot.png" alt="Glint 主界面截图">
+      <img class="shot" src="./screenshot.png" alt="Glint main interface screenshot">
     </div>
     <div class="dots-legend">
-      <span><i style="color:var(--amber)"></i><span data-i18n="legend_run">运行中</span></span>
-      <span><i style="color:var(--red)"></i><span data-i18n="legend_perm">等待批准</span></span>
-      <span><i style="color:var(--green)"></i><span data-i18n="legend_done">已完成</span></span>
-      <span><i style="color:var(--cyan)"></i><span data-i18n="legend_idle">空闲</span></span>
+      <span><i style="color:var(--amber)"></i><span data-i18n="legend_run">Running</span></span>
+      <span><i style="color:var(--red)"></i><span data-i18n="legend_perm">Needs approval</span></span>
+      <span><i style="color:var(--green)"></i><span data-i18n="legend_done">Done</span></span>
+      <span><i style="color:var(--cyan)"></i><span data-i18n="legend_idle">Idle</span></span>
     </div>
   </div>
 </header>
@@ -295,22 +286,22 @@
       </div>
       <div class="stat">
         <div class="num" id="s-downloads" data-target="234">—</div>
-        <div class="lbl" data-i18n="stat_total">累计下载</div>
-        <div class="sub" data-i18n="stat_total_sub">手动 + 自动更新 + brew</div>
+        <div class="lbl" data-i18n="stat_total">Total downloads</div>
+        <div class="sub" data-i18n="stat_total_sub">manual + auto-update + brew</div>
       </div>
       <div class="stat">
         <div class="num" id="s-latest" data-target="64">—</div>
-        <div class="lbl" data-i18n="stat_latest">最新稳定版下载</div>
+        <div class="lbl" data-i18n="stat_latest">Latest stable downloads</div>
         <div class="sub" id="s-latest-ver">v0.1.21</div>
       </div>
       <div class="stat">
         <div class="num" id="s-beta" data-target="13">—</div>
-        <div class="lbl" data-i18n="stat_beta">Beta 通道(峰值)</div>
-        <div class="sub" id="s-beta-sub" data-i18n="stat_beta_sub">最高单版 ≈ 通道人数</div>
+        <div class="lbl" data-i18n="stat_beta">Beta channel (peak)</div>
+        <div class="sub" id="s-beta-sub" data-i18n="stat_beta_sub">peak single build ~= channel size</div>
       </div>
     </div>
     <div class="beta-break" id="beta-break">
-      <div class="bh"><span data-i18n="beta_hd_1">测试版分布 · </span><b id="beta-break-ver">v0.1.21</b><span style="color:var(--ink-3)" data-i18n="beta_hd_2"> 之后各 beta 下载数 · 取峰值 ≈ beta 通道人数(求和会重复计同一人)</span></div>
+      <div class="bh"><span data-i18n="beta_hd_1">Beta breakdown · downloads per beta after </span><b id="beta-break-ver">v0.1.21</b><span style="color:var(--ink-3)" data-i18n="beta_hd_2"> · peak ~= beta channel size (summing double-counts the same user)</span></div>
       <div id="beta-rows"></div>
     </div>
     <div class="live">
@@ -324,11 +315,11 @@
 <section class="history" id="history">
   <div class="wrap">
     <div class="sec-head">
-      <h2 data-i18n="hist_hd">历史稳定版下载</h2>
-      <p data-i18n="hist_sub">采用趋势 + 下载量榜单。</p>
+      <h2 data-i18n="hist_hd">Stable release downloads</h2>
+      <p data-i18n="hist_sub">Adoption trend + download leaderboard.</p>
     </div>
     <div class="trend">
-      <div class="trend-cap"><span data-i18n="hist_trend">采用趋势 · 旧 → 新</span></div>
+      <div class="trend-cap"><span data-i18n="hist_trend">Adoption · old to new</span></div>
       <div id="trend-svg" class="trend-svg"></div>
       <div class="trend-axis"><span id="trend-old"></span><span id="trend-new"></span></div>
       <div id="trend-tip" class="trend-tip"></div>
@@ -341,55 +332,55 @@
 <section class="feat" id="features">
   <div class="wrap">
     <div class="sec-head">
-      <h2 data-i18n="feat_hd">为「多开党」设计的终端</h2>
-      <p data-i18n="feat_sub">一个 workspace 里同时跑 Claude、Codex、OpenCode、Devin,分屏、多 tab,谁也不抢谁的注意力。</p>
+      <h2 data-i18n="feat_hd">A terminal for power multitaskers</h2>
+      <p data-i18n="feat_sub">Run Claude, Codex, OpenCode and Devin in one workspace: split panes, tabs, none stealing your attention.</p>
     </div>
     <div class="cards">
       <div class="card">
         <div class="ic">🎯</div>
-        <h3 data-i18n="f1_h">per-pane 状态一览</h3>
-        <p data-i18n="f1_p">每个 pane 的 AI 代理在干什么,状态点 + 悬浮明细一眼看清,不用逐个切过去问。</p>
+        <h3 data-i18n="f1_h">Per-pane status at a glance</h3>
+        <p data-i18n="f1_p">See what each pane's agent is doing with status dots and hover details, no switching around to check.</p>
       </div>
       <div class="card">
         <div class="ic">⚡️</div>
-        <h3 data-i18n="f2_h">多 agent 并行</h3>
-        <p data-i18n="f2_p">左边 Claude、右边 Codex、另一个 tab 跑 OpenCode 或 Devin,各自独立会话互不打扰。</p>
+        <h3 data-i18n="f2_h">Multiple agents in parallel</h3>
+        <p data-i18n="f2_p">Claude on the left, Codex on the right, OpenCode or Devin in another tab: independent sessions, no crosstalk.</p>
       </div>
       <div class="card">
         <div class="ic">🪟</div>
-        <h3 data-i18n="f3_h">分屏 · 多标签</h3>
-        <p data-i18n="f3_p">workspace-global 的 pane 模型,⌘T 开标签、随手分屏,布局怎么切 key 都不变。</p>
+        <h3 data-i18n="f3_h">Splits and tabs</h3>
+        <p data-i18n="f3_p">A workspace-global pane model: Cmd-T for tabs, split anytime, keys stay stable however you rearrange.</p>
       </div>
       <div class="card">
         <div class="ic">✨</div>
-        <h3 data-i18n="f4_h">Liquid Glass 头部</h3>
-        <p data-i18n="f4_p">macOS 26 玻璃浮岛 header,终端内容顶到顶部,质感拉满。</p>
+        <h3 data-i18n="f4_h">Liquid Glass header</h3>
+        <p data-i18n="f4_p">A macOS 26 floating glass header with terminal content running right to the top.</p>
       </div>
       <div class="card">
         <div class="ic">🚀</div>
-        <h3 data-i18n="f5_h">基于 Ghostty</h3>
-        <p data-i18n="f5_p">底层用 Ghostty 渲染,SwiftUI + AppKit 重写交互,快且原生。</p>
+        <h3 data-i18n="f5_h">Built on Ghostty</h3>
+        <p data-i18n="f5_p">Ghostty under the hood, interaction rewritten in SwiftUI + AppKit: fast and native.</p>
       </div>
       <div class="card">
         <div class="ic">🔄</div>
-        <h3 data-i18n="f6_h">Sparkle 自动更新</h3>
-        <p data-i18n="f6_p">新版本静默推送、一键升级,brew cask 也能跟上。</p>
+        <h3 data-i18n="f6_h">Sparkle auto-update</h3>
+        <p data-i18n="f6_p">New versions pushed silently, one-click upgrade, and the brew cask keeps up too.</p>
       </div>
     </div>
 
     <div class="showcase">
       <div class="panel">
-        <img src="./screenshot-sidebar.png" alt="侧边栏工作区状态">
+        <img src="./screenshot-sidebar.png" alt="Sidebar workspace status">
         <div class="cap">
-          <h3 data-i18n="sc1_h">侧边栏:谁在跑 · 谁等你 · 谁跑完了</h3>
-          <p data-i18n="sc1_p">每个工作区显示当前代理、状态与已用时长,红点等批准、绿勾已完成。</p>
+          <h3 data-i18n="sc1_h">Sidebar: who is running, who needs you, who is done</h3>
+          <p data-i18n="sc1_p">Each workspace shows its agent, status and elapsed time: red dot waiting for approval, green check done.</p>
         </div>
       </div>
       <div class="panel">
-        <img src="./screenshot.png" alt="分屏多代理">
+        <img src="./screenshot.png" alt="Split panes with multiple agents">
         <div class="cap">
-          <h3 data-i18n="sc2_h">分屏里跑多个代理</h3>
-          <p data-i18n="sc2_p">同一个工作区左右分屏,两个 AI 各跑各的,状态实时汇总到 tab 与侧边栏。</p>
+          <h3 data-i18n="sc2_h">Many agents in one split</h3>
+          <p data-i18n="sc2_p">Split a workspace left and right, two AIs each doing their thing, status rolled up live to the tab and sidebar.</p>
         </div>
       </div>
     </div>
@@ -400,8 +391,8 @@
 <section class="install" id="install">
   <div class="wrap">
     <div class="sec-head">
-      <h2 data-i18n="inst_hd">装上它</h2>
-      <p data-i18n="inst_sub">Homebrew 一行装好,或直接下载 DMG。macOS 专属。</p>
+      <h2 data-i18n="inst_hd">Get it</h2>
+      <p data-i18n="inst_sub">One line with Homebrew, or grab the DMG. macOS only.</p>
     </div>
     <div class="term">
       <div class="bar">
@@ -411,22 +402,22 @@
       <div class="body">
         <div class="cmd">
           <code><span class="c">brew</span> tap chenbstack/glint</code>
-          <button class="copy" data-cmd="brew tap chenbstack/glint" data-i18n="copy">复制</button>
+          <button class="copy" data-cmd="brew tap chenbstack/glint" data-i18n="copy">Copy</button>
         </div>
         <div class="cmd">
           <code><span class="c">brew</span> install --cask glint</code>
-          <button class="copy" data-cmd="brew install --cask glint" data-i18n="copy">复制</button>
+          <button class="copy" data-cmd="brew install --cask glint" data-i18n="copy">Copy</button>
         </div>
         <div class="cmd">
-          <code class="m" data-i18n="term_upgrade"># 升级</code>
+          <code class="m" data-i18n="term_upgrade"># upgrade</code>
         </div>
         <div class="cmd">
           <code><span class="c">brew</span> upgrade --cask glint</code>
-          <button class="copy" data-cmd="brew update && brew upgrade --cask glint" data-i18n="copy">复制</button>
+          <button class="copy" data-cmd="brew update && brew upgrade --cask glint" data-i18n="copy">Copy</button>
         </div>
       </div>
     </div>
-    <p class="alt"><span data-i18n="alt_pre">不想用 Homebrew?</span><a id="dmg-link" href="https://github.com/chenbstack/glint/releases/latest" target="_blank" rel="noopener" data-i18n="alt_link">直接下载最新 DMG →</a></p>
+    <p class="alt"><span data-i18n="alt_pre">Prefer not to use Homebrew? </span><a id="dmg-link" href="https://github.com/chenbstack/glint/releases/latest" target="_blank" rel="noopener" data-i18n="alt_link">Download the latest DMG -></a></p>
   </div>
 </section>
 
@@ -435,7 +426,7 @@
     <a class="brand" href="#top" style="display:flex;align-items:center;gap:9px;">
       <img src="./glint-logo.png" alt="" style="width:22px;height:22px;border-radius:6px;">Glint
     </a>
-    <span data-i18n="footer_tag">· MIT · 为 vibe coding 而生</span>
+    <span data-i18n="footer_tag">· MIT · built for vibe coding</span>
     <div class="right">
       <a href="https://github.com/chenbstack/glint" target="_blank" rel="noopener">GitHub</a>
       <a href="https://github.com/chenbstack/glint/releases" target="_blank" rel="noopener">Releases</a>
@@ -448,113 +439,59 @@
 const REPO = 'chenbstack/glint';
 const fmt = n => n.toLocaleString('en-US');
 
-// ---- i18n ----------------------------------------------------------------
+// ---- copy ----------------------------------------------------------------
 const I18N = {
-  zh: {
-    nav_features:'功能', nav_stats:'数据', nav_download:'下载', cta:'下载',
-    eyebrow:'VIBE CODING · 多 AGENT 工作流',
-    h1_a:'一个人,', h1_b:'指挥一队 AI',
-    sub:'为 vibe coding 而生的精致 macOS 终端。底层基于 Ghostty,侧边栏一眼看清每个 AI 代理 —— 谁在跑、谁等你、谁跑完了。',
-    dl_macos:'↓ 下载 for macOS', view_gh:'在 GitHub 上查看',
-    pill_dl:'次下载', pill_latest:'最新稳定版', pill_mit:'MIT 开源',
-    legend_run:'运行中', legend_perm:'等待批准', legend_done:'已完成', legend_idle:'空闲',
-    stat_total:'累计下载', stat_total_sub:'手动 + 自动更新 + brew',
-    stat_latest:'最新稳定版下载', stat_beta:'Beta 通道(峰值)', stat_beta_sub:'最高单版 ≈ 通道人数',
-    beta_hd_1:'测试版分布 · ', beta_hd_2:' 之后各 beta 下载数 · 取峰值 ≈ beta 通道人数(求和会重复计同一人)',
-    beta_peak:'峰值', beta_none:'暂无更新的测试版',
-    beta_empty:'当前没有比稳定版更新的测试版 —— beta 通道和稳定版同步',
-    hist_hd:'历史稳定版下载', hist_sub:'采用趋势 + 下载量榜单。',
-    hist_trend:'采用趋势 · 旧 → 新',
-    feat_hd:'为「多开党」设计的终端',
-    feat_sub:'一个 workspace 里同时跑 Claude、Codex、OpenCode、Devin,分屏、多 tab,谁也不抢谁的注意力。',
-    f1_h:'per-pane 状态一览', f1_p:'每个 pane 的 AI 代理在干什么,状态点 + 悬浮明细一眼看清,不用逐个切过去问。',
-    f2_h:'多 agent 并行', f2_p:'左边 Claude、右边 Codex、另一个 tab 跑 OpenCode 或 Devin,各自独立会话互不打扰。',
-    f3_h:'分屏 · 多标签', f3_p:'workspace-global 的 pane 模型,⌘T 开标签、随手分屏,布局怎么切 key 都不变。',
-    f4_h:'Liquid Glass 头部', f4_p:'macOS 26 玻璃浮岛 header,终端内容顶到顶部,质感拉满。',
-    f5_h:'基于 Ghostty', f5_p:'底层用 Ghostty 渲染,SwiftUI + AppKit 重写交互,快且原生。',
-    f6_h:'Sparkle 自动更新', f6_p:'新版本静默推送、一键升级,brew cask 也能跟上。',
-    sc1_h:'侧边栏:谁在跑 · 谁等你 · 谁跑完了', sc1_p:'每个工作区显示当前代理、状态与已用时长,红点等批准、绿勾已完成。',
-    sc2_h:'分屏里跑多个代理', sc2_p:'同一个工作区左右分屏,两个 AI 各跑各的,状态实时汇总到 tab 与侧边栏。',
-    inst_hd:'装上它', inst_sub:'Homebrew 一行装好,或直接下载 DMG。macOS 专属。',
-    term_upgrade:'# 升级', copy:'复制', copied:'已复制 ✓',
-    alt_pre:'不想用 Homebrew?', alt_link:'直接下载最新 DMG →',
-    footer_tag:'· MIT · 为 vibe coding 而生',
-    releases:'Releases',
-    beta_sub_peak: t => `峰值 · ${t}`,
-    live_fresh: t => `实时数据来自 GitHub · 更新于 ${t} · `,
-    live_cache: t => `缓存数据 · ${t} 抓取 · 10 分钟内不重复请求 · `,
-    live_rate: m => `GitHub API 限流(本 IP 共享额度,约 ${m} 分钟后恢复)· 显示缓存数据`,
-    live_offline_cache:'离线 · 显示的是缓存数据',
-    live_offline_static:'离线 · 显示的是页面预置数据',
-  },
-  en: {
-    nav_features:'Features', nav_stats:'Stats', nav_download:'Download', cta:'Download',
-    eyebrow:'VIBE CODING · MULTI-AGENT WORKFLOW',
-    h1_a:'One person,', h1_b:'a whole crew of AI',
-    sub:'A refined macOS terminal built for vibe coding. Powered by Ghostty — the sidebar shows every AI agent at a glance: who’s running, who needs you, who’s done.',
-    dl_macos:'↓ Download for macOS', view_gh:'View on GitHub',
-    pill_dl:'downloads', pill_latest:'Latest stable', pill_mit:'MIT licensed',
-    legend_run:'Running', legend_perm:'Needs approval', legend_done:'Done', legend_idle:'Idle',
-    stat_total:'Total downloads', stat_total_sub:'manual + auto-update + brew',
-    stat_latest:'Latest stable downloads', stat_beta:'Beta channel (peak)', stat_beta_sub:'peak single build ≈ channel size',
-    beta_hd_1:'Beta breakdown · downloads per beta after ', beta_hd_2:' · peak ≈ beta channel size (summing double-counts the same user)',
-    beta_peak:'peak', beta_none:'no beta newer than stable',
-    beta_empty:'No beta newer than the stable release — the beta channel is in sync.',
-    hist_hd:'Stable release downloads', hist_sub:'Adoption trend + download leaderboard.',
-    hist_trend:'Adoption · old → new',
-    feat_hd:'A terminal for power multitaskers',
-    feat_sub:'Run Claude, Codex, OpenCode and Devin in one workspace — split panes, tabs, none stealing your attention.',
-    f1_h:'Per-pane status at a glance', f1_p:'See what each pane’s agent is doing — status dots plus a hover breakdown, no switching around to check.',
-    f2_h:'Multiple agents in parallel', f2_p:'Claude on the left, Codex on the right, OpenCode or Devin in another tab — independent sessions, no crosstalk.',
-    f3_h:'Splits & tabs', f3_p:'A workspace-global pane model: ⌘T for tabs, split anytime — keys stay stable however you rearrange.',
-    f4_h:'Liquid Glass header', f4_p:'A macOS 26 floating glass header; terminal content runs right to the top.',
-    f5_h:'Built on Ghostty', f5_p:'Ghostty under the hood, interaction rewritten in SwiftUI + AppKit — fast and native.',
-    f6_h:'Sparkle auto-update', f6_p:'New versions pushed silently, one-click upgrade; the brew cask keeps up too.',
-    sc1_h:'Sidebar: who’s running · who needs you · who’s done', sc1_p:'Each workspace shows its agent, status and elapsed time — red dot waiting for approval, green check done.',
-    sc2_h:'Many agents in one split', sc2_p:'Split a workspace left/right, two AIs each doing their thing, status rolled up live to the tab and sidebar.',
-    inst_hd:'Get it', inst_sub:'One line with Homebrew, or grab the DMG. macOS only.',
-    term_upgrade:'# upgrade', copy:'Copy', copied:'Copied ✓',
-    alt_pre:'Prefer not to use Homebrew? ', alt_link:'Download the latest DMG →',
-    footer_tag:'· MIT · built for vibe coding',
-    releases:'Releases',
-    beta_sub_peak: t => `peak · ${t}`,
-    live_fresh: t => `Live from GitHub · updated ${t} · `,
-    live_cache: t => `Cached · fetched ${t} · no refetch within 10 min · `,
-    live_rate: m => `GitHub API rate-limited (shared per-IP budget, ~${m} min to reset) · showing cached data`,
-    live_offline_cache:'Offline · showing cached data',
-    live_offline_static:'Offline · showing preset data',
-  },
+  nav_features:'Features', nav_stats:'Stats', nav_download:'Download', cta:'Download',
+  eyebrow:'VIBE CODING · MULTI-AGENT WORKFLOW',
+  h1_a:'One person,', h1_b:'a whole crew of AI',
+  sub:'A refined macOS terminal built for vibe coding. Powered by Ghostty, the sidebar shows every AI agent at a glance: who is running, who needs you, and who is done.',
+  dl_macos:'↓ Download for macOS', view_gh:'View on GitHub',
+  pill_dl:'downloads', pill_latest:'Latest stable', pill_mit:'MIT licensed',
+  legend_run:'Running', legend_perm:'Needs approval', legend_done:'Done', legend_idle:'Idle',
+  stat_total:'Total downloads', stat_total_sub:'manual + auto-update + brew',
+  stat_latest:'Latest stable downloads', stat_beta:'Beta channel (peak)', stat_beta_sub:'peak single build ~= channel size',
+  beta_hd_1:'Beta breakdown · downloads per beta after ', beta_hd_2:' · peak ~= beta channel size (summing double-counts the same user)',
+  beta_peak:'peak', beta_none:'no beta newer than stable',
+  beta_empty:'No beta newer than the stable release — the beta channel is in sync.',
+  hist_hd:'Stable release downloads', hist_sub:'Adoption trend + download leaderboard.',
+  hist_trend:'Adoption · old to new',
+  feat_hd:'A terminal for power multitaskers',
+  feat_sub:'Run Claude, Codex, OpenCode and Devin in one workspace: split panes, tabs, none stealing your attention.',
+  f1_h:'Per-pane status at a glance', f1_p:"See what each pane's agent is doing with status dots and hover details, no switching around to check.",
+  f2_h:'Multiple agents in parallel', f2_p:'Claude on the left, Codex on the right, OpenCode or Devin in another tab: independent sessions, no crosstalk.',
+  f3_h:'Splits and tabs', f3_p:'A workspace-global pane model: Cmd-T for tabs, split anytime, keys stay stable however you rearrange.',
+  f4_h:'Liquid Glass header', f4_p:'A macOS 26 floating glass header with terminal content running right to the top.',
+  f5_h:'Built on Ghostty', f5_p:'Ghostty under the hood, interaction rewritten in SwiftUI + AppKit: fast and native.',
+  f6_h:'Sparkle auto-update', f6_p:'New versions pushed silently, one-click upgrade, and the brew cask keeps up too.',
+  sc1_h:'Sidebar: who is running, who needs you, who is done', sc1_p:'Each workspace shows its agent, status and elapsed time: red dot waiting for approval, green check done.',
+  sc2_h:'Many agents in one split', sc2_p:'Split a workspace left and right, two AIs each doing their thing, status rolled up live to the tab and sidebar.',
+  inst_hd:'Get it', inst_sub:'One line with Homebrew, or grab the DMG. macOS only.',
+  term_upgrade:'# upgrade', copy:'Copy', copied:'Copied ✓',
+  alt_pre:'Prefer not to use Homebrew? ', alt_link:'Download the latest DMG ->',
+  footer_tag:'· MIT · built for vibe coding',
+  releases:'Releases',
+  beta_sub_peak: t => `peak · ${t}`,
+  live_fresh: t => `Live from GitHub · updated ${t} · `,
+  live_cache: t => `Cached · fetched ${t} · no refetch within 10 min · `,
+  live_rate: m => `GitHub API rate-limited (shared per-IP budget, ~${m} min to reset) · showing cached data`,
+  live_offline_cache:'Offline · showing cached data',
+  live_offline_static:'Offline · showing preset data',
 };
-let LANG = (()=>{
-  const saved = localStorage.getItem('glint-lang');
-  if(saved === 'zh' || saved === 'en') return saved;
-  return (navigator.language||'').toLowerCase().startsWith('zh') ? 'zh' : 'en';
-})();
-const L = () => I18N[LANG];
+const L = () => I18N;
 
 let LAST_D = null;                 // last rendered payload, for re-render on lang switch
 let liveState = { kind:'none' };   // current live-line state, language-agnostic
 let TREND = null;                  // {tags,dates,dls} oldest→newest, for trend hover
 
 function applyLang(){
-  document.documentElement.lang = LANG === 'zh' ? 'zh-CN' : 'en';
-  document.title = LANG === 'zh'
-    ? 'Glint · 为 vibe coding 而生的 macOS 终端'
-    : 'Glint · a macOS terminal built for vibe coding';
+  document.documentElement.lang = 'en';
+  document.title = 'Glint · a macOS terminal built for vibe coding';
   document.querySelectorAll('[data-i18n]').forEach(el=>{
-    const v = I18N[LANG][el.dataset.i18n];
+    const v = I18N[el.dataset.i18n];
     if(typeof v === 'string') el.textContent = v;
   });
-  document.querySelectorAll('.lang button').forEach(b=>b.classList.toggle('on', b.dataset.lang === LANG));
-  if(LAST_D) render(LAST_D);       // rebuild beta-sub + breakdown in new language
+  if(LAST_D) render(LAST_D);
   renderLive();                    // rebuild the live line in new language
-}
-
-function setLang(lang){
-  if(lang === LANG) return;
-  LANG = lang;
-  localStorage.setItem('glint-lang', lang);
-  applyLang();
 }
 
 function renderLive(){
@@ -751,7 +688,7 @@ async function fetchFresh(){
   return d;
 }
 
-const clock = (ts, sec) => new Date(ts).toLocaleTimeString(LANG === 'zh' ? 'zh-CN' : 'en-US',
+const clock = (ts, sec) => new Date(ts).toLocaleTimeString('en-US',
   sec ? {hour:'2-digit',minute:'2-digit',second:'2-digit'} : {hour:'2-digit',minute:'2-digit'});
 
 async function refresh(force){
@@ -779,11 +716,6 @@ document.querySelectorAll('.copy').forEach(b=>{
       setTimeout(()=>{ b.textContent = L().copy; b.classList.remove('ok'); }, 1400);
     }catch(_){}
   });
-});
-
-// language toggle
-document.querySelectorAll('.lang button').forEach(b=>{
-  b.addEventListener('click', ()=> setLang(b.dataset.lang));
 });
 
 // trend hover: map cursor X to a column (bars stretch to fill, so go by
@@ -824,7 +756,7 @@ document.querySelectorAll('.lang button').forEach(b=>{
   box.addEventListener('mouseleave', leave);
 })();
 
-applyLang();   // paint static text in the chosen language first
+applyLang();   // paint static text before live release data
 refresh();     // then numbers + live line
 // background poll, paused while the tab is hidden; refetch on return if stale
 setInterval(()=>{ if(!document.hidden) refresh(); }, POLL_MS);

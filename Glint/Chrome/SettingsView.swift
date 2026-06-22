@@ -24,7 +24,7 @@ struct GlintSettingsView: View {
                                 )
                             }
                         } else {
-                            Color(red: 0.094, green: 0.094, blue: 0.122)
+                            Theme.bgPane
                         }
                     }
                 )
@@ -37,7 +37,7 @@ struct GlintSettingsView: View {
         }
         .frame(width: 760, height: 540)
         .background(Theme.bgWindow)
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(store.appearanceMode.preferredColorScheme)
     }
 
     // MARK: - Sidebar
@@ -382,11 +382,9 @@ private struct GeneralPane: View {
         SettingsCard("Language") {
             SettingsRow("Language",
                         subtitle: "Display language for Glint's UI.") {
-                GlintDropdown(selection: $store.preferredLanguage, items: [
-                    (value: "system", label: "Follow system"),
-                    (value: "en", label: "English"),
-                    (value: "zh-Hans", label: "中文（简体）"),
-                ], listWidth: 170)
+                GlintDropdown(selection: $store.preferredLanguage,
+                              items: WorkspaceStore.languageOptions,
+                              listWidth: 170)
             }
         }
 
@@ -464,9 +462,9 @@ private struct AppearancePane: View {
     @EnvironmentObject var store: WorkspaceStore
     @State private var browsingThemes = false
 
-    /// 设置里只展示精选 + 「跟随 Ghostty」,全量 502 套走浏览器(搜索 + 实时预览),
-    /// 否则这个网格会塞进 503 张卡片。当前选中若是某套 catalog 主题,把它也临时
-    /// 拉进网格,这样用户能看到自己选的是哪套、不必再开浏览器确认。
+    /// Settings shows featured themes plus Follow Ghostty. The full catalog
+    /// lives in the browser; if a catalog theme is selected, include it here
+    /// so the current choice remains visible.
     private var featuredCards: [GlintTheme] {
         var cards = ThemeRegistry.featured + [ThemeRegistry.followGhostty]
         if !cards.contains(where: { $0.id == store.themeName }) {
@@ -476,9 +474,23 @@ private struct AppearancePane: View {
     }
 
     var body: some View {
+        SettingsCard("Appearance") {
+            SettingsRow("Mode",
+                        subtitle: "Auto follows the macOS appearance and switches Glint's chrome and terminal together.") {
+                Picker("", selection: $store.appearanceMode) {
+                    ForEach(AppAppearanceMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 180)
+                .labelsHidden()
+            }
+        }
+
         SettingsCard("Theme") {
             VStack(alignment: .leading, spacing: 8) {
-                Text("终端与界面共用一套配色,一键换肤。")
+                Text("Advanced terminal color themes remain available for custom workflows.")
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.text3)
                 LazyVGrid(
@@ -498,7 +510,7 @@ private struct AppearancePane: View {
                     HStack(spacing: 6) {
                         Image(systemName: "square.grid.2x2")
                             .font(.system(size: 11, weight: .medium))
-                        Text("浏览全部 \(ThemeRegistry.catalog.count + ThemeRegistry.featured.count) 套主题")
+                        Text("Browse all \(ThemeRegistry.catalog.count + ThemeRegistry.featured.count) themes")
                             .font(.system(size: 12, weight: .medium))
                         Image(systemName: "chevron.right")
                             .font(.system(size: 9, weight: .semibold))
@@ -556,17 +568,17 @@ private struct AppearancePane: View {
             }
         }
 
-        SettingsCard("透明度与模糊",
-                     footer: "让桌面从背后透出 —— 终端区与侧栏/工具栏可分开调。背景模糊把透出的桌面磨砂虚化,终端文字更易读。注:macOS 原生全屏下系统会禁用窗口透明。") {
-            SettingsRow("终端透明度") {
+        SettingsCard("Transparency and blur",
+                     footer: "Let the desktop show through behind Glint. Terminal and chrome opacity are separate; background blur softens transparent terminal content. macOS disables window transparency in native full screen.") {
+            SettingsRow("Terminal opacity") {
                 OpacityControl(value: $store.terminalOpacity)
             }
             SettingsDivider()
-            SettingsRow("界面透明度", subtitle: "侧栏与工具栏") {
+            SettingsRow("Chrome opacity", subtitle: "Sidebar and toolbar") {
                 OpacityControl(value: $store.chromeOpacity)
             }
             SettingsDivider()
-            SettingsRow("背景模糊") {
+            SettingsRow("Background blur") {
                 HStack(spacing: 10) {
                     Slider(value: $store.backgroundBlur, in: 0...60)
                         .frame(width: 150)
@@ -578,8 +590,8 @@ private struct AppearancePane: View {
             }
         }
 
-        SettingsCard("应用图标",
-                     footer: "切换程序坞（Dock）中的图标。「默认」在 macOS 26 上保留 Liquid Glass 玻璃图标；其余配色为静态图标。") {
+        SettingsCard("App icon",
+                     footer: "Switch the Dock icon. Default keeps the Liquid Glass icon on macOS 26; the other presets are static icons.") {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 14) {
                 ForEach(AppIconPreset.allCases) { preset in
                     VStack(spacing: 5) {
@@ -613,8 +625,7 @@ private struct AppearancePane: View {
     }
 }
 
-/// 主题预览卡片:一个 mini 终端(主题真实背景 + 彩色示例 + 16 色 palette 条)+ 名字。
-/// 让用户看着配色选,而不是只读主题名。
+/// Theme preview card with a mini terminal sample and ANSI palette strip.
 private struct ThemePreviewCard: View {
     let theme: GlintTheme
     let selected: Bool
@@ -672,7 +683,8 @@ private struct ThemePreviewCard: View {
     }
 }
 
-/// 透明度滑块 + 百分比标签。范围下限 0.3,避免拖到全透导致界面不可用。
+/// Opacity slider with a percent label. The lower bound prevents unusably
+/// transparent chrome.
 private struct OpacityControl: View {
     @Binding var value: Double
     var body: some View {
@@ -687,22 +699,18 @@ private struct OpacityControl: View {
     }
 }
 
-// MARK: - 主题浏览器(全量 502+ 套:搜索 + 点击选中预览 + 确认应用)
-//
-// 设置卡只放精选;全量配色塞不进网格,所以走这个 sheet。每行一个 mini 配色条 +
-// 名字。**点击某行 = 选中并把那套套到整窗预览**(终端 + chrome 一起),底部「应用」
-// 按钮才真正持久化。取消 / 直接关 sheet = 放弃,还原回原主题。鼠标悬停只高亮,不变样。
+// MARK: - Theme browser
 private struct ThemeBrowserSheet: View {
     @EnvironmentObject var store: WorkspaceStore
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
-    /// 是否已点「应用」。未应用就关闭 → onDisappear 还原。
+    /// Whether Apply was clicked. Closing without applying restores the theme.
     @State private var applied = false
-    /// 当前点选(预览中)的主题 id;初始 = 已应用的真值。
+    /// Theme currently being previewed.
     @State private var selectedID: String = ""
     @FocusState private var searchFocused: Bool
 
-    /// featured 在前,catalog(已剔除撞 id 的)在后 —— 精选浮在顶上。
+    /// Featured themes stay at the top, followed by the bundled catalog.
     private var allThemes: [GlintTheme] { ThemeRegistry.featured + ThemeRegistry.catalog }
 
     private var filtered: [GlintTheme] {
@@ -711,7 +719,7 @@ private struct ThemeBrowserSheet: View {
         return allThemes.filter { $0.name.lowercased().contains(q) || $0.id.contains(q) }
     }
 
-    /// 选中的主题和已应用的真值不同 → 「应用」可点。
+    /// Apply is enabled only when the preview differs from the saved theme.
     private var dirty: Bool { selectedID != store.themeName }
 
     var body: some View {
@@ -729,8 +737,7 @@ private struct ThemeBrowserSheet: View {
             DispatchQueue.main.async { searchFocused = true }
         }
         .onDisappear {
-            // 没点「应用」就关 → 还原到已应用的真值(themeName 全程没被动过)。
-            if !applied { store.previewTheme(id: store.themeName) }
+            if !applied { store.restoreResolvedTheme() }
         }
     }
 
@@ -739,7 +746,7 @@ private struct ThemeBrowserSheet: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Theme.text3)
-            TextField("搜索主题…", text: $query)
+            TextField("Search themes...", text: $query)
                 .textFieldStyle(.plain)
                 .font(.system(size: 14))
                 .foregroundStyle(Theme.text1)
@@ -779,7 +786,6 @@ private struct ThemeBrowserSheet: View {
                 .padding(.vertical, 8)
             }
             .onAppear {
-                // 打开时滚到当前选中那行,用户立刻看到自己用的是哪套。
                 proxy.scrollTo(store.themeName, anchor: .center)
             }
         }
@@ -788,7 +794,7 @@ private struct ThemeBrowserSheet: View {
     private var footer: some View {
         HStack(spacing: 10) {
             Spacer()
-            Button("取消") { dismiss() }       // applied 仍为 false → onDisappear 还原
+            Button("Cancel") { dismiss() }
                 .buttonStyle(.plain)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Theme.text2)
@@ -799,7 +805,7 @@ private struct ThemeBrowserSheet: View {
                         .fill(Theme.overlay(0.05))
                 )
 
-            Button("应用") { apply() }
+            Button("Apply") { apply() }
                 .buttonStyle(.plain)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(dirty ? .white : Theme.text4)
@@ -815,27 +821,25 @@ private struct ThemeBrowserSheet: View {
         .padding(.vertical, 12)
     }
 
-    /// 点击行:选中 + 整窗预览(不持久化)。
+    /// Selects and previews a theme without saving.
     private func select(_ id: String) {
         selectedID = id
         store.previewTheme(id: id)
     }
 
-    /// 点「应用」:把选中的主题持久化并关闭。
+    /// Persists the selected theme and closes the sheet.
     private func apply() {
         applied = true
-        store.themeName = selectedID    // didSet 持久化 + 套用
+        store.themeName = selectedID
         dismiss()
     }
 }
 
-/// 主题浏览器的一行:左侧 mini 配色块(背景 + "Aa" 前景示例)、中间名字 + 明暗标签、
-/// 右侧 16 色 palette 细条,最右选中态指示。点击 = 选中预览;悬停只高亮。
+/// Theme browser row with a sample swatch, name, brightness label, palette
+/// strip, and selection indicator.
 private struct ThemeBrowserRow: View {
     let theme: GlintTheme
-    /// 当前点选(预览中)的行 —— accent 高亮。
     let isSelected: Bool
-    /// 已应用的真值那一行 —— 显示「当前」标记。
     let isCurrent: Bool
     let accent: Color
     let onPick: () -> Void
@@ -844,7 +848,6 @@ private struct ThemeBrowserRow: View {
     var body: some View {
         Button(action: onPick) {
             HStack(spacing: 12) {
-                // mini 配色块:真实背景 + 前景色 "Aa"
                 ZStack {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(theme.background)
@@ -865,7 +868,7 @@ private struct ThemeBrowserRow: View {
                             .foregroundStyle(Theme.text1)
                             .lineLimit(1)
                         if isCurrent {
-                            Text("当前")
+                            Text("Current")
                                 .font(.system(size: 9, weight: .semibold))
                                 .foregroundStyle(accent)
                                 .padding(.horizontal, 5)
@@ -882,7 +885,6 @@ private struct ThemeBrowserRow: View {
 
                 Spacer(minLength: 8)
 
-                // 16 色 palette 细条
                 HStack(spacing: 0) {
                     ForEach(Array(theme.palette.enumerated()), id: \.offset) { pair in
                         Rectangle().fill(pair.element).frame(width: 7, height: 16)

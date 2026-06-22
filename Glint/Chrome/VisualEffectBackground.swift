@@ -104,36 +104,25 @@ struct GlassCapsuleFallback: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        let dark = Theme.current.isDark
         ZStack {
-            // `.underPageBackground` is the darkest stock vibrancy
-            // material in dark mode — `.hudWindow` was a HUD-style frosty
-            // light grey and even a 0.6 black wash couldn't fully tame it
-            // (you could see the capsule "settle" a frame or two after
-            // the viewport-top-offset's scrollback rows landed underneath
-            // and blurred up through the glass).
-            //
-            // State pinned to `.active` so the material doesn't flash the
-            // lighter `.inactive` palette during the first frames while
-            // the window is still picking up key state.
-            VisualEffectBackground(material: .underPageBackground, state: .active)
-            // Light black wash — underPageBackground is already the
-            // darker stock material, so we only need a small nudge to
-            // keep the capsule reading as glass without flattening it
-            // into an opaque slab.
-            Color.black.opacity(0.3)
+            VisualEffectBackground(material: dark ? .underPageBackground : .popover,
+                                   state: .active)
+            (dark ? Color.black.opacity(0.28) : Color.white.opacity(0.42))
             if let tint {
-                tint.opacity(0.18)
+                tint.opacity(dark ? 0.18 : 0.24)
             }
-            // Faint top-down sheen so the upper edge catches "light" — the
-            // single cheapest cue that says "glass surface" rather than
-            // "translucent slab."
             LinearGradient(
-                colors: [Color.white.opacity(0.06), Color.white.opacity(0)],
+                colors: [
+                    Color.white.opacity(dark ? 0.07 : 0.55),
+                    Color.white.opacity(0)
+                ],
                 startPoint: .top, endPoint: .center
             )
         }
         .clipShape(shape)
-        .overlay(shape.strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
+        .overlay(shape.strokeBorder(Theme.overlay(dark ? 0.11 : 0.16), lineWidth: 0.5))
+        .shadow(color: Color.black.opacity(dark ? 0.22 : 0.10), radius: 10, x: 0, y: 4)
     }
 }
 
@@ -227,5 +216,20 @@ extension View {
                                     interactive: interactive,
                                     autoCapsule: false,
                                     fallback: fallback))
+    }
+
+    @ViewBuilder
+    func liquidGlassGroup(enabled: Bool) -> some View {
+        #if compiler(>=6.2)
+        if #available(macOS 26.0, *), enabled {
+            GlassEffectContainer {
+                self
+            }
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
     }
 }

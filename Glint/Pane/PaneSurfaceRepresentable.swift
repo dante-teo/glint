@@ -105,7 +105,8 @@ struct PaneSurfaceRepresentable: NSViewRepresentable {
     /// Shares the single implementation in `GhosttyManager` so it can't drift
     /// from the surface view's own backing.
     private static func updateContainerBacking(_ container: NoDragContainerView) {
-        GhosttyManager.shared.applyTerminalBacking(to: container.layer)
+        GhosttyManager.shared.applyTerminalBacking(to: container.layer,
+                                                   appliesContentOpacity: false)
     }
 
     private func attach(_ surface: GhosttySurfaceView, to container: NoDragContainerView) {

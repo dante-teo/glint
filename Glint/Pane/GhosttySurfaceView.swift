@@ -560,7 +560,7 @@ final class GhosttySurfaceView: NSView, NSTextInputClient {
                     col = sp.column + sp.cell_width
                 }
                 // A TUI input box renders its whole row as ONE span — text
-                // "› 你好" then padding spaces, all on the same non-default bg —
+                // A sample prompt and padding spaces, all on the same non-default bg —
                 // so the row is full-width and wraps when restored. Two moves
                 // keep the look without wrapping:
                 //  1. Trim trailing whitespace at the CHARACTER level (across
@@ -568,7 +568,7 @@ final class GhosttySurfaceView: NSView, NSTextInputClient {
                 //  2. If that trimmed tail was a COLORED background fill, repaint
                 //     it with Erase-in-Line: emit the box bg + `\e[K`. EL fills
                 //     from the cursor to the live terminal's right edge with the
-                //     current bg and never advances the cursor, so the box色条
+                //     current bg and never advances the cursor, so the color strip
                 //     comes back at whatever width the terminal currently is —
                 //     width-independent, never wraps. A bordered box ends in a
                 //     glyph (not a space), so it's left literal and full-width.
@@ -634,10 +634,9 @@ final class GhosttySurfaceView: NSView, NSTextInputClient {
 
     /// Centered "Terminal failed to start" + Retry, shown when ghostty
     /// isn't ready or `ghostty_surface_new` fails. Without it the pane is
-    /// just a dead dark rectangle and the only evidence is an NSLog line.
+    /// just a dead rectangle and the only evidence is an NSLog line.
     /// Plain AppKit (no SwiftUI hosting) because this view is below the
-    /// SwiftUI layer; colors mirror Theme.text1/text2 — the app is
-    /// dark-mode-only so hardcoding the dark values is safe.
+    /// SwiftUI layer; colors mirror the active theme.
     private var surfaceErrorStack: NSStackView?
 
     private func showSurfaceCreationError() {
@@ -645,7 +644,7 @@ final class GhosttySurfaceView: NSView, NSTextInputClient {
 
         let label = NSTextField(labelWithString: String(localized: "Terminal failed to start"))
         label.font = NSFont.systemFont(ofSize: 13, weight: .medium)
-        label.textColor = NSColor(red: 0.925, green: 0.929, blue: 0.949, alpha: 1.0) // Theme.text1
+        label.textColor = NSColor(Theme.text1)
         label.alignment = .center
 
         let retry = NSButton(title: String(localized: "Retry"),

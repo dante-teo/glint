@@ -47,6 +47,7 @@ _design/
 # Local-only docs drafts (proposals, integration notes). Already-tracked
 # docs like external-pane-control.md are unaffected — ignore never untracks.
 docs/*.md
+!docs/appearance.md
 !docs/releasing.md
 
 # Local-only marketing / social assets (cover shots, WeChat & 小红书 cards).
