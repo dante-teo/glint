@@ -1154,6 +1154,9 @@ final class WorkspaceStore: ObservableObject {
         for view in surfaceViews.values { view.flushScrollbackToDisk() }
     }
 
+    /// Snapshot every live surface's cwd, refresh foreground process names,
+    /// and write per-TTY lookup files for the CLI-agent hook fallback.
+    /// Called periodically (1 s timer) and on ghostty PWD updates.
     func captureCwdsFromLiveSurfaces() {
         var newProcesses: [WorkspacePaneKey: String] = [:]
         for i in workspaces.indices {
@@ -1185,6 +1188,9 @@ final class WorkspaceStore: ObservableObject {
                         workspaces[i].panes[paneID]?.lastAgent = agent
                     }
                 }
+                // Write the per-TTY lookup file once the shell's PID is
+                // resolvable. Idempotent — skips if already written.
+                view.writeTTYLookupFile()
             }
         }
         if newProcesses != paneProcesses {
@@ -1658,6 +1664,8 @@ final class WorkspaceStore: ObservableObject {
         let (newRoot, survivor) = Self.removeLeaf(workspaces[i].tabs[t].root, target: target)
         if let newRoot { workspaces[i].tabs[t].root = newRoot }
         workspaces[i].panes.removeValue(forKey: target)
+        // Clean up the TTY lookup file before dropping the view reference.
+        surfaceViews[key]?.removeTTYLookupFile()
         surfaceViews.removeValue(forKey: key)
         // The pane is gone for good — drop its scrollback snapshot too.
         ScrollbackArchive.delete(
@@ -1849,6 +1857,7 @@ final class WorkspaceStore: ObservableObject {
         for pane in panes {
             let key = WorkspacePaneKey(workspace: wsID, pane: pane)
             workspaces[i].panes.removeValue(forKey: pane)
+            surfaceViews[key]?.removeTTYLookupFile()
             surfaceViews.removeValue(forKey: key)
             ScrollbackArchive.delete(
                 id: ScrollbackArchive.fileID(forPaneKey: "\(wsID.uuidString):\(pane.value)"))
@@ -1948,6 +1957,10 @@ final class WorkspaceStore: ObservableObject {
 
         // Drop every surface tied to this workspace (their ghostty surfaces
         // get freed in GhosttySurfaceView.deinit when the dict releases them).
+        // Clean up TTY lookup files first, while the views are still alive.
+        for (key, view) in surfaceViews where key.workspace == id {
+            view.removeTTYLookupFile()
+        }
         surfaceViews = surfaceViews.filter { $0.key.workspace != id }
         clearDockBadges(for: workspaces[idx].panes.keys.map { WorkspacePaneKey(workspace: id, pane: $0) })
         // And their scrollback snapshots.
@@ -1993,6 +2006,10 @@ final class WorkspaceStore: ObservableObject {
         // Drop live surfaces + side-state so the parked workspace doesn't
         // hold onto GPU/IOSurface memory. The Pane / SplitNode / scrollback
         // archive stay on disk so unarchive can rehydrate them.
+        // Clean up TTY lookup files first, while the views are still alive.
+        for (key, view) in surfaceViews where key.workspace == id {
+            view.removeTTYLookupFile()
+        }
         surfaceViews = surfaceViews.filter { $0.key.workspace != id }
         clearDockBadges(for: workspaces[idx].panes.keys.map { WorkspacePaneKey(workspace: id, pane: $0) })
         paneAgentState = paneAgentState.filter { $0.key.workspace != id }

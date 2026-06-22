@@ -367,9 +367,27 @@ enum AgentHookInstaller {
     /// Argv[1] = hook event name (e.g. "PostToolUse").
     /// Argv[2] = agent kind ("claude" or "codex"); defaults to "claude" so
     /// existing Claude installs keep working without a script rewrite.
+    ///
+    /// Fallback: some CLI agents (e.g. Devin) don't propagate the parent
+    /// shell's env vars to hook subprocesses. When `GLINT_PANE_ID` is
+    /// unset, the script resolves the controlling TTY via `ps` and reads
+    /// a per-TTY lookup file written by Glint at surface creation time.
+    /// The lookup file is a sourceable KEY=VALUE pair so only one `cat`
+    /// + `. /path` is needed — no JSON parsing or `sed`.
     static let scriptBody: String = """
     #!/bin/sh
     # Glint CLI-agent hook reporter. Argv[1] = hook event, argv[2] = agent kind.
+
+    # Fast path: env vars set directly by Glint's terminal (Claude, Codex, …).
+    # Fallback: resolve via controlling TTY when vars are missing (Devin, …).
+    if [ -z "$GLINT_PANE_ID" ] || [ -z "$GLINT_AGENT_SOCK" ]; then
+      _TTY=$(ps -o tty= -p $$ 2>/dev/null | tr -d ' ')
+      [ -z "$_TTY" ] || [ "$_TTY" = "??" ] && _TTY=$(ps -o tty= -p $PPID 2>/dev/null | tr -d ' ')
+      if [ -n "$_TTY" ] && [ "$_TTY" != "??" ] && [ -f "$HOME/.glint/run/tty/$_TTY" ]; then
+        . "$HOME/.glint/run/tty/$_TTY"
+      fi
+    fi
+
     [ -z "$GLINT_PANE_ID" ] && exit 0
     [ -z "$GLINT_AGENT_SOCK" ] && exit 0
     [ ! -S "$GLINT_AGENT_SOCK" ] && exit 0
