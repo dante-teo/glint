@@ -1185,14 +1185,31 @@ enum MascotAsset {
     }
 
     static func devin(for s: PaneAgentStatus?) -> String {
-        switch s {
-        case .none, .some(.idle): return "DevinIdle"
-        case .some(.thinking): return "DevinThinking"
-        case .some(.tool): return "DevinToolCall"
-        case .some(.compacting): return "DevinCompressing"
-        case .some(.needsPermission): return "DevinNeedsPermission"
-        case .some(.justCompleted): return "DevinDone"
-        case .some(.failed): return "DevinFailed"
+        devin(for: s, style: .portrait)
+    }
+
+    static func devin(for s: PaneAgentStatus?, style: DevinIconStyle = .portrait) -> String {
+        switch style {
+        case .portrait:
+            switch s {
+            case .none, .some(.idle): return "DevinIdle"
+            case .some(.thinking): return "DevinThinking"
+            case .some(.tool): return "DevinToolCall"
+            case .some(.compacting): return "DevinCompressing"
+            case .some(.needsPermission): return "DevinNeedsPermission"
+            case .some(.justCompleted): return "DevinDone"
+            case .some(.failed): return "DevinFailed"
+            }
+        case .pixelMonster:
+            switch s {
+            case .none, .some(.idle): return "DevinPixelIdle"
+            case .some(.thinking): return "DevinPixelThinking"
+            case .some(.tool): return "DevinPixelToolCall"
+            case .some(.compacting): return "DevinPixelCompressing"
+            case .some(.needsPermission): return "DevinPixelNeedsPermission"
+            case .some(.justCompleted): return "DevinPixelDone"
+            case .some(.failed): return "DevinPixelFailed"
+            }
         }
     }
 }
@@ -1316,13 +1333,15 @@ private struct OpenCodeMascotIcon: View {
 /// same pattern as OpenCode. The status dot beacon handles visual state
 /// indication; the tinted variants give a subtle at-a-glance cue.
 private struct DevinMascotIcon: View {
+    @EnvironmentObject var store: WorkspaceStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let status: PaneAgentStatus?
     @State private var celebrateScale: CGFloat = 1.0
     @State private var tapScale: CGFloat = 1.0
 
     var body: some View {
-        AnimatedGIFView(assetName: MascotAsset.devin(for: status), animates: !reduceMotion)
+        AnimatedGIFView(assetName: MascotAsset.devin(for: status, style: store.devinIconStyle),
+                        animates: !reduceMotion)
             .frame(width: 34, height: 34)
             .frame(width: 28, height: 28)
             .scaleEffect(celebrateScale * tapScale, anchor: .bottom)

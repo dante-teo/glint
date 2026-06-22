@@ -487,6 +487,16 @@ final class WorkspaceStore: ObservableObject {
         }
     }
 
+    /// Which Devin icon family the UI draws: the existing portrait badge, or
+    /// the blocky pixel monster inspired by Devin's blue/green mark.
+    @Published var devinIconStyle: DevinIconStyle = {
+        DevinIconStyle.resolved(rawValue: UserDefaults.standard.string(forKey: "glint.devinIconStyle"))
+    }() {
+        didSet {
+            UserDefaults.standard.set(devinIconStyle.rawValue, forKey: "glint.devinIconStyle")
+        }
+    }
+
     /// Whether Glint's Claude Code hook script is currently registered in
     /// `~/.claude/settings.json`. Mirrors `AgentHookInstaller.isInstalled()`
     /// so the Settings UI can react without polling.
@@ -2213,6 +2223,16 @@ enum WorkspaceIconKind {
 enum ClaudeIconStyle: String, CaseIterable {
     case mascot
     case spark
+}
+
+/// Devin icon family for the whole UI. Raw values persist in UserDefaults.
+enum DevinIconStyle: String, CaseIterable {
+    case portrait
+    case pixelMonster
+
+    static func resolved(rawValue: String?) -> DevinIconStyle {
+        rawValue.flatMap(DevinIconStyle.init(rawValue:)) ?? .portrait
+    }
 }
 
 /// Dock-icon palette options shown in Settings. `.default` is the bundle

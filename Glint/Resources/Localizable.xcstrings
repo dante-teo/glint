@@ -116,6 +116,9 @@
     "How Claude panes are drawn in the sidebar and tabs." : {
       "extractionState" : "manual"
     },
+    "How Devin panes are drawn in the sidebar and tabs." : {
+      "extractionState" : "manual"
+    },
     "Icon style" : {
       "extractionState" : "manual"
     },
