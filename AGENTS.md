@@ -1,0 +1,29 @@
+# Repository Guidelines
+
+## Project Structure & Module Organization
+
+Glint is a macOS app built with SwiftUI, AppKit, and GhosttyKit. Application code lives under `Glint/`, grouped by feature: `App/` for app lifecycle and update wiring, `Chrome/` for shell UI, `Pane/` for terminal surfaces, `Agent/` for agent integration, `Workspace/` for persistence and workspace state, and `Ghostty/` for GhosttyKit management. Resources are in `Glint/Resources/`, including asset catalogs, entitlements, localization, themes, and `Info.plist`. Unit tests live in `GlintTests/`. Release and asset automation lives in `scripts/`; documentation and the static site live in `docs/`. `project.yml` is the XcodeGen source for the checked-in `Glint.xcodeproj`.
+
+## Build, Test, and Development Commands
+
+- `git submodule update --init --recursive`: fetch the `ghostty` submodule required by GhosttyKit setup.
+- `scripts/setup-ghosttykit.sh`: download and verify the matching prebuilt `Vendor/GhosttyKit.xcframework`.
+- `xcodegen generate`: regenerate `Glint.xcodeproj` after changing `project.yml`.
+- `xcodebuild test -project Glint.xcodeproj -scheme Glint -configuration Debug -destination "platform=macOS" CODE_SIGNING_ALLOWED=NO`: build and run the XCTest suite locally.
+- `open Glint.xcodeproj`: open the app in Xcode for interactive development.
+
+## Coding Style & Naming Conventions
+
+Use Swift 5.10 conventions with 4-space indentation and clear feature-local organization. Prefer small pure helpers for domain logic, immutable values where practical, and SwiftUI views composed from focused private subviews. Name test files after the behavior under test, such as `AgentKindResolutionTests.swift`, and use direct test method names like `testUnknownReturnsNil`. Keep resources named by product or agent state, for example `CodexWorking.dataset`.
+
+## Testing Guidelines
+
+Tests use XCTest in the `GlintTests` target. Follow red, green, refactor: add or update a focused failing test before implementation changes. Keep tests independent and deterministic; use `@MainActor` for UI or workspace state code that requires it. Run the full `xcodebuild test` command before declaring a change complete.
+
+## Commit & Pull Request Guidelines
+
+Commit history uses concise Conventional Commit-style prefixes, including `fix(agent): ...`, `feat(agent): ...`, `chore: ...`, `ci: ...`, and `release: ...`. Keep commits scoped to one change. Pull requests should include a short summary, tests run, linked issues when relevant, and screenshots or recordings for visible UI changes.
+
+## Security & Configuration Tips
+
+Do not commit signing secrets, Sparkle private keys, notarization credentials, or generated `.secrets/` material. Release setup is documented in `docs/releasing.md`; keep signing and appcast changes isolated from feature work.
