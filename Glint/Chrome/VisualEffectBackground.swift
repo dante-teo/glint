@@ -153,6 +153,7 @@ struct LiquidGlassSurface<Fallback: View>: ViewModifier {
     @ViewBuilder let fallback: () -> Fallback
 
     func body(content: Content) -> some View {
+        #if compiler(>=6.2)
         if #available(macOS 26.0, *), enabled {
             content.glassEffect(
                 glass,
@@ -163,8 +164,16 @@ struct LiquidGlassSurface<Fallback: View>: ViewModifier {
         } else {
             content.background(fallback())
         }
+        #else
+        if enabled && autoCapsule {
+            content.background(GlassCapsuleFallback(cornerRadius: cornerRadius, tint: tint))
+        } else {
+            content.background(fallback())
+        }
+        #endif
     }
 
+    #if compiler(>=6.2)
     @available(macOS 26.0, *)
     private var glass: Glass {
         var g: Glass = .regular
@@ -172,6 +181,7 @@ struct LiquidGlassSurface<Fallback: View>: ViewModifier {
         if interactive { g = g.interactive() }
         return g
     }
+    #endif
 }
 
 extension View {
