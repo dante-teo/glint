@@ -86,3 +86,4 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.glint.GlintTests
+        GENERATE_INFOPLIST_FILE: YES
