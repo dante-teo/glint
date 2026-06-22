@@ -800,6 +800,88 @@ final class GhosttySurfaceView: NSView, NSTextInputClient {
         return nil
     }
 
+    // MARK: - TTY lookup file
+
+    /// The TTY device name (e.g. "ttys001") for this pane's shell, cached
+    /// once resolved. Used to write a per-TTY lookup file that CLI-agent
+    /// hooks can `source` when `$GLINT_PANE_ID` isn't in their env (see
+    /// `glint-report.sh`'s fallback path). `nil` means not yet resolved.
+    private var resolvedTTYName: String?
+
+    /// True once we've successfully written the TTY lookup file for this
+    /// pane's shell — prevents re-writing every poller tick.
+    private(set) var ttyLookupWritten = false
+
+    /// Resolve the controlling TTY device name for this surface's foreground
+    /// process. Returns a short name like `"ttys001"` (no `/dev/` prefix) or
+    /// `nil` when the PID isn't available yet or the call fails.
+    func resolveTTYName() -> String? {
+        if let cached = resolvedTTYName { return cached }
+        guard let s = surface else { return nil }
+        let pid = ghostty_surface_foreground_pid(s)
+        guard pid > 0 else { return nil }
+        var info = proc_bsdinfo()
+        let size = Int32(MemoryLayout<proc_bsdinfo>.size)
+        let result = withUnsafeMutablePointer(to: &info) { ptr -> Int32 in
+            proc_pidinfo(Int32(pid), PROC_PIDTBSDINFO, 0, ptr, size)
+        }
+        guard result == size else { return nil }
+        // devname(3) resolves the dev_t to a human-readable name (e.g. "ttys001").
+        let devT = dev_t(info.e_tdev)
+        guard devT != 0, devT != UInt32.max,
+              let cstr = devname(devT, S_IFCHR) else { return nil }
+        let name = String(cString: cstr)
+        resolvedTTYName = name
+        return name
+    }
+
+    /// Write (or overwrite) `~/.glint/run/tty/<ttyname>` so that CLI-agent
+    /// hook scripts can resolve the pane ID + socket path for this surface
+    /// via their controlling TTY, even when `$GLINT_PANE_ID` is absent from
+    /// the hook subprocess's environment.
+    ///
+    /// The file is a sourceable shell snippet:
+    ///     GLINT_PANE_ID=<uuid>:<seq>
+    ///     GLINT_AGENT_SOCK=/Users/…/.glint/run/agent.sock
+    ///
+    /// Uses atomic write (write to tmp + rename) to avoid partial reads.
+    func writeTTYLookupFile() {
+        guard !ttyLookupWritten,
+              let ttyName = resolveTTYName(),
+              let pk = paneKey,
+              let sock = agentSocketPath, !sock.isEmpty else { return }
+        let dir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".glint/run/tty", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true,
+                                                    attributes: [.posixPermissions: 0o700])
+        } catch {
+            NSLog("[glint] tty lookup dir create failed: \(error)")
+            return
+        }
+        let fileURL = dir.appendingPathComponent(ttyName)
+        let body = "GLINT_PANE_ID=\(pk)\nGLINT_AGENT_SOCK=\(sock)\n"
+        let tmpURL = fileURL.appendingPathExtension("tmp")
+        do {
+            try body.write(to: tmpURL, atomically: false, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: tmpURL.path)
+            // Atomic rename — readers never see partial content.
+            _ = rename(tmpURL.path, fileURL.path)
+            ttyLookupWritten = true
+        } catch {
+            NSLog("[glint] tty lookup file write failed for \(ttyName): \(error)")
+            try? FileManager.default.removeItem(at: tmpURL)
+        }
+    }
+
+    /// Remove the TTY lookup file for this pane (cleanup on close).
+    func removeTTYLookupFile() {
+        guard let ttyName = resolvedTTYName else { return }
+        let file = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".glint/run/tty/\(ttyName)")
+        try? FileManager.default.removeItem(at: file)
+    }
+
     // MARK: - resize
 
     /// Snap our frame to the screen pixel grid, same trick the container does.

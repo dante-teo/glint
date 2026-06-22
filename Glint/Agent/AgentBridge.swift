@@ -104,6 +104,39 @@ final class AgentBridge {
         src.resume()
         acceptSource = src
         NSLog("[glint] agent bridge listening on \(path)")
+
+        // Reap any stale TTY lookup files left by a previous Glint session
+        // that crashed or was force-quit without cleanup. Each file references
+        // a socket path — if it doesn't match THIS session's socket, it's stale.
+        reapStaleTTYLookupFiles()
+    }
+
+    /// Remove TTY lookup files whose recorded socket path doesn't match the
+    /// current session's socket. This handles crash recovery (stale files from
+    /// a Glint that died before cleanup) and debug/prod instance separation.
+    private func reapStaleTTYLookupFiles() {
+        let fm = FileManager.default
+        let dir = fm.homeDirectoryForCurrentUser
+            .appendingPathComponent(".glint/run/tty", isDirectory: true)
+        guard let entries = try? fm.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: nil
+        ) else { return }
+        for entry in entries {
+            // Skip dotfiles and temp files from incomplete writes.
+            let name = entry.lastPathComponent
+            guard !name.hasPrefix("."), !name.hasSuffix(".tmp") else { continue }
+            guard let body = try? String(contentsOf: entry, encoding: .utf8) else {
+                try? fm.removeItem(at: entry)
+                continue
+            }
+            // Extract GLINT_AGENT_SOCK= line and compare to our socket.
+            let sockLine = body.split(separator: "\n")
+                .first { $0.hasPrefix("GLINT_AGENT_SOCK=") }
+            let recordedSock = sockLine.map { String($0.dropFirst("GLINT_AGENT_SOCK=".count)) }
+            if recordedSock != socketPath {
+                try? fm.removeItem(at: entry)
+            }
+        }
     }
 
     private func acceptOne() {

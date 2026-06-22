@@ -1,60 +1,8 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "External control" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "外部控制"
-          }
-        }
-      }
-    },
-    "Allow external control" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "允许外部控制"
-          }
-        }
-      }
-    },
-    "Listening for external commands." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在监听外部命令。"
-          }
-        }
-      }
-    },
-    "Off — no socket bound, no external access." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已关闭 —— 未绑定 socket,外部无法访问。"
-          }
-        }
-      }
-    },
-    "Exposes a local socket under ~/.glint/run/ so other apps on this Mac can focus panes and inject text/keys. Any process that can read the 0600 token file may drive your terminals — off by default. Toggling takes effect immediately." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 ~/.glint/run/ 下开放一个本地 socket,让本机其它程序可以聚焦 pane、注入文本/按键。任何能读取 0600 token 文件的进程都能操控你的终端 —— 默认关闭。开关即时生效。"
-          }
-        }
-      }
+    "  %@" : {
+
     },
     "—" : {
 
@@ -90,10 +38,22 @@
         }
       }
     },
+    "→ origin" : {
+
+    },
     "+%@" : {
 
     },
+    "~/.config/devin/config.json" : {
+
+    },
+    "~/.config/opencode/plugins/glint-agent-bridge.js" : {
+
+    },
     "~/.glint/hooks/glint-report.sh" : {
+
+    },
+    "~/glint" : {
 
     },
     "⌘N" : {
@@ -112,6 +72,9 @@
           }
         }
       }
+    },
+    "✓" : {
+
     },
     "✓ done" : {
       "extractionState" : "stale",
@@ -144,6 +107,9 @@
           }
         }
       }
+    },
+    "Aa" : {
+
     },
     "About" : {
       "extractionState" : "stale",
@@ -189,6 +155,17 @@
         }
       }
     },
+    "Allow external control" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许外部控制"
+          }
+        }
+      }
+    },
     "Appearance" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -229,6 +206,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已归档工作区"
+          }
+        }
+      }
+    },
+    "Ask first when the clipboard contains newlines or control characters — a multi-line paste into a shell prompt runs each line immediately." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当剪贴板包含换行或控制字符时先询问——多行内容粘贴到 shell 提示符会立刻逐行执行。"
           }
         }
       }
@@ -453,28 +441,6 @@
         }
       }
     },
-    "Count background panes that need approval, just finished, or failed." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "统计需要批准、刚完成或失败的后台面板。"
-          }
-        }
-      }
-    },
-    "Dock badges and chimes only update for background workspaces — the one you're looking at stays quiet." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dock 角标和提示音只在后台工作区更新,你正在查看的工作区保持安静。"
-          }
-        }
-      }
-    },
     "Claude Code" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -482,6 +448,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Claude Code"
+          }
+        }
+      }
+    },
+    "Claude Code detected — install the reporter to show its status." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已检测到 Claude Code —— 安装上报脚本即可显示其状态。"
+          }
+        }
+      }
+    },
+    "Claude Code not detected on this Mac." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本机未检测到 Claude Code。"
           }
         }
       }
@@ -596,6 +584,28 @@
         }
       }
     },
+    "Codex detected — install the reporter to show its status." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已检测到 Codex —— 安装上报脚本即可显示其状态。"
+          }
+        }
+      }
+    },
+    "Codex not detected on this Mac." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本机未检测到 Codex。"
+          }
+        }
+      }
+    },
     "Collapse sidebar on launch" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -680,6 +690,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "拷贝"
+          }
+        }
+      }
+    },
+    "Count background panes that need approval, just finished, or failed." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "统计需要批准、刚完成或失败的后台面板。"
           }
         }
       }
@@ -772,6 +793,28 @@
         }
       }
     },
+    "Devin detected — install the reporter to show its status." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已检测到 Devin —— 安装报告器即可显示其状态。"
+          }
+        }
+      }
+    },
+    "Devin not detected on this Mac." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本机未检测到 Devin。"
+          }
+        }
+      }
+    },
     "Disabling vibrancy can help on older Macs." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -812,6 +855,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Glint 界面的显示语言。"
+          }
+        }
+      }
+    },
+    "Dock badges and chimes only update for background workspaces — the one you're looking at stays quiet." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock 角标和提示音只在后台工作区更新,你正在查看的工作区保持安静。"
           }
         }
       }
@@ -877,6 +931,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "事件"
+          }
+        }
+      }
+    },
+    "Exposes a local socket under ~/.glint/run/ so other apps on this Mac can focus panes and inject text/keys. Any process that can read the 0600 token file may drive your terminals — off by default. Toggling takes effect immediately." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 ~/.glint/run/ 下开放一个本地 socket,让本机其它程序可以聚焦 pane、注入文本/按键。任何能读取 0600 token 文件的进程都能操控你的终端 —— 默认关闭。开关即时生效。"
+          }
+        }
+      }
+    },
+    "External control" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外部控制"
           }
         }
       }
@@ -980,6 +1056,9 @@
         }
       }
     },
+    "git" : {
+
+    },
     "Glass effect" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1023,6 +1102,28 @@
         }
       }
     },
+    "Glint can register status hooks with %@ that report when an agent is thinking, finished, or waiting for approval. They only send events to Glint on this Mac. You can uninstall them anytime in Settings → Agents." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glint 可以为 %@ 注册状态 hook，在 agent 思考中、已完成或等待批准时上报。事件只会发送到本机的 Glint。你随时可以在「设置 → Agents」里卸载。"
+          }
+        }
+      }
+    },
+    "Glint installs a global OpenCode plugin at ~/.config/opencode/plugins/glint-agent-bridge.js so OpenCode sessions can report status without being shown as Claude." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glint 会在 ~/.config/opencode/plugins/glint-agent-bridge.js 安装一个全局 OpenCode 插件，让 OpenCode 会话能上报状态、而不被显示成 Claude。"
+          }
+        }
+      }
+    },
     "Glint is dark-mode only for now." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1030,6 +1131,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Glint 目前仅支持深色模式。"
+          }
+        }
+      }
+    },
+    "Glint merges its hook entries into ~/.config/devin/config.json so Devin CLI sessions surface the same status as Claude." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glint 会将钩子条目合并到 ~/.config/devin/config.json，使 Devin CLI 会话能像 Claude 一样显示状态。"
           }
         }
       }
@@ -1111,6 +1223,17 @@
         }
       }
     },
+    "Hooks are stored in Devin's native user config alongside your existing settings." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "钩子存储在 Devin 的原生用户配置中，与你现有的设置并列。"
+          }
+        }
+      }
+    },
     "Hooks Glint reacts to from Claude Code." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1140,6 +1263,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hook 已合并到你的 Codex 配置。"
+          }
+        }
+      }
+    },
+    "Hooks merged into your Devin config." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "钩子已合并到你的 Devin 配置中。"
           }
         }
       }
@@ -1188,6 +1322,17 @@
         }
       }
     },
+    "Install failed — check Console for [glint] logs." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装失败 —— 请在「控制台」中查看 [glint] 日志。"
+          }
+        }
+      }
+    },
     "Install Hooks" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1206,6 +1351,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已安装"
+          }
+        }
+      }
+    },
+    "Installed — open a new shell for it to take effect." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已安装 —— 新开一个 shell 后生效。"
           }
         }
       }
@@ -1243,6 +1399,28 @@
         }
       }
     },
+    "Listening for external commands." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在监听外部命令。"
+          }
+        }
+      }
+    },
+    "Loaded by OpenCode automatically on startup; it only reports when Glint's pane environment variables are present." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenCode 启动时自动加载；仅当存在 Glint 的窗格环境变量时才会上报。"
+          }
+        }
+      }
+    },
     "Local Dev" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1253,6 +1431,9 @@
           }
         }
       }
+    },
+    "main" : {
+
     },
     "Manually look for a new release right now." : {
       "extractionState" : "stale",
@@ -1347,6 +1528,28 @@
     "No results" : {
 
     },
+    "Normalize modified keys" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "规整带修饰按键"
+          }
+        }
+      }
+    },
+    "Not detected" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未检测到"
+          }
+        }
+      }
+    },
     "Not installed" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1354,6 +1557,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未安装"
+          }
+        }
+      }
+    },
+    "Not installed." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未安装。"
           }
         }
       }
@@ -1391,6 +1605,17 @@
         }
       }
     },
+    "Off — no socket bound, no external access." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已关闭 —— 未绑定 socket,外部无法访问。"
+          }
+        }
+      }
+    },
     "Open a new pane on the right" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1398,6 +1623,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在右侧打开一个新面板"
+          }
+        }
+      }
+    },
+    "OpenCode detected — install the plugin to show its status." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已检测到 OpenCode —— 安装插件即可显示其状态。"
+          }
+        }
+      }
+    },
+    "OpenCode not detected on this Mac." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本机未检测到 OpenCode。"
           }
         }
       }
@@ -1501,6 +1748,28 @@
         }
       }
     },
+    "Plugin file" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "插件文件"
+          }
+        }
+      }
+    },
+    "Plugin installed into your OpenCode plugins directory." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "插件已安装到你的 OpenCode 插件目录。"
+          }
+        }
+      }
+    },
     "Preview" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1522,6 +1791,9 @@
           }
         }
       }
+    },
+    "push" : {
+
     },
     "Quit" : {
       "extractionState" : "stale",
@@ -1644,280 +1916,6 @@
         }
       }
     },
-    "When Glint reopens, run `claude --continue` in any pane that was running Claude at last quit." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glint 重新打开时，对上次退出前在跑 Claude 的窗格自动执行 `claude --continue`。"
-          }
-        }
-      }
-    },
-    "When Glint reopens, run `codex resume --last` in any pane that was running Codex at last quit." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glint 重新打开时，对上次退出前在跑 Codex 的窗格自动执行 `codex resume --last`。"
-          }
-        }
-      }
-    },
-    "When Glint reopens, run `opencode --continue` in any pane that was running OpenCode at last quit." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glint 重新打开时，对上次退出前在跑 OpenCode 的窗格自动执行 `opencode --continue`。"
-          }
-        }
-      }
-    },
-    "Plugin file" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "插件文件"
-          }
-        }
-      }
-    },
-    "Loaded by OpenCode automatically on startup; it only reports when Glint's pane environment variables are present." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OpenCode 启动时自动加载；仅当存在 Glint 的窗格环境变量时才会上报。"
-          }
-        }
-      }
-    },
-    "Glint installs a global OpenCode plugin at ~/.config/opencode/plugins/glint-agent-bridge.js so OpenCode sessions can report status without being shown as Claude." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glint 会在 ~/.config/opencode/plugins/glint-agent-bridge.js 安装一个全局 OpenCode 插件，让 OpenCode 会话能上报状态、而不被显示成 Claude。"
-          }
-        }
-      }
-    },
-    "Plugin installed into your OpenCode plugins directory." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "插件已安装到你的 OpenCode 插件目录。"
-          }
-        }
-      }
-    },
-    "Install failed — check Console for [glint] logs." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "安装失败 —— 请在「控制台」中查看 [glint] 日志。"
-          }
-        }
-      }
-    },
-    "Shell keybindings" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Shell 按键绑定"
-          }
-        }
-      }
-    },
-    "Writes the bindings to ~/.config/glint/ and adds a single source line to ~/.zshrc (and ~/.bashrc if present) so modified keys behave sensibly at the shell prompt instead of inserting a raw escape like ;2;13~ or 1;2C. Covers Shift/Ctrl+Enter, Shift/Ctrl/Alt + arrows, Home/End and Delete (Ctrl+←/→ jump by word). Off by default. Doesn't affect Claude/Codex panes, which use these keys themselves." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "把按键绑定写到 ~/.config/glint/,并在 ~/.zshrc(以及存在的话 ~/.bashrc)里只加一行 source 引用,让带修饰键在 shell 提示符下表现正常,而不是插入像 ;2;13~ 或 1;2C 这样的原始转义。覆盖 Shift/Ctrl+Enter、Shift/Ctrl/Alt + 方向键、Home/End 和 Delete(Ctrl+←/→ 按词移动)。默认关闭。不影响 Claude/Codex 窗格(它们自己要用这些键)。"
-          }
-        }
-      }
-    },
-    "Normalize modified keys" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "规整带修饰按键"
-          }
-        }
-      }
-    },
-    "Installed — open a new shell for it to take effect." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已安装 —— 新开一个 shell 后生效。"
-          }
-        }
-      }
-    },
-    "Not installed." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未安装。"
-          }
-        }
-      }
-    },
-    "Glint can register status hooks with %@ that report when an agent is thinking, finished, or waiting for approval. They only send events to Glint on this Mac. You can uninstall them anytime in Settings → Agents." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glint 可以为 %@ 注册状态 hook，在 agent 思考中、已完成或等待批准时上报。事件只会发送到本机的 Glint。你随时可以在「设置 → Agents」里卸载。"
-          }
-        }
-      }
-    },
-    "Not detected" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未检测到"
-          }
-        }
-      }
-    },
-    "Claude Code detected — install the reporter to show its status." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已检测到 Claude Code —— 安装上报脚本即可显示其状态。"
-          }
-        }
-      }
-    },
-    "Claude Code not detected on this Mac." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本机未检测到 Claude Code。"
-          }
-        }
-      }
-    },
-    "Codex detected — install the reporter to show its status." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已检测到 Codex —— 安装上报脚本即可显示其状态。"
-          }
-        }
-      }
-    },
-    "Codex not detected on this Mac." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本机未检测到 Codex。"
-          }
-        }
-      }
-    },
-    "OpenCode detected — install the plugin to show its status." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已检测到 OpenCode —— 安装插件即可显示其状态。"
-          }
-        }
-      }
-    },
-    "OpenCode not detected on this Mac." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本机未检测到 OpenCode。"
-          }
-        }
-      }
-    },
-    "Glint merges its hook entries into ~/.config/devin/config.json so Devin CLI sessions surface the same status as Claude." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glint 会将钩子条目合并到 ~/.config/devin/config.json，使 Devin CLI 会话能像 Claude 一样显示状态。"
-          }
-        }
-      }
-    },
-    "Hooks merged into your Devin config." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "钩子已合并到你的 Devin 配置中。"
-          }
-        }
-      }
-    },
-    "Devin detected — install the reporter to show its status." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已检测到 Devin —— 安装报告器即可显示其状态。"
-          }
-        }
-      }
-    },
-    "Devin not detected on this Mac." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本机未检测到 Devin。"
-          }
-        }
-      }
-    },
-    "When Glint reopens, run `devin --continue` in any pane that was running Devin at last quit." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glint 重新打开时，对上次退出前在跑 Devin 的窗格自动执行 `devin --continue`。"
-          }
-        }
-      }
-    },
-    "Hooks are stored in Devin's native user config alongside your existing settings." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "钩子存储在 Devin 的原生用户配置中，与你现有的设置并列。"
-          }
-        }
-      }
-    },
     "Retry" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1985,7 +1983,6 @@
       }
     },
     "Search" : {
-      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2049,6 +2046,17 @@
         }
       }
     },
+    "Shell keybindings" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shell 按键绑定"
+          }
+        }
+      }
+    },
     "Shortcuts" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2067,6 +2075,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在侧栏显示 agent 状态?"
+          }
+        }
+      }
+    },
+    "Show Dock badge for agent attention" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent 需要关注时显示 Dock 角标"
           }
         }
       }
@@ -2100,17 +2119,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上下文溢出时,在工作区卡片上显示压缩状态。"
-          }
-        }
-      }
-    },
-    "Show Dock badge for agent attention" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agent 需要关注时显示 Dock 角标"
           }
         }
       }
@@ -2470,17 +2478,6 @@
         }
       }
     },
-    "Underline" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下划线"
-          }
-        }
-      }
-    },
     "Unarchive" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2488,6 +2485,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "取消归档"
+          }
+        }
+      }
+    },
+    "Underline" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下划线"
           }
         }
       }
@@ -2569,13 +2577,46 @@
         }
       }
     },
-    "Ask first when the clipboard contains newlines or control characters — a multi-line paste into a shell prompt runs each line immediately." : {
+    "When Glint reopens, run `claude --continue` in any pane that was running Claude at last quit." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "当剪贴板包含换行或控制字符时先询问——多行内容粘贴到 shell 提示符会立刻逐行执行。"
+            "value" : "Glint 重新打开时，对上次退出前在跑 Claude 的窗格自动执行 `claude --continue`。"
+          }
+        }
+      }
+    },
+    "When Glint reopens, run `codex resume --last` in any pane that was running Codex at last quit." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glint 重新打开时，对上次退出前在跑 Codex 的窗格自动执行 `codex resume --last`。"
+          }
+        }
+      }
+    },
+    "When Glint reopens, run `devin --continue` in any pane that was running Devin at last quit." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glint 重新打开时，对上次退出前在跑 Devin 的窗格自动执行 `devin --continue`。"
+          }
+        }
+      }
+    },
+    "When Glint reopens, run `opencode --continue` in any pane that was running OpenCode at last quit." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glint 重新打开时，对上次退出前在跑 OpenCode 的窗格自动执行 `opencode --continue`。"
           }
         }
       }
@@ -2633,6 +2674,26 @@
           }
         }
       }
+    },
+    "Writes the bindings to ~/.config/glint/ and adds a single source line to ~/.zshrc (and ~/.bashrc if present) so modified keys behave sensibly at the shell prompt instead of inserting a raw escape like ;2;13~ or 1;2C. Covers Shift/Ctrl+Enter, Shift/Ctrl/Alt + arrows, Home/End and Delete (Ctrl+←/→ jump by word). Off by default. Doesn't affect Claude/Codex panes, which use these keys themselves." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把按键绑定写到 ~/.config/glint/,并在 ~/.zshrc(以及存在的话 ~/.bashrc)里只加一行 source 引用,让带修饰键在 shell 提示符下表现正常,而不是插入像 ;2;13~ 或 1;2C 这样的原始转义。覆盖 Shift/Ctrl+Enter、Shift/Ctrl/Alt + 方向键、Home/End 和 Delete(Ctrl+←/→ 按词移动)。默认关闭。不影响 Claude/Codex 窗格(它们自己要用这些键)。"
+          }
+        }
+      }
+    },
+    "当前" : {
+
+    },
+    "浏览全部 %@ 套主题" : {
+
+    },
+    "终端与界面共用一套配色,一键换肤。" : {
+
     }
   },
   "version" : "1.0"

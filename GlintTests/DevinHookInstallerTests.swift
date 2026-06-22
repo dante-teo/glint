@@ -144,4 +144,47 @@ final class DevinHookInstallerTests: XCTestCase {
         XCTAssertNil(cleaned["StopFailure"])
         XCTAssertNil(cleaned["PreCompact"])
     }
+
+    // MARK: - TTY fallback in shared script
+
+    /// The shared reporter script must contain the TTY-based fallback path so
+    /// agents that don't propagate env vars (Devin) can still resolve the pane.
+    func testScriptBodyContainsTTYFallback() {
+        let script = AgentHookInstaller.scriptBody
+        XCTAssertTrue(
+            script.contains(".glint/run/tty/"),
+            "script should reference the TTY lookup directory"
+        )
+        XCTAssertTrue(
+            script.contains("ps -o tty="),
+            "script should use `ps -o tty=` to resolve the controlling TTY"
+        )
+    }
+
+    /// The TTY fallback should only fire when GLINT_PANE_ID is empty, not
+    /// unconditionally — the env-var fast path must remain for Claude/Codex.
+    func testScriptBodyPreservesEnvVarFastPath() {
+        let script = AgentHookInstaller.scriptBody
+        // The `if [ -z "$GLINT_PANE_ID" ]` guard must appear BEFORE the TTY
+        // lookup so agents that DO propagate env vars skip the overhead.
+        guard let fallbackRange = script.range(of: ".glint/run/tty/"),
+              let guardRange = script.range(of: #"[ -z "$GLINT_PANE_ID" ]"#) else {
+            XCTFail("script must contain both the guard and the fallback")
+            return
+        }
+        XCTAssertTrue(
+            guardRange.lowerBound < fallbackRange.lowerBound,
+            "env-var emptiness check must come before the TTY fallback"
+        )
+    }
+
+    /// The script must still exit 0 when neither env vars nor TTY lookup are
+    /// available — never error out (exit 1/2) or leave a dangling process.
+    func testScriptExitsCleanlyOnMissingPaneID() {
+        let script = AgentHookInstaller.scriptBody
+        // After the fallback block, the original guards must still be present.
+        let lines = script.components(separatedBy: "\n")
+        let guardLines = lines.filter { $0.trimmingCharacters(in: .whitespaces).hasPrefix(#"[ -z "$GLINT_PANE_ID" ] && exit 0"#) }
+        XCTAssertFalse(guardLines.isEmpty, "script must exit 0 when GLINT_PANE_ID is still empty after fallback")
+    }
 }
