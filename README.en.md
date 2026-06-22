@@ -13,13 +13,13 @@ A polished macOS terminal made for AI agents. SwiftUI + AppKit, with [Ghostty](h
 ### Homebrew (recommended)
 
 ```bash
-brew tap chenbstack/glint
+brew tap dante-teo/tap
 brew install --cask glint
 ```
 
 ### Manual download
 
-Grab the latest `Glint-x.y.z.dmg` from the [Releases](https://github.com/chenbstack/glint/releases) page, mount it, and drag `Glint.app` into `/Applications`.
+Grab the latest `Glint-x.y.z.dmg` from the [Releases](https://github.com/dante-teo/glint/releases) page, mount it, and drag `Glint.app` into `/Applications`.
 
 If macOS refuses to open it with "developer cannot be verified", run once:
 
