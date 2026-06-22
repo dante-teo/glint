@@ -937,16 +937,17 @@ enum ShellKeybindInstaller {
 /// Unlike Claude/Codex, Devin's config file may contain non-hook keys
 /// (`version`, `agent`, `permissions`, …) which must be preserved.
 enum DevinHookInstaller {
-    /// Events Glint reacts to. Matches the Codex set — Devin supports the
-    /// same Claude-compatible lifecycle hooks.
+    /// Events Glint reacts to. Subset of Devin's supported lifecycle hooks
+    /// (differs from Claude/Codex — Devin lacks StopFailure, PreCompact).
     private static let hookEvents: [String] = [
         "SessionStart",
+        "SessionEnd",
         "UserPromptSubmit",
         "PreToolUse",
         "PostToolUse",
         "PermissionRequest",
+        "PostCompaction",
         "Stop",
-        "StopFailure",
     ]
 
     static func isInstalled() -> Bool {

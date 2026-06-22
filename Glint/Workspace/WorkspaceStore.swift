@@ -1272,7 +1272,8 @@ final class WorkspaceStore: ObservableObject {
         let oldStatus = state.status
         let now = Date()
         switch hook {
-        case "SessionStart":      state.status = .idle
+        case "SessionStart", "SessionEnd":
+            state.status = .idle
         case "UserPromptSubmit":  state.status = .thinking
         case "PreToolUse":        state.status = .tool
         case "PostToolUse":
@@ -1288,7 +1289,8 @@ final class WorkspaceStore: ObservableObject {
             state.status = .thinking
         case "Notification":      break   // noisy: background/idle prompts, ignore
         case "PermissionRequest": state.status = .needsPermission
-        case "PreCompact":        state.status = .compacting
+        case "PreCompact", "PostCompaction":
+            state.status = .compacting
         case "Stop":
             // `.justCompleted` persists until the user actually views this
             // pane — see `acknowledgeCompletionIfNeeded(for:)`. This is an
