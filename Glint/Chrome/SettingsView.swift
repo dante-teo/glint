@@ -1235,6 +1235,14 @@ private struct AgentsPane: View {
                     .lineLimit(1)
                     .truncationMode(.head)
             }
+            SettingsDivider()
+            SettingsRow("Icon style",
+                        subtitle: "How Devin panes are drawn in the sidebar and tabs.") {
+                HStack(spacing: 8) {
+                    DevinIconStyleSwatch(style: .portrait)
+                    DevinIconStyleSwatch(style: .pixelMonster)
+                }
+            }
         }
 
         SettingsCard("Notifications",
@@ -1580,6 +1588,46 @@ private struct ClaudeIconStyleSwatch: View {
                         .resizable().interpolation(.high)
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 28, height: 28)
+                }
+            }
+            .frame(width: 38, height: 38)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(isSelected ? store.accent.opacity(0.12) : Theme.overlay(0.03))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .strokeBorder(isSelected ? store.accent.opacity(0.85) : Theme.overlay(0.08),
+                                  lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct DevinIconStyleSwatch: View {
+    @EnvironmentObject var store: WorkspaceStore
+    let style: DevinIconStyle
+
+    private var isSelected: Bool { store.devinIconStyle == style }
+
+    var body: some View {
+        Button {
+            store.devinIconStyle = style
+        } label: {
+            Group {
+                switch style {
+                case .portrait:
+                    AnimatedGIFView(assetName: MascotAsset.devin(for: .idle, style: .portrait),
+                                    animates: false)
+                        .frame(width: 34, height: 34)
+                case .pixelMonster:
+                    AnimatedGIFView(assetName: MascotAsset.devin(for: .idle, style: .pixelMonster),
+                                    animates: false)
+                        .frame(width: 34, height: 34)
                 }
             }
             .frame(width: 38, height: 38)

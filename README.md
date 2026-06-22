@@ -33,6 +33,23 @@ Glint supports Auto, Light, and Dark appearance modes. Auto follows macOS and ke
 
 Developer notes and regression checks live in [docs/appearance.md](docs/appearance.md).
 
+## Agent Icons
+
+Agent status icons are bundled in `Glint/Resources/Assets.xcassets`. Animated status assets are 128x128 transparent APNGs stored as `.png` files inside `.dataset` folders; compact marks are 24x24 and 48x48 rasters inside `.imageset` folders.
+
+Devin has two selectable icon families:
+
+- `Devin*` / `DevinMark`: the default portrait family.
+- `DevinPixel*` / `DevinPixelMark`: the optional pixel-monster family.
+
+Regenerate the pixel-monster family with:
+
+```bash
+python3 scripts/generate_devin_pixel_monster_icons.py
+```
+
+The generator updates the asset catalog and writes a visual contact sheet to `design/devin-pixel-monster-icons/contact-sheet.png`. The pixel monster should remain a real character animation: body, face, limb, expression, or silhouette changes should carry each state, not decorative effects on a static logo.
+
 ## Upgrade & Uninstall
 
 ```bash

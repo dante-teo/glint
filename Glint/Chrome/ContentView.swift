@@ -831,7 +831,8 @@ struct TabIcon: View {
                                 animates: !reduceMotion && isBusy)
                     .frame(width: size * 1.21, height: size * 1.21)
             case .devin:
-                AnimatedGIFView(assetName: MascotAsset.devin(for: status),
+                AnimatedGIFView(assetName: MascotAsset.devin(for: status,
+                                                             style: store.devinIconStyle),
                                 animates: !reduceMotion && isBusy)
                     .frame(width: size * 1.21, height: size * 1.21)
             default:
@@ -1569,7 +1570,7 @@ private struct WorkspaceMicroIcon: View {
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fit)
             } else if isDevin {
-                Image("DevinMark")
+                Image(store.devinIconStyle == .pixelMonster ? "DevinPixelMark" : "DevinMark")
                     .resizable()
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fit)
