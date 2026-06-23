@@ -8,7 +8,7 @@ Glint is a macOS app built with SwiftUI, AppKit, and GhosttyKit. Application cod
 
 - `git submodule update --init --recursive`: fetch the `ghostty` submodule required by GhosttyKit setup.
 - `scripts/setup-ghosttykit.sh`: download and verify the matching prebuilt `Vendor/GhosttyKit.xcframework`.
-- `xcodegen generate`: regenerate `Glint.xcodeproj` after changing `project.yml`.
+- `xcodegen generate`: regenerate `Glint.xcodeproj` after changing `project.yml` **or adding/removing source files**. XcodeGen resolves glob patterns at generation time, so new `.swift` files won't appear in the Xcode project until you regenerate.
 - `xcodebuild test -project Glint.xcodeproj -scheme Glint -configuration Debug -destination "platform=macOS" CODE_SIGNING_ALLOWED=NO`: build and run the XCTest suite locally.
 - `open Glint.xcodeproj`: open the app in Xcode for interactive development.
 
@@ -19,6 +19,8 @@ Use Swift 5.10 conventions with 4-space indentation and clear feature-local orga
 ## Testing Guidelines
 
 Tests use XCTest in the `GlintTests` target. Follow red, green, refactor: add or update a focused failing test before implementation changes. Keep tests independent and deterministic; use `@MainActor` for UI or workspace state code that requires it. Run the full `xcodebuild test` command before declaring a change complete.
+
+To unit-test `WorkspaceStore` operations (tabs, splits, pane state), create a `WorkspaceStore()` and override `workspaces` and `selectedWorkspaceID` with test data. The init loads persisted state, but overwriting those two properties replaces it entirely. There are no live surface views in tests, so `focusedPaneLiveCwd()` falls back to the model — this is expected. See `CwdInheritanceTests.swift` for the canonical pattern.
 
 ## Commit & Pull Request Guidelines
 

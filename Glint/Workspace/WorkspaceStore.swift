@@ -1587,11 +1587,24 @@ final class WorkspaceStore: ObservableObject {
 
     // MARK: pane operations on the current workspace
 
+    /// Best-effort cwd for the currently focused pane: prefers the live
+    /// surface's value (event-driven via OSC 7 / proc_pidinfo), falls back
+    /// to the model (polled every 1 s). A recent `cd` that updated
+    /// `cachedCwd` but hasn't been swept into the model yet still propagates.
+    private func focusedPaneLiveCwd() -> String? {
+        guard let i = currentIndex,
+              let focusedID = workspaces[i].selectedTab?.focusedPane else { return nil }
+        let key = WorkspacePaneKey(workspace: workspaces[i].id, pane: focusedID)
+        return surfaceViews[key]?.currentCwd()
+            ?? workspaces[i].panes[focusedID]?.workingDirectory
+    }
+
     func splitFocused(_ direction: SplitDirection) {
         guard let i = currentIndex, let t = workspaces[i].selectedTabIndex else { return }
+        let inheritedCwd = focusedPaneLiveCwd()
         let new = PaneID(value: workspaces[i].nextPaneSeq)
         workspaces[i].nextPaneSeq += 1
-        workspaces[i].panes[new] = Pane(id: new, title: "zsh", workingDirectory: nil)
+        workspaces[i].panes[new] = Pane(id: new, title: "zsh", workingDirectory: inheritedCwd)
         workspaces[i].tabs[t].root = Self.splitLeaf(
             workspaces[i].tabs[t].root,
             target: workspaces[i].tabs[t].focusedPane,
@@ -1857,8 +1870,7 @@ final class WorkspaceStore: ObservableObject {
     /// after the current tab and selects it.
     func newTab() {
         guard let i = currentIndex else { return }
-        let inheritedCwd = (workspaces[i].selectedTab?.focusedPane)
-            .flatMap { workspaces[i].panes[$0]?.workingDirectory }
+        let inheritedCwd = focusedPaneLiveCwd()
         let pane = PaneID(value: workspaces[i].nextPaneSeq)
         workspaces[i].nextPaneSeq += 1
         workspaces[i].panes[pane] = Pane(id: pane, title: "zsh", workingDirectory: inheritedCwd)
