@@ -79,7 +79,7 @@ struct CommandPalette: View {
                 .foregroundStyle(Theme.text3)
             TextField("Type a command or workspace…", text: $query)
                 .textFieldStyle(.plain)
-                .font(.system(size: 15))
+                .font(AppFonts.ui(15))
                 .foregroundStyle(Theme.text1)
                 .focused($queryFocused)
                 .onSubmit { execute() }
@@ -153,7 +153,7 @@ struct CommandPalette: View {
                 .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(Theme.text4)
             Text("No results")
-                .font(.system(size: 12.5))
+                .font(AppFonts.ui(12.5))
                 .foregroundStyle(Theme.text3)
         }
         .frame(maxWidth: .infinity)
@@ -307,14 +307,14 @@ private struct PaletteRow: View {
                 (item.userContent
                     ? Text(verbatim: item.title)
                     : Text(LocalizedStringKey(item.title)))
-                    .font(.system(size: 13.5, weight: selected ? .semibold : .medium))
+                    .font(AppFonts.ui(13.5, weight: selected ? .semibold : .medium))
                     .foregroundStyle(Theme.text1)
                     .lineLimit(1)
                 if let s = item.subtitle {
                     (item.userContent
                         ? Text(verbatim: s)
                         : Text(LocalizedStringKey(s)))
-                        .font(.system(size: 11))
+                        .font(AppFonts.ui(11))
                         .foregroundStyle(Theme.text3)
                         .lineLimit(1)
                 }
@@ -382,7 +382,7 @@ private struct PaletteRow: View {
             // real accent badge so it stays legible on a light panel (text4 was
             // a near-invisible light grey there).
             Text(LocalizedStringKey(label))
-                .font(.system(size: 9.5, weight: .bold))
+                .font(AppFonts.ui(9.5, weight: .bold))
                 .kerning(0.6)
                 .foregroundStyle(store.accent)
                 .padding(.horizontal, 6)
@@ -390,7 +390,7 @@ private struct PaletteRow: View {
                 .background(Capsule().fill(store.accent.opacity(0.16)))
         case .kind(let label):
             Text(LocalizedStringKey(label))
-                .font(.system(size: 10, weight: .semibold))
+                .font(AppFonts.ui(10, weight: .semibold))
                 .kerning(0.6)
                 .foregroundStyle(Theme.text3)
         default:

@@ -98,11 +98,11 @@ struct PaneSummaryInlineRows: View {
                 HStack(spacing: 7) {
                     AgentStatusBeacon(status: info.status, size: 6)
                     Text(info.label)
-                        .font(.system(size: 10.5, weight: .medium))
+                        .font(AppFonts.ui(10.5, weight: .medium))
                         .foregroundStyle(Theme.text2)
                         .lineLimit(1)
                     Text(info.kind.displayName)
-                        .font(.system(size: 10, weight: .medium))
+                        .font(AppFonts.ui(10, weight: .medium))
                         .foregroundStyle(Theme.text4)
                         .lineLimit(1)
                         .layoutPriority(-1)
@@ -146,10 +146,10 @@ private struct PaneSummaryRow: View {
             // Tab name (as the chip shows it) + agent, single line each so a
             // narrow popover never breaks the label across two lines.
             (Text(info.label)
-                .font(.system(size: 12.5, weight: .semibold))
+                .font(AppFonts.ui(12.5, weight: .semibold))
                 .foregroundColor(Theme.text1)
              + Text("  \(info.kind.displayName)")
-                .font(.system(size: 11, weight: .medium))
+                .font(AppFonts.ui(11, weight: .medium))
                 .foregroundColor(Theme.text3))
                 .lineLimit(1)
                 .fixedSize()
@@ -159,7 +159,7 @@ private struct PaneSummaryRow: View {
             // Status as a tinted pill — gives the color structure and makes
             // the state scannable down the column.
             Text(agentStatusLabel(info.status))
-                .font(.system(size: 10.5, weight: .semibold))
+                .font(AppFonts.ui(10.5, weight: .semibold))
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .fixedSize()

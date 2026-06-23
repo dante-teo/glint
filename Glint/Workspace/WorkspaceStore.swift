@@ -436,7 +436,7 @@ final class WorkspaceStore: ObservableObject {
     /// Terminal appearance settings. Each is persisted to UserDefaults and
     /// fed into ghostty via `GhosttyManager.reloadConfig()` whenever it
     /// changes. The `didSet` hooks both persist and trigger live reload.
-    @Published var terminalFontFamily: String = UserDefaults.standard.string(forKey: "glint.terminalFontFamily") ?? "SF Mono" {
+    @Published var terminalFontFamily: String = UserDefaults.standard.string(forKey: "glint.terminalFontFamily") ?? AppFonts.defaultTerminalFamily {
         didSet {
             UserDefaults.standard.set(terminalFontFamily, forKey: "glint.terminalFontFamily")
             GhosttyManager.shared.reloadConfig()

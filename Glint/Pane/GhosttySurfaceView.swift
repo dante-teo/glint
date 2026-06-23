@@ -643,7 +643,7 @@ final class GhosttySurfaceView: NSView, NSTextInputClient {
         guard surfaceErrorStack == nil else { return }
 
         let label = NSTextField(labelWithString: String(localized: "Terminal failed to start"))
-        label.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        label.font = AppFonts.nsUI(13, weight: .medium)
         label.textColor = NSColor(Theme.text1)
         label.alignment = .center
 

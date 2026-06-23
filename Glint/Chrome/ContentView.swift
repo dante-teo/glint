@@ -436,7 +436,7 @@ private struct TabBarPlan: Equatable {
     private static var textWidthCache: [String: CGFloat] = [:]
     private static func textWidth(_ s: String) -> CGFloat {
         if let w = textWidthCache[s] { return w }
-        let font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        let font = AppFonts.nsUI(12, weight: .medium)
         let w = min(ceil((s as NSString).size(withAttributes: [.font: font]).width), 150)
         textWidthCache[s] = w
         return w
@@ -477,7 +477,7 @@ private struct TabChip: View {
             if isEditing {
                 TextField("", text: $draftName)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(AppFonts.ui(12, weight: .medium))
                     .foregroundStyle(Theme.text1)
                     .frame(maxWidth: 150)
                     .focused($nameFieldFocused)
@@ -495,7 +495,7 @@ private struct TabChip: View {
                     }
             } else {
                 Text(ws.tabDisplayName(tab))
-                    .font(.system(size: 12, weight: .medium))
+                    .font(AppFonts.ui(12, weight: .medium))
                     .foregroundStyle(isActive ? Theme.text1 : Theme.text3)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -842,7 +842,7 @@ struct TabIcon: View {
                         .foregroundStyle(Theme.text2)
                 } else {
                     Text(kind.letter)
-                        .font(.system(size: size * 0.8, weight: .semibold))
+                        .font(AppFonts.ui(size * 0.8, weight: .semibold))
                         .foregroundStyle(Theme.text2)
                 }
             }
@@ -950,7 +950,7 @@ private struct TabOverflowPopover: View {
     private var header: some View {
         HStack {
             Text("TABS")
-                .font(.system(size: 10, weight: .semibold))
+                .font(AppFonts.ui(10, weight: .semibold))
                 .kerning(1.1)
                 .foregroundStyle(Theme.text4)
             Spacer()
@@ -981,7 +981,7 @@ private struct TabOverflowPopover: View {
                 }
                 .frame(width: 24, height: 24)
                 Text("New Tab")
-                    .font(.system(size: 12.5, weight: .medium))
+                    .font(AppFonts.ui(12.5, weight: .medium))
                     .foregroundStyle(Theme.text3)
                 Spacer()
                 Text("⌘T")
@@ -1027,7 +1027,7 @@ private struct TabOverflowRow: View {
                     .frame(width: 24, height: 24)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(ws.tabDisplayName(tab))
-                            .font(.system(size: 12.5, weight: .medium))
+                            .font(AppFonts.ui(12.5, weight: .medium))
                             .foregroundStyle(hover ? Theme.text1 : Theme.text2)
                             .lineLimit(1)
                             .truncationMode(.middle)
@@ -1167,7 +1167,7 @@ struct GlintBrandMark: View {
                 .shadow(color: Color(red: 0.95, green: 0.30, blue: 0.55).opacity(0.35),
                         radius: 6, y: 0)
             Text("Glint")
-                .font(.system(size: 14, weight: .semibold))
+                .font(AppFonts.ui(14, weight: .semibold))
                 .foregroundStyle(Theme.text1)
                 .kerning(-0.2)
             #if DEBUG
@@ -1184,7 +1184,7 @@ struct GlintBrandMark: View {
 private struct DevBadge: View {
     var body: some View {
         Text("DEV")
-            .font(.system(size: 9, weight: .bold))
+            .font(AppFonts.ui(9, weight: .bold))
             .kerning(0.4)
             .foregroundStyle(Color.white)
             .padding(.horizontal, 5)
@@ -1258,7 +1258,7 @@ private struct WorkspaceSwitcher: View {
                     WorkspaceMicroIcon(ws: ws, kind: store.iconKind(for: ws), size: 16)
                 }
                 Text(currentName)
-                    .font(.system(size: 12.5, weight: .medium))
+                    .font(AppFonts.ui(12.5, weight: .medium))
                     .foregroundStyle(Theme.text1)
                     .lineLimit(1)
                 Image(systemName: "chevron.down")
@@ -1369,7 +1369,7 @@ private struct WorkspaceSwitcherPopover: View {
     private var header: some View {
         HStack {
             Text("WORKSPACES")
-                .font(.system(size: 10, weight: .semibold))
+                .font(AppFonts.ui(10, weight: .semibold))
                 .kerning(1.1)
                 .foregroundStyle(Theme.text4)
             Spacer()
@@ -1398,7 +1398,7 @@ private struct WorkspaceSwitcherPopover: View {
                 }
                 .frame(width: 24, height: 24)
                 Text("New Workspace")
-                    .font(.system(size: 12.5, weight: .medium))
+                    .font(AppFonts.ui(12.5, weight: .medium))
                     .foregroundStyle(Theme.text3)
                 Spacer()
                 Text("⌘N")
@@ -1437,8 +1437,8 @@ private struct WorkspaceSwitcherRow: View {
                     WorkspaceMicroIcon(ws: ws, kind: kind, size: 26)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(ws.displayName)
-                            .font(.system(size: 13,
-                                          weight: isCurrent ? .semibold : .medium))
+                            .font(AppFonts.ui(13,
+                                              weight: isCurrent ? .semibold : .medium))
                             .foregroundStyle(isCurrent ? Theme.text1 : Theme.text2)
                             .italic(!ws.userNamed)
                             .lineLimit(1)
@@ -1580,7 +1580,7 @@ private struct WorkspaceMicroIcon: View {
                     .foregroundStyle(.white)
             } else {
                 Text(kind.letter)
-                    .font(.system(size: size * 0.55, weight: .semibold))
+                    .font(AppFonts.ui(size * 0.55, weight: .semibold))
                     .foregroundStyle(.white)
             }
         }

@@ -21,6 +21,18 @@ In Auto mode, a macOS appearance change should:
 
 Glint's UI language is English-only. Unsupported stored language values are normalized to `system`, and Settings only offers `System` and `English`.
 
+## Typography
+
+Glint bundles its app fonts in `Glint/Resources/Fonts/` and registers them process-locally during `GlintApp.init()`, before `WorkspaceStore` can build Ghostty configuration or SwiftUI renders app chrome.
+
+- UI chrome uses Barlow through the helpers in `AppFonts.swift`.
+- New terminal defaults use `DepartureMono Nerd Font`.
+- Ghostty configuration keeps `Menlo` as the second `font-family` fallback, so missing or failed bundled font registration still leaves a usable terminal.
+- Existing users keep their stored `glint.terminalFontFamily` value. Only missing-user-default and fresh-install states resolve to the bundled terminal default.
+- Monospaced UI labels, shortcuts, counters, and terminal-like readouts intentionally keep system monospaced fonts. Ghostty terminal rendering is controlled only by Ghostty configuration.
+
+When adding, removing, or renaming bundled fonts, update `AppFonts.swift`, `GlintTests/FontDefaultsTests.swift`, regenerate the Xcode project with `xcodegen generate`, and keep third-party attribution current in `Glint/Resources/Fonts/THIRD_PARTY_FONT_LICENSES.md`.
+
 ## Liquid Glass and Transparency
 
 When glass is enabled, Glint uses floating glass islands for the top chrome and lets terminal content extend behind them. On macOS versions without native Liquid Glass, the fallback capsule must stay adaptive in both light and dark appearances.
@@ -31,7 +43,7 @@ Chrome opacity and terminal opacity are separate settings. Full-screen macOS win
 
 ## Regression Checks
 
-Run the XCTest suite with a fresh DerivedData path when touching appearance, theme, localization, or terminal backing behavior:
+Run the XCTest suite with a fresh DerivedData path when touching appearance, theme, typography, localization, or terminal backing behavior:
 
 ```bash
 xcodebuild test -project Glint.xcodeproj -scheme Glint -configuration Debug -destination "platform=macOS" CODE_SIGNING_ALLOWED=NO -derivedDataPath /private/tmp/glint-dd-appearance-check
