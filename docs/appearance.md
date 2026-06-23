@@ -41,6 +41,14 @@ Terminal translucency is controlled primarily by Ghostty's `background-opacity`.
 
 Chrome opacity and terminal opacity are separate settings. Full-screen macOS window behavior may reduce or disable desktop transparency, so verify windowed mode when testing glass refraction.
 
+## App Icon Packaging
+
+The shipping bundle icon comes from `Glint/Resources/Assets.xcassets/AppIcon.appiconset`. Keep it as a complete conventional macOS app icon set with 16, 32, 128, 256, 512, and 1024 px representations so Launch Services, Spotlight, Launchpad, Finder, and release packaging can read `AppIcon.icns` without depending on runtime Dock overrides.
+
+The Liquid Glass `.icon` source art is preserved in `AppIconSource/liquid-glass/AppIcon.icon`, outside `Glint/Resources`, because resources under `Glint/Resources` are copied into the app bundle. Do not move `.icon` packages back under bundled resources unless the app icon pipeline is changed deliberately.
+
+`project.yml` must keep both `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon` and `ASSETCATALOG_COMPILER_STANDALONE_ICON_BEHAVIOR: all`. After app icon resource changes, regenerate `Glint.xcodeproj` with `xcodegen generate` and run `GlintTests/AppIconAssetTests.swift`.
+
 ## Regression Checks
 
 Run the XCTest suite with a fresh DerivedData path when touching appearance, theme, typography, localization, or terminal backing behavior:
