@@ -74,10 +74,10 @@ extension Color {
 }
 
 extension Font {
-    static let glintUI       = Font.system(size: 13, weight: .medium)
-    static let glintUISmall  = Font.system(size: 12, weight: .medium)
-    static let glintCaption  = Font.system(size: 10.5, weight: .semibold).leading(.tight)
-    static let glintSection  = Font.system(size: 10.5, weight: .semibold)
+    static let glintUI       = AppFonts.ui(13, weight: .medium)
+    static let glintUISmall  = AppFonts.ui(12, weight: .medium)
+    static let glintCaption  = AppFonts.ui(10.5, weight: .semibold).leading(.tight)
+    static let glintSection  = AppFonts.ui(10.5, weight: .semibold)
     static let glintMono     = Font.system(size: 12.5, weight: .regular, design: .monospaced)
     static let glintMonoBig  = Font.system(size: 13, weight: .regular, design: .monospaced)
     static let glintStatus   = Font.system(size: 11, weight: .medium, design: .monospaced)

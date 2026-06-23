@@ -31,6 +31,8 @@ The Homebrew Cask does this automatically.
 
 Glint supports Auto, Light, and Dark appearance modes. Auto follows macOS and keeps the app chrome and Ghostty terminal colors in sync. Liquid Glass chrome and terminal translucency are configurable from Settings.
 
+Glint bundles Barlow for app UI and DepartureMono Nerd Font for new terminal defaults, so fresh installs do not depend on fonts installed in Font Book.
+
 Developer notes and regression checks live in [docs/appearance.md](docs/appearance.md).
 
 ## Agent Icons

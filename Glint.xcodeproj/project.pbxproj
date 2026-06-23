@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		03A10F3C2A6E3D55B543D7E6 /* THIRD_PARTY_FONT_LICENSES.md in Resources */ = {isa = PBXBuildFile; fileRef = D8CAD184E9D0547B876C8AFE /* THIRD_PARTY_FONT_LICENSES.md */; };
 		04E75EAD5165E8D96C1C5517 /* MascotAssetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 349714D49AE52D84995314FD /* MascotAssetTests.swift */; };
 		1115F230E14FBE3C1FC754A2 /* GhosttySurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E298AD81B1615CBBFD69F48A /* GhosttySurfaceView.swift */; };
 		175E069EE844FB32C6EE51BB /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EDE0D7C434B8E9C76C4A297 /* Persistence.swift */; };
@@ -19,6 +20,7 @@
 		47BB527385B84454ABF8FC40 /* themes.json in Resources */ = {isa = PBXBuildFile; fileRef = 6860F8F626EFDB9A289FC727 /* themes.json */; };
 		49DF8EE59313B7CFE29DA303 /* PaneTreeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E646AABA8ADCE8A2A5C6F55 /* PaneTreeView.swift */; };
 		5157C5439862F21202BCC44D /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E67CF5D8552AE1F51386161 /* AppDelegate.swift */; };
+		657E526F46F719D1F9DEF150 /* Barlow-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = 771C4C951D83D876034A393F /* Barlow-Medium.otf */; };
 		692D1A7D490E07D796535EAA /* UpdaterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4408F9761E584DE2AB6630E2 /* UpdaterController.swift */; };
 		6D74FE6545631EB8193C82E1 /* PaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FC2FBC9E8729A5ECBF857C /* PaneView.swift */; };
 		7D07A40DF6411A613624827A /* PaneSurfaceRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16137B405E48DBE262A15B6D /* PaneSurfaceRepresentable.swift */; };
@@ -26,10 +28,13 @@
 		81532B36FEC3039B8EAD9CB1 /* AgentKindResolutionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEF00CBEF45A9D60423A207 /* AgentKindResolutionTests.swift */; };
 		930665E39CE84564CBF9D300 /* GlintTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 150EEF32284061D527E51866 /* GlintTheme.swift */; };
 		942ED7C1C1A2E823BA52F67A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3023490E670A10EC38870B12 /* Assets.xcassets */; };
+		A1A72E96C61443EFFEA8A712 /* Barlow-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = 76ADFA17E75A528997343B1C /* Barlow-Regular.otf */; };
 		A91EFEF0FEA392A0745724DE /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 89B8883C4456681F07B6D662 /* AppIcon.icon */; };
 		AB89FA6EF5785EC4026F4402 /* VisualEffectBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0656F7C1D48AE0429C1888B /* VisualEffectBackground.swift */; };
+		AC6C263FBCEAF29D274E0881 /* Barlow-SemiBold.otf in Resources */ = {isa = PBXBuildFile; fileRef = 8970AF928E9F330D5C81C2C3 /* Barlow-SemiBold.otf */; };
 		B70CAFEBB2416E25B0FFED97 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = C48F9D3C512A0ABE8369D0F4 /* Sparkle */; };
 		C0E8D97C08BA3F0FA33F31E7 /* CommandPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 235E2D958A2244483CAA0812 /* CommandPalette.swift */; };
+		C1102E6BF39B44928974869A /* FontDefaultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE559C44534F14D1C4C817A8 /* FontDefaultsTests.swift */; };
 		C48BD1224EA2C6D3C87B9120 /* AgentPaneSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 829D894CF747D6BC08667239 /* AgentPaneSummary.swift */; };
 		C748DE21F23B49B2FFD73DC7 /* WorkspaceIconKindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83E4DF4C5180D50C381B4976 /* WorkspaceIconKindTests.swift */; };
 		CD30F5E1B78B3C46C9990FD6 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8C269A6E9AE87961C3356DC /* SidebarView.swift */; };
@@ -37,6 +42,8 @@
 		CEA0A8FF66046FEFA80FAC0C /* GlintApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CB74659D174004C620D538A /* GlintApp.swift */; };
 		D1BDE1E5DE8D4FE1F96822D1 /* WorkspaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A8933F67B4B6EEA3FD4E603 /* WorkspaceStore.swift */; };
 		D3D6CF13B67D30E9DA557F83 /* UsageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A1F24DAA7220AD4EE961E2 /* UsageStore.swift */; };
+		D821F5498BB280D170E945F7 /* DepartureMonoNerdFont-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = BE9117F7FB3E54B8267A1843 /* DepartureMonoNerdFont-Regular.otf */; };
+		E38979E8FE4960028D4C6C8A /* Barlow-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = F9D0615395D05BE6077AC0E7 /* Barlow-Bold.otf */; };
 		E464D0233508CD31C1235054 /* AgentBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05F2CA2243872C8111048EF2 /* AgentBridge.swift */; };
 		ED46CD7A6E09551A775AD3B8 /* PaneAgentKindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBCC04C19D745AA867D961FD /* PaneAgentKindTests.swift */; };
 		EF3ACBA990526130228FAD0B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3B64992BBD5A190DFE36D2 /* SettingsView.swift */; };
@@ -45,6 +52,7 @@
 		F6AFF715FCE5357CEB07683D /* SettingsSafety.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB20921E3CAC1006A8FBD3AE /* SettingsSafety.swift */; };
 		F7ABF70CD455143BF89B89B3 /* SafeJSON.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9E2B9ADF809766CE4278047 /* SafeJSON.swift */; };
 		FCB67525DF16A4DCF9B2AF7A /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 376568363043C189904E4E0A /* Localizable.xcstrings */; };
+		FF23A847BC5D81C090121A22 /* AppFonts.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC651B821F3C8E89A5D1F8DC /* AppFonts.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -81,23 +89,31 @@
 		5A8933F67B4B6EEA3FD4E603 /* WorkspaceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStore.swift; sourceTree = "<group>"; };
 		6860F8F626EFDB9A289FC727 /* themes.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = themes.json; sourceTree = "<group>"; };
 		6D3B64992BBD5A190DFE36D2 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		76ADFA17E75A528997343B1C /* Barlow-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Barlow-Regular.otf"; sourceTree = "<group>"; };
+		771C4C951D83D876034A393F /* Barlow-Medium.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Barlow-Medium.otf"; sourceTree = "<group>"; };
 		7CB74659D174004C620D538A /* GlintApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlintApp.swift; sourceTree = "<group>"; };
 		81DADCF27E710CC77846E961 /* GhosttyKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = GhosttyKit.xcframework; path = Vendor/GhosttyKit.xcframework; sourceTree = "<group>"; };
 		829D894CF747D6BC08667239 /* AgentPaneSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentPaneSummary.swift; sourceTree = "<group>"; };
 		83E4DF4C5180D50C381B4976 /* WorkspaceIconKindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceIconKindTests.swift; sourceTree = "<group>"; };
+		8970AF928E9F330D5C81C2C3 /* Barlow-SemiBold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Barlow-SemiBold.otf"; sourceTree = "<group>"; };
 		89B8883C4456681F07B6D662 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		8C8B584A039DB106E33D41EF /* CwdInheritanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CwdInheritanceTests.swift; sourceTree = "<group>"; };
 		8EDE0D7C434B8E9C76C4A297 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
 		9E67CF5D8552AE1F51386161 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A8C269A6E9AE87961C3356DC /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		BE9117F7FB3E54B8267A1843 /* DepartureMonoNerdFont-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "DepartureMonoNerdFont-Regular.otf"; sourceTree = "<group>"; };
 		C0656F7C1D48AE0429C1888B /* VisualEffectBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualEffectBackground.swift; sourceTree = "<group>"; };
 		C9E2B9ADF809766CE4278047 /* SafeJSON.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeJSON.swift; sourceTree = "<group>"; };
+		D8CAD184E9D0547B876C8AFE /* THIRD_PARTY_FONT_LICENSES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = THIRD_PARTY_FONT_LICENSES.md; sourceTree = "<group>"; };
 		DB20921E3CAC1006A8FBD3AE /* SettingsSafety.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSafety.swift; sourceTree = "<group>"; };
+		DE559C44534F14D1C4C817A8 /* FontDefaultsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontDefaultsTests.swift; sourceTree = "<group>"; };
 		E298AD81B1615CBBFD69F48A /* GhosttySurfaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttySurfaceView.swift; sourceTree = "<group>"; };
 		E94AB23640CA1E6007F8B2B4 /* GlintTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GlintTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		EBCC04C19D745AA867D961FD /* PaneAgentKindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneAgentKindTests.swift; sourceTree = "<group>"; };
+		EC651B821F3C8E89A5D1F8DC /* AppFonts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFonts.swift; sourceTree = "<group>"; };
 		F5A69ACF962AEDE189F98649 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F8A1F24DAA7220AD4EE961E2 /* UsageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageStore.swift; sourceTree = "<group>"; };
+		F9D0615395D05BE6077AC0E7 /* Barlow-Bold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Barlow-Bold.otf"; sourceTree = "<group>"; };
 		FC6FFB5185C403F6F44A1687 /* GhosttyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -123,6 +139,7 @@
 				F5A69ACF962AEDE189F98649 /* Info.plist */,
 				376568363043C189904E4E0A /* Localizable.xcstrings */,
 				6860F8F626EFDB9A289FC727 /* themes.json */,
+				C86DBF425136387D2AC2A124 /* Fonts */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -145,6 +162,7 @@
 				049EF5193FE5D19E86C9EC85 /* AppearanceThemeTests.swift */,
 				8C8B584A039DB106E33D41EF /* CwdInheritanceTests.swift */,
 				0F58E2127BAE2C9F5155CF07 /* DevinHookInstallerTests.swift */,
+				DE559C44534F14D1C4C817A8 /* FontDefaultsTests.swift */,
 				349714D49AE52D84995314FD /* MascotAssetTests.swift */,
 				EBCC04C19D745AA867D961FD /* PaneAgentKindTests.swift */,
 				83E4DF4C5180D50C381B4976 /* WorkspaceIconKindTests.swift */,
@@ -211,10 +229,24 @@
 			path = Glint;
 			sourceTree = "<group>";
 		};
+		C86DBF425136387D2AC2A124 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				F9D0615395D05BE6077AC0E7 /* Barlow-Bold.otf */,
+				771C4C951D83D876034A393F /* Barlow-Medium.otf */,
+				76ADFA17E75A528997343B1C /* Barlow-Regular.otf */,
+				8970AF928E9F330D5C81C2C3 /* Barlow-SemiBold.otf */,
+				BE9117F7FB3E54B8267A1843 /* DepartureMonoNerdFont-Regular.otf */,
+				D8CAD184E9D0547B876C8AFE /* THIRD_PARTY_FONT_LICENSES.md */,
+			);
+			path = Fonts;
+			sourceTree = "<group>";
+		};
 		CE6E633968E3B9EE7F187610 /* App */ = {
 			isa = PBXGroup;
 			children = (
 				9E67CF5D8552AE1F51386161 /* AppDelegate.swift */,
+				EC651B821F3C8E89A5D1F8DC /* AppFonts.swift */,
 				7CB74659D174004C620D538A /* GlintApp.swift */,
 				DB20921E3CAC1006A8FBD3AE /* SettingsSafety.swift */,
 				4408F9761E584DE2AB6630E2 /* UpdaterController.swift */,
@@ -335,7 +367,13 @@
 			files = (
 				A91EFEF0FEA392A0745724DE /* AppIcon.icon in Resources */,
 				942ED7C1C1A2E823BA52F67A /* Assets.xcassets in Resources */,
+				E38979E8FE4960028D4C6C8A /* Barlow-Bold.otf in Resources */,
+				657E526F46F719D1F9DEF150 /* Barlow-Medium.otf in Resources */,
+				A1A72E96C61443EFFEA8A712 /* Barlow-Regular.otf in Resources */,
+				AC6C263FBCEAF29D274E0881 /* Barlow-SemiBold.otf in Resources */,
+				D821F5498BB280D170E945F7 /* DepartureMonoNerdFont-Regular.otf in Resources */,
 				FCB67525DF16A4DCF9B2AF7A /* Localizable.xcstrings in Resources */,
+				03A10F3C2A6E3D55B543D7E6 /* THIRD_PARTY_FONT_LICENSES.md in Resources */,
 				47BB527385B84454ABF8FC40 /* themes.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -351,6 +389,7 @@
 				F0C9D4521F90D3DE4F02E29A /* AppearanceThemeTests.swift in Sources */,
 				3A7EFF6FAB2F2AF7006A6B49 /* CwdInheritanceTests.swift in Sources */,
 				34997DD4A4F9B64A754FE77F /* DevinHookInstallerTests.swift in Sources */,
+				C1102E6BF39B44928974869A /* FontDefaultsTests.swift in Sources */,
 				04E75EAD5165E8D96C1C5517 /* MascotAssetTests.swift in Sources */,
 				ED46CD7A6E09551A775AD3B8 /* PaneAgentKindTests.swift in Sources */,
 				C748DE21F23B49B2FFD73DC7 /* WorkspaceIconKindTests.swift in Sources */,
@@ -365,6 +404,7 @@
 				3932A4CFEFF6FB81AE283645 /* AgentHookInstaller.swift in Sources */,
 				C48BD1224EA2C6D3C87B9120 /* AgentPaneSummary.swift in Sources */,
 				5157C5439862F21202BCC44D /* AppDelegate.swift in Sources */,
+				FF23A847BC5D81C090121A22 /* AppFonts.swift in Sources */,
 				C0E8D97C08BA3F0FA33F31E7 /* CommandPalette.swift in Sources */,
 				CD7908F096580864CB2992ED /* ContentView.swift in Sources */,
 				EF937781512647E835836F83 /* ControlBridge.swift in Sources */,

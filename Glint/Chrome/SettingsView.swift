@@ -53,7 +53,7 @@ struct GlintSettingsView: View {
             .padding(.bottom, 4)
 
             Text("Settings")
-                .font(.system(size: 11, weight: .semibold))
+                .font(AppFonts.ui(11, weight: .semibold))
                 .kerning(1.0)
                 .foregroundStyle(Theme.text4)
                 .padding(.horizontal, 14)
@@ -74,7 +74,7 @@ struct GlintSettingsView: View {
 
             HStack(spacing: 6) {
                 Text("Glint")
-                    .font(.system(size: 10.5, weight: .medium))
+                    .font(AppFonts.ui(10.5, weight: .medium))
                     .foregroundStyle(Theme.text4)
                 Text(versionLabel)
                     .font(.system(size: 10.5, design: .monospaced))
@@ -91,11 +91,11 @@ struct GlintSettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .lastTextBaseline) {
                 Text(LocalizedStringKey(selected.title))
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(AppFonts.ui(22, weight: .semibold))
                     .foregroundStyle(Theme.text1)
                 if let subtitle = selected.subtitle {
                     Text(LocalizedStringKey(subtitle))
-                        .font(.system(size: 12))
+                        .font(AppFonts.ui(12))
                         .foregroundStyle(Theme.text4)
                         .padding(.leading, 4)
                 }
@@ -203,7 +203,7 @@ private struct SettingsCategoryRow: View {
                 .frame(width: 22, height: 22)
 
                 Text(LocalizedStringKey(category.title))
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                    .font(AppFonts.ui(13, weight: isSelected ? .semibold : .medium))
                     .foregroundStyle(isSelected ? Theme.text1 : Theme.text2)
 
                 Spacer()
@@ -247,7 +247,7 @@ struct SettingsCard<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(NSLocalizedString(title, comment: "").uppercased())
-                .font(.system(size: 10.5, weight: .semibold))
+                .font(AppFonts.ui(10.5, weight: .semibold))
                 .kerning(1.1)
                 .foregroundStyle(Theme.text4)
 
@@ -263,7 +263,7 @@ struct SettingsCard<Content: View>: View {
 
             if let footer {
                 Text(LocalizedStringKey(footer))
-                    .font(.system(size: 11))
+                    .font(AppFonts.ui(11))
                     .foregroundStyle(Theme.text4)
                     .padding(.leading, 2)
                     .padding(.top, 2)
@@ -291,7 +291,7 @@ struct SettingsRow<Trailing: View>: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(LocalizedStringKey(title))
-                        .font(.system(size: 13, weight: .medium))
+                        .font(AppFonts.ui(13, weight: .medium))
                         .foregroundStyle(Theme.text1)
                     if wip {
                         Circle()
@@ -302,7 +302,7 @@ struct SettingsRow<Trailing: View>: View {
                 }
                 if let subtitle {
                     Text(LocalizedStringKey(subtitle))
-                        .font(.system(size: 11))
+                        .font(AppFonts.ui(11))
                         .foregroundStyle(Theme.text4)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -354,7 +354,7 @@ struct StatusPill: View {
         HStack(spacing: 5) {
             Circle().fill(color).frame(width: 6, height: 6)
             Text(LocalizedStringKey(label))
-                .font(.system(size: 11, weight: .medium))
+                .font(AppFonts.ui(11, weight: .medium))
                 .foregroundStyle(Theme.text2)
         }
         .padding(.horizontal, 8)
@@ -491,7 +491,7 @@ private struct AppearancePane: View {
         SettingsCard("Theme") {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Advanced terminal color themes remain available for custom workflows.")
-                    .font(.system(size: 11))
+                    .font(AppFonts.ui(11))
                     .foregroundStyle(Theme.text3)
                 LazyVGrid(
                     columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)],
@@ -511,7 +511,7 @@ private struct AppearancePane: View {
                         Image(systemName: "square.grid.2x2")
                             .font(.system(size: 11, weight: .medium))
                         Text("Browse all \(ThemeRegistry.catalog.count + ThemeRegistry.featured.count) themes")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(AppFonts.ui(12, weight: .medium))
                         Image(systemName: "chevron.right")
                             .font(.system(size: 9, weight: .semibold))
                     }
@@ -607,7 +607,7 @@ private struct AppearancePane: View {
                             .scaleEffect(preset == store.appIconPreset ? 1.06 : 1.0)
                             .animation(.easeOut(duration: 0.15), value: store.appIconPreset)
                         Text(preset.displayName)
-                            .font(.system(size: 9.5, weight: preset == store.appIconPreset ? .semibold : .regular))
+                            .font(AppFonts.ui(9.5, weight: preset == store.appIconPreset ? .semibold : .regular))
                             .foregroundStyle(preset == store.appIconPreset ? Theme.text1 : Theme.text2)
                     }
                     .contentShape(Rectangle())
@@ -674,7 +674,7 @@ private struct ThemePreviewCard: View {
                 }
             }
             Text(theme.name)
-                .font(.system(size: 11, weight: selected ? .semibold : .medium))
+                .font(AppFonts.ui(11, weight: selected ? .semibold : .medium))
                 .foregroundStyle(selected ? Theme.text1 : Theme.text2)
                 .lineLimit(1)
                 .padding(.leading, 2)
@@ -748,7 +748,7 @@ private struct ThemeBrowserSheet: View {
                 .foregroundStyle(Theme.text3)
             TextField("Search themes...", text: $query)
                 .textFieldStyle(.plain)
-                .font(.system(size: 14))
+                .font(AppFonts.ui(14))
                 .foregroundStyle(Theme.text1)
                 .focused($searchFocused)
             if !query.isEmpty {
@@ -796,7 +796,7 @@ private struct ThemeBrowserSheet: View {
             Spacer()
             Button("Cancel") { dismiss() }
                 .buttonStyle(.plain)
-                .font(.system(size: 13, weight: .medium))
+                .font(AppFonts.ui(13, weight: .medium))
                 .foregroundStyle(Theme.text2)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
@@ -807,7 +807,7 @@ private struct ThemeBrowserSheet: View {
 
             Button("Apply") { apply() }
                 .buttonStyle(.plain)
-                .font(.system(size: 13, weight: .semibold))
+                .font(AppFonts.ui(13, weight: .semibold))
                 .foregroundStyle(dirty ? .white : Theme.text4)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 7)
@@ -864,12 +864,12 @@ private struct ThemeBrowserRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(theme.name)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(AppFonts.ui(13, weight: .medium))
                             .foregroundStyle(Theme.text1)
                             .lineLimit(1)
                         if isCurrent {
                             Text("Current")
-                                .font(.system(size: 9, weight: .semibold))
+                                .font(AppFonts.ui(9, weight: .semibold))
                                 .foregroundStyle(accent)
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 1)
@@ -879,7 +879,7 @@ private struct ThemeBrowserRow: View {
                         }
                     }
                     Text(theme.isDark ? "Dark" : "Light")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(AppFonts.ui(10, weight: .medium))
                         .foregroundStyle(Theme.text4)
                 }
 
@@ -924,21 +924,13 @@ private struct TerminalPane: View {
     @EnvironmentObject var store: WorkspaceStore
     @State private var shellKeybindsInstallFailed = false
 
-    /// Curated list of monospaced families we know ghostty can resolve.
-    /// Extra families fall back to Menlo via the second `font-family` line
-    /// in `applyGlintTheme`.
-    private let fontFamilies = [
-        "SF Mono", "Menlo", "Monaco", "Courier New",
-        "JetBrains Mono", "Fira Code", "IBM Plex Mono",
-    ]
-
     private let scrollbackChoices: [Int] = [1_000, 5_000, 10_000, 50_000, 100_000]
 
     var body: some View {
         SettingsCard("Font") {
             SettingsRow("Family", subtitle: "Used for all panes. Falls back to Menlo if missing.") {
                 GlintDropdown(selection: $store.terminalFontFamily,
-                              items: fontFamilies.map { (value: $0, label: $0) },
+                              items: AppFonts.terminalFontFamilies.map { (value: $0, label: $0) },
                               listWidth: 230)
             }
             SettingsDivider()
@@ -1308,7 +1300,7 @@ private struct GlintDropdown<Value: Hashable>: View {
         Button { isOpen.toggle() } label: {
             HStack(spacing: 6) {
                 Text(LocalizedStringKey(selectedLabel))
-                    .font(.system(size: 11.5))
+                    .font(AppFonts.ui(11.5))
                     .foregroundStyle(Theme.text1)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 7, weight: .bold))
@@ -1376,7 +1368,7 @@ private struct GlintDropdownRow: View {
                 .opacity(isSelected ? 1 : 0)
                 .frame(width: 12)
             Text(LocalizedStringKey(label))
-                .font(.system(size: 12.5, weight: isSelected ? .medium : .regular))
+                .font(AppFonts.ui(12.5, weight: isSelected ? .medium : .regular))
                 .foregroundStyle(isSelected ? Theme.text1 : Theme.text2)
             Spacer(minLength: 12)
         }
@@ -1411,7 +1403,7 @@ private struct SoundPicker: View {
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(Theme.text3)
                 Text(selection)
-                    .font(.system(size: 11.5))
+                    .font(AppFonts.ui(11.5))
                     .foregroundStyle(Theme.text1)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 7, weight: .bold))
@@ -1450,7 +1442,7 @@ private struct SoundPickerList: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text(NSLocalizedString("Sound", comment: "").uppercased())
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(AppFonts.ui(10, weight: .semibold))
                     .kerning(1.1)
                     .foregroundStyle(Theme.text4)
                 Spacer()
@@ -1531,7 +1523,7 @@ private struct SoundPickerRow: View {
                 .opacity(isSelected ? 1 : 0)
                 .frame(width: 12)
             Text(name)
-                .font(.system(size: 12.5, weight: isSelected ? .medium : .regular))
+                .font(AppFonts.ui(12.5, weight: isSelected ? .medium : .regular))
                 .foregroundStyle(isSelected ? Theme.text1 : Theme.text2)
             Spacer(minLength: 12)
             Button(action: preview) {
@@ -1725,13 +1717,13 @@ private struct AboutPane: View {
                             radius: 18, y: 4)
                 VStack(spacing: 4) {
                     Text("Glint")
-                        .font(.system(size: 22, weight: .semibold))
+                        .font(AppFonts.ui(22, weight: .semibold))
                         .foregroundStyle(Theme.text1)
                     Text(versionLabel)
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
                         .foregroundStyle(Theme.text3)
                     Text("A native mac terminal made for AI agents.")
-                        .font(.system(size: 12))
+                        .font(AppFonts.ui(12))
                         .foregroundStyle(Theme.text4)
                         .padding(.top, 6)
                 }

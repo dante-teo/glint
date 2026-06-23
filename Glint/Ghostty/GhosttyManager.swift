@@ -196,7 +196,7 @@ final class GhosttyManager {
     /// inside this lower layer.
     private func applyGlintTheme(_ cfg: ghostty_config_t) {
         let defaults = UserDefaults.standard
-        let family = defaults.string(forKey: "glint.terminalFontFamily") ?? "SF Mono"
+        let family = defaults.string(forKey: "glint.terminalFontFamily") ?? AppFonts.defaultTerminalFamily
         let size: Double = {
             let v = defaults.double(forKey: "glint.terminalFontSize")
             return v == 0 ? 13 : v
@@ -244,7 +244,7 @@ final class GhosttyManager {
         \(colorBlock)cursor-style = \(cursorStyle)
         cursor-style-blink = \(cursorBlink)
         font-family = \(family)
-        font-family = Menlo
+        font-family = \(AppFonts.terminalFallbackFamily)
         font-size = \(size)
         scrollback-limit = \(scrollback)
         window-padding-x = 14

@@ -3,11 +3,17 @@ import SwiftUI
 @main
 struct GlintApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @StateObject private var workspaceStore = WorkspaceStore()
-    @StateObject private var updater = UpdaterController()
-    @StateObject private var usage = UsageStore()
+    @StateObject private var workspaceStore: WorkspaceStore
+    @StateObject private var updater: UpdaterController
+    @StateObject private var usage: UsageStore
 
     init() {
+        BundledFontRegistrar.registerBundledFonts()
+
+        _workspaceStore = StateObject(wrappedValue: WorkspaceStore())
+        _updater = StateObject(wrappedValue: UpdaterController())
+        _usage = StateObject(wrappedValue: UsageStore())
+
         #if DEBUG
         // Dev builds run under their own defaults domain (app.glint.Glint.dev).
         // The first dev launch copies the production app's glint.* preferences

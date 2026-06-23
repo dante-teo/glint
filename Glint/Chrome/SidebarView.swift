@@ -208,7 +208,7 @@ struct SidebarView: View {
                             .fill(store.accent.opacity(newWorkspaceHovered ? 0.30 : 0.18))
                     )
                 Text("New Workspace")
-                    .font(.system(size: 12.5, weight: .medium))
+                    .font(AppFonts.ui(12.5, weight: .medium))
                     .foregroundStyle(newWorkspaceHovered ? Theme.text1 : Theme.text2)
                 Spacer()
             }
@@ -234,7 +234,7 @@ struct SidebarView: View {
                 .foregroundStyle(Theme.text3)
             TextField("", text: $searchText)
                 .textFieldStyle(.plain)
-                .font(.system(size: 12))
+                .font(AppFonts.ui(12))
                 .foregroundStyle(Theme.text1)
                 .focused($searchFocused)
                 .overlay(alignment: .leading) {
@@ -243,7 +243,7 @@ struct SidebarView: View {
                     // appearances readable.
                     if searchText.isEmpty {
                         Text("Search")
-                            .font(.system(size: 12))
+                            .font(AppFonts.ui(12))
                             .foregroundStyle(Theme.text3)
                             .allowsHitTesting(false)
                     }
@@ -338,7 +338,7 @@ struct SidebarView: View {
         } label: {
             HStack(spacing: 4) {
                 Text("Archived")
-                    .font(.system(size: 10.5, weight: .medium))
+                    .font(AppFonts.ui(10.5, weight: .medium))
                     .foregroundStyle(store.archiveExpanded ? Theme.text2 : Theme.text4)
                 Text("\(count)")
                     .font(.system(size: 10.5, weight: .medium, design: .monospaced))
@@ -638,7 +638,7 @@ private struct WorkspaceCard: View {
                 if isEditing {
                     TextField("", text: $draftName)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 13, weight: active ? .semibold : .medium))
+                        .font(AppFonts.ui(13, weight: active ? .semibold : .medium))
                         .foregroundStyle(Theme.text1)
                         .focused($nameFieldFocused)
                         .onSubmit { commitRename() }
@@ -654,7 +654,7 @@ private struct WorkspaceCard: View {
                         }
                 } else {
                     Text(ws.displayName)
-                        .font(.system(size: 13, weight: active ? .semibold : .medium))
+                        .font(AppFonts.ui(13, weight: active ? .semibold : .medium))
                         .foregroundStyle(active ? Theme.text1 : Theme.text2)
                         .italic(!ws.userNamed)
                         .lineLimit(1)
@@ -818,7 +818,7 @@ private struct WorkspaceCard: View {
                     .foregroundStyle(Theme.text2)
             } else {
                 Text(kind.letter)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(AppFonts.ui(16, weight: .semibold))
                     .foregroundStyle(Theme.text2)
             }
         }
@@ -893,7 +893,7 @@ private struct WorkspaceCard: View {
             Image(systemName: "archivebox.fill")
                 .font(.system(size: 8, weight: .semibold))
             Text("Archived")
-                .font(.system(size: 9.5, weight: .semibold))
+                .font(AppFonts.ui(9.5, weight: .semibold))
         }
         .foregroundStyle(Theme.text2)
         .lineLimit(1)
@@ -922,7 +922,7 @@ private struct WorkspaceCard: View {
 
     private func metadataBadge(_ text: String, active: Bool) -> some View {
         Text(text)
-            .font(.system(size: 9.5, weight: .semibold))
+            .font(AppFonts.ui(9.5, weight: .semibold))
             .foregroundStyle(active ? Theme.text2 : Theme.text3)
             .lineLimit(1)
             .fixedSize(horizontal: true, vertical: false)
