@@ -50,6 +50,7 @@ final class SettingsSafety {
     private static let ignoredKeys: Set<String> = [
         "glint.mainWindowFrame",
         "glint.devDefaultsSeeded",
+        "glint.activeFramedSplitMode",
     ]
     private static let keyPrefix = "glint."
     /// Cap the journal so a chatty setting can't grow the file without bound;

@@ -64,6 +64,32 @@ extension SplitNode {
         case .split(_, _, let a, let b): return a.leaves + b.leaves
         }
     }
+
+    var leafCount: Int {
+        switch self {
+        case .leaf:
+            return 1
+        case .split(_, _, let a, let b):
+            return a.leafCount + b.leafCount
+        }
+    }
+
+    /// True when `target` reaches the top edge of this split tree. Horizontal
+    /// splits preserve top alignment for both children; vertical lower
+    /// children are no longer top-aligned.
+    func leafReachesTop(_ target: PaneID) -> Bool? {
+        switch self {
+        case .leaf(let id):
+            return id == target ? true : nil
+        case .split(.horizontal, _, let a, let b):
+            if let v = a.leafReachesTop(target) { return v }
+            return b.leafReachesTop(target)
+        case .split(.vertical, _, let a, let b):
+            if let v = a.leafReachesTop(target) { return v }
+            if b.leafReachesTop(target) != nil { return false }
+            return nil
+        }
+    }
 }
 
 struct Pane: Identifiable, Codable {
@@ -369,8 +395,12 @@ extension Workspace {
 @MainActor
 final class WorkspaceStore: ObservableObject {
 
-    @Published var workspaces: [Workspace]
-    @Published var selectedWorkspaceID: UUID?
+    @Published var workspaces: [Workspace] {
+        didSet { syncActiveFramedSplitMode() }
+    }
+    @Published var selectedWorkspaceID: UUID? {
+        didSet { syncActiveFramedSplitMode() }
+    }
     @Published var sidebarCollapsed: Bool
     /// Latest foreground-process name per (workspace, pane). Polled every
     /// few seconds; drives the workspace card icon. Non-persistent.
@@ -520,7 +550,22 @@ final class WorkspaceStore: ObservableObject {
     /// back to flat opaque surfaces — useful on older Macs and gives a
     /// noticeably flatter look. Defaults to on.
     @Published var glassEffect: Bool = (UserDefaults.standard.object(forKey: "glint.glassEffect") as? Bool) ?? true {
-        didSet { UserDefaults.standard.set(glassEffect, forKey: "glint.glassEffect") }
+        didSet {
+            UserDefaults.standard.set(glassEffect, forKey: "glint.glassEffect")
+            syncActiveFramedSplitMode()
+            GhosttyManager.shared.reloadConfig()
+        }
+    }
+
+    /// Optional visual treatment that renders split panes as rounded Liquid
+    /// Glass mini-windows. It is gated by `glassEffect` at render time so the
+    /// preference can stay set while global glass is temporarily off.
+    @Published var framedSplits: Bool = (UserDefaults.standard.object(forKey: "glint.framedSplits") as? Bool) ?? false {
+        didSet {
+            UserDefaults.standard.set(framedSplits, forKey: "glint.framedSplits")
+            syncActiveFramedSplitMode()
+            GhosttyManager.shared.reloadConfig()
+        }
     }
 
     /// UI accent color. Drives focus/selection highlights across the chrome,
@@ -1086,6 +1131,7 @@ final class WorkspaceStore: ObservableObject {
         self.devinHooksInstalled = DevinHookInstaller.isInstalled()
         self.shellKeybindsInstalled = ShellKeybindInstaller.isInstalled()
         updateDockBadge()
+        syncActiveFramedSplitMode()
         observerTokens.append(NotificationCenter.default.addObserver(
             forName: .glintAgentEvent,
             object: nil,
@@ -1131,14 +1177,20 @@ final class WorkspaceStore: ObservableObject {
             NSLog("[glint.visible] MINT surface ws=\(workspaceID.uuidString.prefix(8)) pane=\(paneID.value) inModel=\(known)")
         }
         let paneKey = "\(workspaceID.uuidString):\(paneID.value)"
-        // Only top-edge panes need the padded launcher (clear + blank rows
-        // to escape the floating header). A pane sitting below a vertical
-        // split divider already starts mid-window, so padding leaves empty
-        // rows above the prompt.
+        // Top-edge panes need the extended viewport inset to escape the
+        // floating app header. In Liquid Glass split-window mode every framed
+        // pane gets the same extended inset so its close button floats above
+        // live terminal rows instead of a dead SwiftUI padding strip.
         let topAligned: Bool = {
             guard let ws = workspaces.first(where: { $0.id == workspaceID }) else { return true }
             for tab in ws.tabs {
-                if let v = Self.leafTopAlignment(tab.root, target: paneID) { return v }
+                guard let usesInset = Self.usesExtendedViewportInset(
+                    framedSplits: framedSplits,
+                    glassEffect: glassEffect,
+                    root: tab.root,
+                    paneID: paneID
+                ) else { continue }
+                return usesInset
             }
             return true
         }()
@@ -1168,24 +1220,6 @@ final class WorkspaceStore: ObservableObject {
         )
         surfaceViews[key] = v
         return v
-    }
-
-    /// Walks the split tree to decide whether `target` sits flush with the
-    /// top edge of the window. Returns nil if the leaf isn't in this tree.
-    /// Horizontal splits don't change top-alignment (both sides reach the
-    /// top); a vertical split's `b` child (the lower half) does not.
-    private static func leafTopAlignment(_ node: SplitNode, target: PaneID) -> Bool? {
-        switch node {
-        case .leaf(let id):
-            return id == target ? true : nil
-        case .split(.horizontal, _, let a, let b):
-            if let v = leafTopAlignment(a, target: target) { return v }
-            return leafTopAlignment(b, target: target)
-        case .split(.vertical, _, let a, let b):
-            if let v = leafTopAlignment(a, target: target) { return v }
-            if leafTopAlignment(b, target: target) != nil { return false }
-            return nil
-        }
     }
 
     /// Snapshot every live surface's cwd back into the workspace model and
@@ -1572,6 +1606,41 @@ final class WorkspaceStore: ObservableObject {
         selectedWorkspace?.selectedTab?.root ?? .leaf(PaneID(value: 0))
     }
 
+    var usesLiquidGlassSplitWindows: Bool {
+        Self.usesLiquidGlassSplitWindows(
+            framedSplits: framedSplits,
+            glassEffect: glassEffect,
+            root: currentRoot
+        )
+    }
+
+    static func usesLiquidGlassSplitWindows(framedSplits: Bool,
+                                            glassEffect: Bool,
+                                            root: SplitNode) -> Bool {
+        framedSplits && glassEffect && root.leafCount > 1
+    }
+
+    static func usesExtendedViewportInset(framedSplits: Bool,
+                                          glassEffect: Bool,
+                                          root: SplitNode,
+                                          paneID: PaneID) -> Bool? {
+        guard let reachesTop = root.leafReachesTop(paneID) else { return nil }
+        return reachesTop || usesLiquidGlassSplitWindows(
+            framedSplits: framedSplits,
+            glassEffect: glassEffect,
+            root: root
+        )
+    }
+
+    private func syncActiveFramedSplitMode() {
+        let defaults = UserDefaults.standard
+        let next = usesLiquidGlassSplitWindows
+        let current = (defaults.object(forKey: GhosttyManager.activeFramedSplitModeKey) as? Bool) ?? false
+        guard current != next else { return }
+        defaults.set(next, forKey: GhosttyManager.activeFramedSplitModeKey)
+        GhosttyManager.shared.reloadConfig()
+    }
+
     var currentFocusedPane: PaneID {
         selectedWorkspace?.selectedTab?.focusedPane ?? PaneID(value: 0)
     }
@@ -1701,14 +1770,18 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func closeFocused() {
+        closePane(currentFocusedPane)
+    }
+
+    func closePane(_ target: PaneID) {
         guard let i = currentIndex, let t = workspaces[i].selectedTabIndex else { return }
+        guard workspaces[i].tabs[t].root.leaves.contains(target) else { return }
         // Last pane in this tab → close the whole tab instead (which itself
         // beeps when it's also the workspace's last tab).
         guard workspaces[i].tabs[t].root.leaves.count > 1 else {
             closeTab(workspaces[i].tabs[t].id)
             return
         }
-        let target = workspaces[i].tabs[t].focusedPane
         let key = WorkspacePaneKey(workspace: workspaces[i].id, pane: target)
         if paneNeedsCloseConfirmation(key),
            !Self.confirmDestruction(

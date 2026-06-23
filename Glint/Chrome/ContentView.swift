@@ -54,6 +54,7 @@ struct ContentView: View {
             .overlay(alignment: .top) {
                 if floatingHeader {
                     ToolbarHeader()
+                        .zIndex(0)
                 }
             }
         }
@@ -183,12 +184,14 @@ struct ToolbarHeader: View {
         .padding(.leading, store.sidebarCollapsed && !isFullscreen ? 78 : 12)
         .padding(.trailing, 14)
         .frame(height: 52)
-        // Invisible drag strip across the whole header: buttons and tabs
-        // still win the click (they sit above), but every empty stretch —
-        // including the gaps between floating islands — drags the window.
-        // This trades away click-through to the terminal's top 52pt, which
-        // only ever showed scrollback passing under the glass.
-        .background(WindowDragSurface())
+        // Invisible drag strip across the whole header. In framed split mode
+        // the panes have their own close buttons in this top region, so empty
+        // toolbar gaps must click through to the pane chrome instead.
+        .background {
+            if !store.usesLiquidGlassSplitWindows {
+                WindowDragSurface()
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(
             for: NSWindow.willEnterFullScreenNotification)) { _ in
             isFullscreen = true

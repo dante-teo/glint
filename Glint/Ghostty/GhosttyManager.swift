@@ -95,12 +95,20 @@ final class GhosttyManager {
     /// (The Metal renderer already produces an alpha IOSurface; without these
     /// AppKit signals the compositor still draws an opaque backing behind it.)
     var terminalIsTransparent: Bool {
-        Self.terminalOpacity() < 1.0
+        Self.effectiveTerminalOpacity() < 1.0
     }
+
+    static let activeFramedSplitModeKey = "glint.activeFramedSplitMode"
 
     static func terminalOpacity(defaults: UserDefaults = .standard) -> Double {
         (defaults.object(forKey: "glint.terminalOpacity") as? Double)
             ?? WorkspaceStore.defaultTerminalOpacity
+    }
+
+    static func effectiveTerminalOpacity(defaults: UserDefaults = .standard) -> Double {
+        ((defaults.object(forKey: activeFramedSplitModeKey) as? Bool) ?? false)
+            ? 0
+            : terminalOpacity(defaults: defaults)
     }
 
     /// Opaque flash-guard color for the surface/container layer in the NON
@@ -142,7 +150,7 @@ final class GhosttyManager {
     /// stay alpha 1 so the surface isn't faded twice.
     func applyTerminalBacking(to layer: CALayer?, appliesContentOpacity: Bool = true) {
         guard let layer else { return }
-        let style = Self.terminalBackingStyle(terminalOpacity: Self.terminalOpacity(),
+        let style = Self.terminalBackingStyle(terminalOpacity: Self.effectiveTerminalOpacity(),
                                               backgroundColor: currentBackgroundColor)
         layer.isOpaque = style.isOpaque
         layer.opacity = appliesContentOpacity ? style.layerOpacity : 1
@@ -211,16 +219,20 @@ final class GhosttyManager {
         // Transparency and blur are independent of color theme. The defaults
         // intentionally keep both terminal and chrome translucent so Liquid
         // Glass has real content to refract immediately on first launch.
-        let termOpacity = (defaults.object(forKey: "glint.terminalOpacity") as? Double)
-            ?? WorkspaceStore.defaultTerminalOpacity
+        let activeFramedSplitMode = (defaults.object(forKey: Self.activeFramedSplitModeKey) as? Bool) ?? false
+        let termOpacity = Self.effectiveTerminalOpacity(defaults: defaults)
         let blurRadius = Int(((defaults.object(forKey: "glint.backgroundBlur") as? Double)
                               ?? WorkspaceStore.defaultBackgroundBlur).rounded())
+        let viewportTopOffsetBlock = activeFramedSplitMode
+            ? "viewport-top-offset = \(Self.floatingHeaderInsetPoints)\n"
+            : ""
 
-        // Note: the per-surface `viewport-top-offset` reserves an inset above
-        // the grid that the renderer paints scrollback rows up into (instead
-        // of the dead-padding behavior of `window-padding-y`). It's set in
-        // GhosttySurfaceView.createSurface, not here, because only the
-        // top-aligned pane needs the inset; split children don't.
+        // Note: `viewport-top-offset` reserves an inset above the grid that
+        // the renderer paints scrollback rows up into (instead of the
+        // dead-padding behavior of `window-padding-y`). Normal panes set it
+        // per surface in GhosttySurfaceView.createSurface. Framed split panes
+        // also set it globally here so already-live lower split surfaces can
+        // pick up the same extended inset through config reload.
         // Colors come from the active theme. Cursor/selection still follow the
         // accent setting, while layout settings are injected for every theme.
         // follow-ghostty skips the color block so the user's Ghostty config
@@ -254,6 +266,7 @@ final class GhosttyManager {
         macos-titlebar-style = hidden
         background-opacity = \(termOpacity)
         background-blur = \(blurRadius)
+        \(viewportTopOffsetBlock)
         """
         let source = "glint-inline"
         overrides.withCString { ovr in
@@ -279,8 +292,11 @@ final class GhosttyManager {
     /// helper on `#available(macOS 26.0, *)` previously dropped the inset
     /// on macOS 15.x and let the first terminal row sit under the islands.
     ///
-    /// Applied PER-SURFACE in `GhosttySurfaceView.createSurface`; split
-    /// children don't get the inset because they sit below the header.
+    /// Applied per surface in `GhosttySurfaceView.createSurface` for ordinary
+    /// layouts. Framed split windows also apply the same value globally during
+    /// config reload so every mini-window uses the extended inset.
+    static let floatingHeaderInsetPoints: UInt32 = 48
+
     static func floatingHeaderInsetPt() -> UInt32? {
         guard (UserDefaults.standard.object(forKey: "glint.glassEffect") as? Bool) ?? true else {
             return nil
@@ -288,7 +304,7 @@ final class GhosttyManager {
         // ToolbarHeader is 52pt tall (Glint/Chrome/ContentView.swift); a
         // little less than that lets the terminal's first visible row sit
         // tight to the islands' lower edge without a wide gap.
-        return 48
+        return floatingHeaderInsetPoints
     }
 
     /// Rebuild the config from current user defaults and push it into the

@@ -566,6 +566,13 @@ private struct AppearancePane: View {
                 Toggle("", isOn: $store.glassEffect)
                     .toggleStyle(.switch).labelsHidden()
             }
+            SettingsDivider()
+            SettingsRow("Liquid Glass split windows",
+                        subtitle: "Applies only when the current tab has split panes.") {
+                Toggle("", isOn: $store.framedSplits)
+                    .toggleStyle(.switch).labelsHidden()
+                    .disabled(!store.glassEffect)
+            }
         }
 
         SettingsCard("Transparency and blur",

@@ -41,6 +41,12 @@ Terminal translucency is controlled primarily by Ghostty's `background-opacity`.
 
 Chrome opacity and terminal opacity are separate settings. Full-screen macOS window behavior may reduce or disable desktop transparency, so verify windowed mode when testing glass refraction.
 
+The optional `Liquid Glass split windows` setting is a visual treatment for split-pane tabs only. It is persisted as `glint.framedSplits`, but it is active only when global glass is enabled and the current tab has at least two panes. Single-pane tabs must remain full-bleed with the same terminal backing and no extra gutters, even if the preference is on.
+
+When split windows are active, the outer pane area should keep the same background treatment as an unsplit terminal, while each split leaf becomes its own rounded glass shell. The Ghostty surface inside those shells is made clear through the derived runtime flag `glint.activeFramedSplitMode`, so the mini-window glass/fallback must sit behind the terminal surface. Keep that runtime key out of settings recovery or user-facing preference flows; it is derived from the current tab layout, not an independent setting.
+
+The pane glass shell should use the shared `liquidGlass` helper so macOS 26 gets system Liquid Glass and older macOS versions keep the app's adaptive `VisualEffectBackground` fallback. Avoid adding opaque fills inside the pane frame; borders, highlights, shadows, and close controls should be the only chrome over the clear terminal surface.
+
 ## App Icon Packaging
 
 The shipping bundle icon comes from `Glint/Resources/Assets.xcassets/AppIcon.appiconset`. Keep it as a complete conventional macOS app icon set with 16, 32, 128, 256, 512, and 1024 px representations so Launch Services, Spotlight, Launchpad, Finder, and release packaging can read `AppIcon.icns` without depending on runtime Dock overrides.
@@ -68,4 +74,4 @@ rg -n "darkAqua|Color\\.black|Color\\.white|NSColor\\(" Glint --glob '*.swift'
 
 The first two `rg` commands should produce no matches. Inspect every hit from the final color sweep and keep only intentional adaptive/system appearance handling, shadows, dividers, or highlights.
 
-Manual visual QA should cover Light, Dark, Auto-light, Auto-dark, glass on/off, terminal opacity at `1.0` and below `1.0`, Settings, command palette, theme browser, sidebar expanded/collapsed, and a split-pane terminal. Do not ship changes that introduce illegible text, stale dark materials in light mode, muddy glass, black-on-dark controls, white-on-light controls, or overlapping toolbar/sidebar content.
+Manual visual QA should cover Light, Dark, Auto-light, Auto-dark, glass on/off, terminal opacity at `1.0` and below `1.0`, Settings, command palette, theme browser, sidebar expanded/collapsed, and split-pane terminals. For `Liquid Glass split windows`, verify option off with splits, option on with a single pane, option on with horizontal/vertical/nested splits, split resizing, pane close buttons under the floating toolbar area, and switching between split and non-split tabs. Do not ship changes that introduce illegible text, stale dark materials in light mode, muddy glass, black-on-dark controls, white-on-light controls, or overlapping toolbar/sidebar content.
