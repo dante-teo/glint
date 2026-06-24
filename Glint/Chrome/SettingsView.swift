@@ -1245,10 +1245,16 @@ private struct AgentsPane: View {
         }
 
         SettingsCard("Notifications",
-                     footer: "Dock badges and chimes only update for background workspaces — the one you're looking at stays quiet.") {
+                     footer: "Dock badges only update for background workspaces. Chimes follow the \u{201C}Always play sounds\u{201D} toggle.") {
             SettingsRow("Show Dock badge for agent attention",
                         subtitle: "Count background panes that need approval, just finished, or failed.") {
                 Toggle("", isOn: $store.dockBadgeOnAgentAttention)
+                    .toggleStyle(.switch).labelsHidden()
+            }
+            SettingsDivider()
+            SettingsRow("Always play sounds",
+                        subtitle: "Play notification chimes even when the agent's pane is focused. When off, only background workspaces trigger sounds.") {
+                Toggle("", isOn: $store.playSoundsAlways)
                     .toggleStyle(.switch).labelsHidden()
             }
             SettingsDivider()

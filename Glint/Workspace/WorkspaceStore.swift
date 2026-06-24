@@ -754,25 +754,34 @@ final class WorkspaceStore: ObservableObject {
         }
     }
 
-    /// Play a chime when the focused pane in a background workspace flips
-    /// to `.needsPermission`. Background-only so the chime doesn't fire on
-    /// the workspace the user is already watching. Defaults to on.
+    /// Play a chime when a non-visible pane (background workspace or
+    /// background tab) flips to `.needsPermission`. Background-only by
+    /// default; `playSoundsAlways` overrides this. Defaults to on.
     @Published var soundOnPermissionRequest: Bool = (UserDefaults.standard.object(forKey: "glint.soundOnPermissionRequest") as? Bool) ?? true {
         didSet { UserDefaults.standard.set(soundOnPermissionRequest, forKey: "glint.soundOnPermissionRequest") }
     }
 
-    /// Play a softer chime when a background workspace's agent finishes a
-    /// turn (transitions into `.justCompleted`). Same background-only rule.
-    /// Defaults to on.
+    /// Play a softer chime when an agent finishes a turn. For non-visible
+    /// panes this fires on the `.justCompleted` transition; when
+    /// `playSoundsAlways` is on and the user IS watching, "Stop" sets
+    /// `.idle` instead, so a dedicated `.idle` + `hook == "Stop"` case
+    /// handles that path. Defaults to on.
     @Published var soundOnTurnComplete: Bool = (UserDefaults.standard.object(forKey: "glint.soundOnTurnComplete") as? Bool) ?? true {
         didSet { UserDefaults.standard.set(soundOnTurnComplete, forKey: "glint.soundOnTurnComplete") }
     }
 
-    /// Play an error tone when a background workspace's agent turn ends in an
-    /// API/transport error (transitions into `.failed`). Same background-only
-    /// rule as the other cues. Defaults to on.
+    /// Play an error tone when an agent turn ends in an API/transport error
+    /// (transitions into `.failed`). Same background-only-by-default rule;
+    /// `playSoundsAlways` overrides. Defaults to on.
     @Published var soundOnError: Bool = (UserDefaults.standard.object(forKey: "glint.soundOnError") as? Bool) ?? true {
         didSet { UserDefaults.standard.set(soundOnError, forKey: "glint.soundOnError") }
+    }
+
+    /// When true, notification chimes play even when the user is actively
+    /// watching the pane (Glint frontmost, pane on screen). When false
+    /// (default), chimes only fire for background workspaces/tabs.
+    @Published var playSoundsAlways: Bool = (UserDefaults.standard.object(forKey: "glint.playSoundsAlways") as? Bool) ?? false {
+        didSet { UserDefaults.standard.set(playSoundsAlways, forKey: "glint.playSoundsAlways") }
     }
 
     /// Show a Dock badge count for background agent states that need a look.
@@ -1420,9 +1429,10 @@ final class WorkspaceStore: ObservableObject {
         // Audio cues fire whenever the user is NOT actively watching this
         // pane — that means Glint isn't the frontmost app, or the user is on
         // a different workspace, or on a different tab of this workspace. If
-        // Glint has focus AND the pane is on screen, stay quiet.
+        // Glint has focus AND the pane is on screen, stay quiet — unless
+        // `playSoundsAlways` overrides the background-only rule.
         let userIsWatching = NSApp.isActive && isPaneVisible(key)
-        if !userIsWatching && oldStatus != state.status {
+        if (playSoundsAlways || !userIsWatching) && oldStatus != state.status {
             switch state.status {
             case .needsPermission where soundOnPermissionRequest:
                 NSSound(named: soundPermissionName)?.play()
@@ -1430,6 +1440,11 @@ final class WorkspaceStore: ObservableObject {
                 NSSound(named: soundCompleteName)?.play()
             case .failed where soundOnError:
                 NSSound(named: soundErrorName)?.play()
+            // When the user IS watching, "Stop" sets status to .idle
+            // (skipping .justCompleted) — catch that path so the
+            // completion chime still fires under playSoundsAlways.
+            case .idle where playSoundsAlways && soundOnTurnComplete && hook == "Stop":
+                NSSound(named: soundCompleteName)?.play()
             default:
                 break
             }

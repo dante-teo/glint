@@ -55,6 +55,9 @@
     "Advanced terminal color themes remain available for custom workflows." : {
 
     },
+    "Always play sounds" : {
+      "extractionState" : "manual"
+    },
     "Allow external control" : {
       "extractionState" : "manual"
     },
@@ -92,7 +95,7 @@
     "Display Codex's 5-hour and weekly limits in the sidebar." : {
       "extractionState" : "manual"
     },
-    "Dock badges and chimes only update for background workspaces — the one you're looking at stays quiet." : {
+    "Dock badges only update for background workspaces. Chimes follow the \u201CAlways play sounds\u201D toggle." : {
       "extractionState" : "manual"
     },
     "ESC" : {
@@ -144,6 +147,9 @@
       "extractionState" : "manual"
     },
     "Off — no socket bound, no external access." : {
+      "extractionState" : "manual"
+    },
+    "Play notification chimes even when the agent's pane is focused. When off, only background workspaces trigger sounds." : {
       "extractionState" : "manual"
     },
     "Preview" : {
