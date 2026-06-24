@@ -81,13 +81,21 @@ final class AppearanceThemeTests: XCTestCase {
     }
 
     func testTerminalBackingMutatesSurfaceButNotContainerOpacity() {
-        let previous = UserDefaults.standard.object(forKey: "glint.terminalOpacity")
-        UserDefaults.standard.set(0.64, forKey: "glint.terminalOpacity")
+        let defaults = UserDefaults.standard
+        let previousOpacity = defaults.object(forKey: "glint.terminalOpacity")
+        let previousFramedSplitMode = defaults.object(forKey: GhosttyManager.activeFramedSplitModeKey)
+        defaults.set(0.64, forKey: "glint.terminalOpacity")
+        defaults.set(false, forKey: GhosttyManager.activeFramedSplitModeKey)
         defer {
-            if let previous {
-                UserDefaults.standard.set(previous, forKey: "glint.terminalOpacity")
+            if let previousOpacity {
+                defaults.set(previousOpacity, forKey: "glint.terminalOpacity")
             } else {
-                UserDefaults.standard.removeObject(forKey: "glint.terminalOpacity")
+                defaults.removeObject(forKey: "glint.terminalOpacity")
+            }
+            if let previousFramedSplitMode {
+                defaults.set(previousFramedSplitMode, forKey: GhosttyManager.activeFramedSplitModeKey)
+            } else {
+                defaults.removeObject(forKey: GhosttyManager.activeFramedSplitModeKey)
             }
         }
 

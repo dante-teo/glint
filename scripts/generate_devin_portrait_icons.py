@@ -1,15 +1,21 @@
-"""Generate Devin's portrait-based status icon family.
+"""Generate Devin's real animated portrait icon family from frame strips.
 
-Source:
-  scripts/assets/devin-portrait-source.png
+Source strips:
+  scripts/assets/devin-real-animated/strips/<state>.png
+
+See:
+  scripts/assets/devin-real-animated/README.md
 
 Generates:
   - seven 128px transparent APNGs in Devin*.dataset folders
   - static 24px and 48px DevinMark PNGs
-  - design/devin-portrait-icons/contact-sheet.png for visual review
+  - design/devin-real-animated/qa/contact-sheet.png for visual review
 
-The app stores APNGs as `.png` data assets. `AnimatedGIFView` decodes them
-through ImageIO, which preserves full alpha better than GIF for this portrait.
+The source strips are AI-generated, hand-animation-style frame rows: the face,
+eyes, brows, and mouth are redrawn per frame. This script only performs
+deterministic production work: crop the green strip band, split frames, remove
+the chroma background, normalize the portrait into the app canvas, and package
+the existing asset names Glint already uses.
 
 Usage:
   python3 scripts/generate_devin_portrait_icons.py
@@ -22,243 +28,244 @@ After regenerating, run:
 
 from __future__ import annotations
 
-import math
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import Iterable
 
 from PIL import Image, ImageDraw, ImageFilter
 
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSET_ROOT = ROOT / "Glint" / "Resources" / "Assets.xcassets"
-OUT = ROOT / "design" / "devin-portrait-icons"
-SOURCE = ROOT / "scripts" / "assets" / "devin-portrait-source.png"
+RUN_ROOT = ROOT / "design" / "devin-real-animated"
+STRIP_ROOT = ROOT / "scripts" / "assets" / "devin-real-animated" / "strips"
+FRAME_ROOT = RUN_ROOT / "frames"
+QA_ROOT = RUN_ROOT / "qa"
 
 SIZE = 128
-SCALE = 4
-FPS_MS = 60
-LOOP = 40
+FPS_MS = 85
+FRAMES = 8
 
-CREAM = (238, 214, 176)
-INK = (47, 31, 23)
-TEAL = (54, 166, 169)
-CYAN = (90, 206, 255)
-AMBER = (255, 188, 86)
-GREEN = (63, 209, 116)
-RED = (244, 91, 101)
-WHITE = (255, 255, 255)
-SKIN = (222, 160, 123)
-
-
-def ease_sine(t: float) -> float:
-    return 0.5 - 0.5 * math.cos(t * math.tau)
+STATES: dict[str, tuple[str, str]] = {
+    "idle": ("DevinIdle", "devin-idle.png"),
+    "thinking": ("DevinThinking", "devin-thinking.png"),
+    "tool": ("DevinToolCall", "devin-tool-call.png"),
+    "compressing": ("DevinCompressing", "devin-compressing.png"),
+    "permission": ("DevinNeedsPermission", "devin-needs-permission.png"),
+    "done": ("DevinDone", "devin-done.png"),
+    "failed": ("DevinFailed", "devin-failed.png"),
+}
 
 
-def clamp01(v: float) -> float:
-    return min(1.0, max(0.0, v))
+def is_green_pixel(r: int, g: int, b: int) -> bool:
+    return g > 140 and g > r * 1.45 and g > b * 1.45
 
 
-def load_portrait() -> Image.Image:
-    if not SOURCE.exists():
-        raise FileNotFoundError(
-            f"Missing source portrait: {SOURCE}. Restore this tracked asset before regenerating Devin icons."
-        )
-    src = Image.open(SOURCE).convert("RGBA")
-    w, h = src.size
-    side = min(w, h)
-    # Slightly tighter and higher than a center crop so the face stays legible
-    # in 24-40pt chrome while retaining the white blazer cue.
-    crop_side = int(side * 0.86)
-    left = (w - crop_side) // 2
-    top = int(side * 0.02)
-    return src.crop((left, top, left + crop_side, top + crop_side))
+def green_band_bbox(strip: Image.Image) -> tuple[int, int, int, int]:
+    rgb = strip.convert("RGB")
+    rows: list[int] = []
+    cols: list[int] = []
+
+    pixels = rgb.load()
+    for y in range(rgb.height):
+        green_count = 0
+        for x in range(rgb.width):
+            if is_green_pixel(*pixels[x, y]):
+                green_count += 1
+        if green_count >= rgb.width * 0.28:
+            rows.append(y)
+
+    if not rows:
+        raise ValueError("Could not find the chroma-green animation band")
+
+    y0, y1 = min(rows), max(rows) + 1
+    for x in range(rgb.width):
+        green_count = 0
+        for y in range(y0, y1):
+            if is_green_pixel(*pixels[x, y]):
+                green_count += 1
+        if green_count >= (y1 - y0) * 0.20:
+            cols.append(x)
+
+    if not cols:
+        return (0, y0, rgb.width, y1)
+    return (min(cols), y0, max(cols) + 1, y1)
 
 
-def avatar_base(size: int = SIZE) -> Image.Image:
-    canvas = size * SCALE
-    badge = int(canvas * 0.91)
-    pad = (canvas - badge) // 2
+def remove_green(frame: Image.Image) -> Image.Image:
+    rgba = frame.convert("RGBA")
+    px = rgba.load()
 
-    img = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
-    shadow = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
-    sd = ImageDraw.Draw(shadow, "RGBA")
-    sd.ellipse((pad + 4, pad + 10, pad + badge - 4, pad + badge + 6), fill=(0, 0, 0, 42))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(radius=5 * SCALE))
-    img.alpha_composite(shadow)
+    for y in range(rgba.height):
+        for x in range(rgba.width):
+            r, g, b, a = px[x, y]
+            if a == 0:
+                continue
 
-    mask = Image.new("L", (badge, badge), 0)
-    md = ImageDraw.Draw(mask)
-    md.ellipse((0, 0, badge - 1, badge - 1), fill=255)
+            if is_green_pixel(r, g, b):
+                px[x, y] = (0, 0, 0, 0)
+                continue
 
-    portrait = load_portrait().resize((badge, badge), Image.Resampling.LANCZOS)
-    img.paste(portrait, (pad, pad), mask)
+            # Despill pixels close to the matte edge without dulling skin.
+            if g > max(r, b) + 18:
+                g = max(r, b) + 8
+            px[x, y] = (r, g, b, a)
 
-    ring = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
-    rd = ImageDraw.Draw(ring, "RGBA")
-    rd.ellipse((pad + 1, pad + 1, pad + badge - 1, pad + badge - 1), outline=(*WHITE, 180), width=2 * SCALE)
-    rd.ellipse((pad + 4, pad + 4, pad + badge - 4, pad + badge - 4), outline=(*CREAM, 115), width=SCALE)
-    img.alpha_composite(ring)
-    return img.resize((size, size), Image.Resampling.LANCZOS)
+    alpha = rgba.getchannel("A").filter(ImageFilter.GaussianBlur(0.25))
+    rgba.putalpha(alpha)
+    return rgba
 
 
-BASE = avatar_base()
-
-
-def transform_avatar(
-    *,
-    scale: float = 1.0,
-    bob: float = 0.0,
-    tilt: float = 0.0,
-    x_scale: float = 1.0,
-    y_scale: float = 1.0,
-) -> Image.Image:
-    canvas = SIZE * SCALE
-    src = BASE.resize((canvas, canvas), Image.Resampling.LANCZOS)
-
-    if abs(x_scale - 1.0) > 0.001 or abs(y_scale - 1.0) > 0.001:
-        resized = src.resize((round(canvas * x_scale), round(canvas * y_scale)), Image.Resampling.BICUBIC)
-        src = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
-        src.alpha_composite(resized, ((canvas - resized.width) // 2, (canvas - resized.height) // 2))
-
-    if abs(tilt) > 0.01:
-        src = src.rotate(tilt, resample=Image.Resampling.BICUBIC, center=(canvas / 2, canvas / 2))
-
-    if abs(scale - 1.0) > 0.001:
-        resized = src.resize((round(canvas * scale), round(canvas * scale)), Image.Resampling.LANCZOS)
-        src = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
-        src.alpha_composite(resized, ((canvas - resized.width) // 2, (canvas - resized.height) // 2))
-
-    if abs(bob) > 0.01:
-        shifted = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
-        shifted.alpha_composite(src, (0, round(bob * SCALE)))
-        src = shifted
-
-    return src.resize((SIZE, SIZE), Image.Resampling.LANCZOS)
-
-
-def draw_plus(draw: ImageDraw.ImageDraw, cx: float, cy: float, r: float, color: tuple[int, int, int], alpha: int) -> None:
-    width = max(1, round(r / 4))
-    draw.line((cx - r, cy, cx + r, cy), fill=(*color, alpha), width=width)
-    draw.line((cx, cy - r, cx, cy + r), fill=(*color, alpha), width=width)
-
-
-def draw_blink(frame: Image.Image, amount: float) -> None:
-    if amount <= 0.01:
-        return
-    d = ImageDraw.Draw(frame, "RGBA")
-    alpha = round(180 * clamp01(amount))
-    for cx in (50, 78):
-        d.ellipse((cx - 11, 52 - 2 * amount, cx + 11, 61 + 3 * amount), fill=(*SKIN, alpha))
-        d.arc((cx - 10, 53, cx + 10, 62), start=190, end=350, fill=(*INK, round(150 * amount)), width=1)
-
-
-def idle_frame(i: int, n: int) -> Image.Image:
-    t = i / n
-    breathe = ease_sine(t)
-    blink_phase = (t * 2.0) % 1
-    blink = clamp01(1 - abs(blink_phase - 0.08) / 0.035) if blink_phase < 0.16 else 0
-    frame = transform_avatar(scale=0.99 + 0.012 * breathe, bob=math.sin(t * math.tau) * 0.7)
-    draw_blink(frame, blink)
+def matte_frame(frame: Image.Image) -> Image.Image:
+    frame = remove_green(frame)
+    bbox = frame.getchannel("A").getbbox()
+    if bbox is None:
+        raise ValueError("Frame is empty after chroma removal")
     return frame
 
 
-def thinking_frame(i: int, n: int) -> Image.Image:
-    t = i / n
-    frame = transform_avatar(
-        scale=1.0 + 0.006 * math.sin(t * math.tau * 2),
-        bob=math.sin(t * math.tau * 2) * 0.6,
-        tilt=math.sin(t * math.tau) * 2.2,
+def normalize_frame(frame: Image.Image, bbox: tuple[int, int, int, int]) -> Image.Image:
+    subject = frame.crop(bbox)
+    subject.thumbnail((SIZE - 4, SIZE - 4), Image.Resampling.LANCZOS)
+
+    canvas = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+    x = (SIZE - subject.width) // 2
+    y = max(0, (SIZE - subject.height) // 2 - 1)
+    canvas.alpha_composite(subject, (x, y))
+    return remove_small_alpha_components(canvas)
+
+
+def remove_small_alpha_components(frame: Image.Image, min_pixels: int = 32) -> Image.Image:
+    frame = frame.copy()
+    alpha = frame.getchannel("A")
+    width, height = alpha.size
+    data = alpha.load()
+    visited = [[False for _ in range(width)] for _ in range(height)]
+    remove: list[tuple[int, int]] = []
+
+    for y in range(height):
+        for x in range(width):
+            if visited[y][x] or data[x, y] <= 8:
+                visited[y][x] = True
+                continue
+
+            stack = [(x, y)]
+            component: list[tuple[int, int]] = []
+            visited[y][x] = True
+
+            while stack:
+                cx, cy = stack.pop()
+                component.append((cx, cy))
+                for nx, ny in ((cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)):
+                    if nx < 0 or ny < 0 or nx >= width or ny >= height:
+                        continue
+                    if visited[ny][nx]:
+                        continue
+                    visited[ny][nx] = True
+                    if data[nx, ny] > 8:
+                        stack.append((nx, ny))
+
+            xs = [point[0] for point in component]
+            ys = [point[1] for point in component]
+            touches_side = min(xs) <= 1 or max(xs) >= width - 2
+            bottom_seam = max(ys) >= height - 2 and (max(ys) - min(ys)) <= 3
+            small_artifact = len(component) < min_pixels
+
+            if small_artifact or (touches_side and len(component) < 2_000) or bottom_seam:
+                remove.extend(component)
+
+    px = frame.load()
+    for x, y in remove:
+        px[x, y] = (0, 0, 0, 0)
+    return frame
+
+
+def split_strip(path: Path) -> list[Image.Image]:
+    strip = Image.open(path).convert("RGBA")
+    band = strip.crop(green_band_bbox(strip))
+    matted: list[Image.Image] = []
+    rgb = band.convert("RGB")
+    pixels = rgb.load()
+    projection: list[int] = []
+
+    for x in range(rgb.width):
+        count = 0
+        for y in range(rgb.height):
+            r, g, b = pixels[x, y]
+            if is_green_pixel(r, g, b):
+                continue
+            if r + g + b <= 36:
+                continue
+            count += 1
+        projection.append(count)
+
+    boundaries = [0]
+    nominal_cell = band.width / FRAMES
+    for index in range(1, FRAMES):
+        expected = index * nominal_cell
+        radius = nominal_cell * 0.32
+        left = max(boundaries[-1] + 8, round(expected - radius))
+        right = min(band.width - 8, round(expected + radius))
+        if left >= right:
+            boundary = round(expected)
+        else:
+            # Prefer a small green valley, but avoid single-column noise by
+            # scoring a narrow neighborhood around each candidate boundary.
+            def score(x: int) -> int:
+                lo = max(0, x - 2)
+                hi = min(len(projection), x + 3)
+                return sum(projection[lo:hi])
+
+            boundary = min(range(left, right), key=score)
+        boundaries.append(boundary)
+    boundaries.append(band.width)
+
+    for index in range(FRAMES):
+        left = boundaries[index]
+        right = boundaries[index + 1]
+        raw = band.crop((left, 0, right, band.height))
+        matted.append(matte_frame(raw))
+
+    boxes = [frame.getchannel("A").getbbox() for frame in matted]
+    boxes = [box for box in boxes if box is not None]
+    if not boxes:
+        raise ValueError(f"No visible frames in strip: {path}")
+
+    union = (
+        min(box[0] for box in boxes),
+        min(box[1] for box in boxes),
+        max(box[2] for box in boxes),
+        max(box[3] for box in boxes),
     )
-    d = ImageDraw.Draw(frame, "RGBA")
-    for k in range(3):
-        phase = (t + k / 3) % 1
-        lift = math.sin(phase * math.tau) * 3
-        r = 2.2 + 1.3 * ease_sine(phase)
-        x = 44 + k * 13
-        y = 18 - lift
-        d.ellipse((x - r, y - r, x + r, y + r), fill=(*AMBER, 235))
-    return frame
+    return [normalize_frame(frame, union) for frame in matted]
 
 
-def tool_frame(i: int, n: int) -> Image.Image:
-    t = i / n
-    frame = transform_avatar(scale=1.0, bob=math.sin(t * math.tau * 2) * 0.35)
-    d = ImageDraw.Draw(frame, "RGBA")
-    sweep = 25 + 78 * t
-    d.rounded_rectangle((sweep - 15, 33, sweep + 15, 36), radius=2, fill=(*CYAN, 210))
-    d.rounded_rectangle((28, 92, 52, 96), radius=2, fill=(*CYAN, 205))
-    d.rounded_rectangle((56, 99, 78, 103), radius=2, fill=(*TEAL, 205))
-    d.rounded_rectangle((82, 92, 102, 96), radius=2, fill=(*CYAN, 205))
-    for k in range(3):
-        phase = (t * 1.4 + k / 3) % 1
-        draw_plus(d, 28 + 74 * phase, 82 + math.sin(phase * math.tau) * 4, 3.4, CYAN, round(210 * (1 - phase)))
-    return frame
+def shift_frame(frame: Image.Image, dx: int, dy: int) -> Image.Image:
+    shifted = Image.new("RGBA", frame.size, (0, 0, 0, 0))
+    shifted.alpha_composite(frame, (dx, dy))
+    return shifted
 
 
-def compressing_frame(i: int, n: int) -> Image.Image:
-    t = i / n
-    squeeze = ease_sine((t * 2) % 1)
-    frame = transform_avatar(
-        scale=1.0,
-        bob=1.2 * squeeze,
-        x_scale=1.0 + 0.035 * squeeze,
-        y_scale=1.0 - 0.055 * squeeze,
-    )
-    d = ImageDraw.Draw(frame, "RGBA")
-    top_y = 17 + 8 * squeeze
-    bottom_y = 108 - 8 * squeeze
-    d.rounded_rectangle((36, top_y, 92, top_y + 4), radius=2, fill=(*CYAN, 230))
-    d.rounded_rectangle((36, bottom_y, 92, bottom_y + 4), radius=2, fill=(*CYAN, 230))
-    for k in range(3):
-        w = 23 - k * 4
-        x = 64 - w / 2
-        y = 84 + k * 6 + math.sin(t * math.tau + k) * 1.2
-        d.rounded_rectangle((x, y, x + w, y + 3), radius=1.5, fill=(*AMBER, 220))
-    return frame
+def stabilize_frames(frames: list[Image.Image]) -> list[Image.Image]:
+    boxes = [frame.getchannel("A").getbbox() for frame in frames]
+    boxes = [box for box in boxes if box is not None]
+    if not boxes:
+        return frames
 
+    centers_x = sorted((box[0] + box[2]) / 2 for box in boxes)
+    centers_y = sorted((box[1] + box[3]) / 2 for box in boxes)
+    target_x = centers_x[len(centers_x) // 2]
+    target_y = centers_y[len(centers_y) // 2]
 
-def permission_frame(i: int, n: int) -> Image.Image:
-    t = i / n
-    pulse = ease_sine((t * 2) % 1)
-    frame = transform_avatar(scale=0.995 + 0.008 * pulse, bob=math.sin(t * math.tau) * 0.4)
-    d = ImageDraw.Draw(frame, "RGBA")
-    r = 13 + 6 * pulse
-    alpha = round(190 * (1 - pulse))
-    d.ellipse((94 - r, 30 - r, 94 + r, 30 + r), outline=(*AMBER, alpha), width=2)
-    d.ellipse((88, 24, 100, 36), fill=(*AMBER, 245))
-    d.text((91, 22), "!", fill=(*INK, 230))
-    return frame
-
-
-def done_frame(i: int, n: int) -> Image.Image:
-    t = i / n
-    pop = min(1.0, t * 3.2)
-    settle = 1.0 + 0.025 * math.sin(pop * math.pi) * (1 - clamp01((t - 0.35) / 0.65))
-    frame = transform_avatar(scale=settle, bob=-1.0 * math.sin(min(1, t * 2) * math.pi))
-    d = ImageDraw.Draw(frame, "RGBA")
-    if 0.05 < t < 0.65:
-        phase = (t - 0.05) / 0.60
-        alpha = round(230 * math.sin(phase * math.pi))
-        d.arc((21, 20, 107, 106), start=210, end=210 + 245 * phase, fill=(*GREEN, alpha), width=3)
-        draw_plus(d, 35, 34, 6 + 8 * phase, AMBER, alpha)
-    if t > 0.18:
-        p = clamp01((t - 0.18) / 0.32)
-        d.line((88, 33, 94, 39), fill=(*GREEN, 250), width=4)
-        d.line((94, 39, 106 - 8 * (1 - p), 25 + 14 * (1 - p)), fill=(*GREEN, 250), width=4)
-    return frame
-
-
-def failed_frame(i: int, n: int) -> Image.Image:
-    t = i / n
-    shake = math.sin(t * math.tau * 4) * 1.7 * (0.35 + 0.65 * ease_sine(t))
-    frame = transform_avatar(scale=1.0, bob=0, tilt=shake)
-    d = ImageDraw.Draw(frame, "RGBA")
-    pulse = ease_sine((t * 2) % 1)
-    r = 11 + 5 * pulse
-    d.ellipse((94 - r, 31 - r, 94 + r, 31 + r), outline=(*RED, round(180 * (1 - pulse))), width=2)
-    d.line((88, 25, 100, 37), fill=(*RED, 240), width=3)
-    d.line((100, 25, 88, 37), fill=(*RED, 240), width=3)
-    return frame
+    stabilized: list[Image.Image] = []
+    for frame in frames:
+        box = frame.getchannel("A").getbbox()
+        if box is None:
+            stabilized.append(frame)
+            continue
+        cx = (box[0] + box[2]) / 2
+        cy = (box[1] + box[3]) / 2
+        stabilized.append(shift_frame(frame, round(target_x - cx), round(target_y - cy)))
+    return stabilized
 
 
 def save_apng(path: Path, frames: Iterable[Image.Image], duration: int = FPS_MS) -> None:
@@ -276,9 +283,9 @@ def save_apng(path: Path, frames: Iterable[Image.Image], duration: int = FPS_MS)
     )
 
 
-def write_dataset(asset_name: str, filename: str, factory: Callable[[int, int], Image.Image], frames: int = LOOP) -> None:
+def write_dataset(asset_name: str, filename: str, frames: list[Image.Image]) -> None:
     ds = ASSET_ROOT / f"{asset_name}.dataset"
-    save_apng(ds / filename, (factory(i, frames) for i in range(frames)))
+    save_apng(ds / filename, frames)
     (ds / "Contents.json").write_text(
         '{\n'
         '  "data": [\n'
@@ -296,11 +303,19 @@ def write_dataset(asset_name: str, filename: str, factory: Callable[[int, int], 
     )
 
 
-def write_mark() -> None:
+def write_frames(state: str, frames: list[Image.Image]) -> None:
+    out = FRAME_ROOT / state
+    out.mkdir(parents=True, exist_ok=True)
+    for index, frame in enumerate(frames):
+        frame.save(out / f"{index:02d}.png")
+
+
+def write_mark(frames_by_state: dict[str, list[Image.Image]]) -> None:
     iset = ASSET_ROOT / "DevinMark.imageset"
     iset.mkdir(exist_ok=True)
-    BASE.resize((24, 24), Image.Resampling.LANCZOS).save(iset / "devin24.png")
-    BASE.resize((48, 48), Image.Resampling.LANCZOS).save(iset / "devin48.png")
+    mark = frames_by_state["idle"][0]
+    mark.resize((24, 24), Image.Resampling.LANCZOS).save(iset / "devin24.png")
+    mark.resize((48, 48), Image.Resampling.LANCZOS).save(iset / "devin48.png")
     (iset / "Contents.json").write_text(
         '{\n'
         '  "images": [\n'
@@ -324,36 +339,62 @@ def write_mark() -> None:
     )
 
 
-def write_contact_sheet(samples: dict[str, Image.Image]) -> None:
-    OUT.mkdir(parents=True, exist_ok=True)
+def write_contact_sheet(frames_by_state: dict[str, list[Image.Image]]) -> None:
+    QA_ROOT.mkdir(parents=True, exist_ok=True)
     cell = 160
     sheet = Image.new("RGBA", (cell * 4, cell * 2), (18, 18, 22, 255))
     d = ImageDraw.Draw(sheet, "RGBA")
-    for idx, (name, img) in enumerate(samples.items()):
+
+    for idx, (name, frames) in enumerate(frames_by_state.items()):
         x = (idx % 4) * cell
         y = (idx // 4) * cell
-        d.rounded_rectangle((x + 12, y + 12, x + cell - 12, y + cell - 28), radius=10, fill=(255, 255, 255, 12))
-        sheet.alpha_composite(img, (x + 16, y + 8))
+        d.rounded_rectangle(
+            (x + 12, y + 12, x + cell - 12, y + cell - 28),
+            radius=10,
+            fill=(255, 255, 255, 12),
+        )
+        sheet.alpha_composite(frames[len(frames) // 2], (x + 16, y + 8))
         d.text((x + 16, y + cell - 24), name, fill=(225, 225, 230, 255))
-    sheet.save(OUT / "contact-sheet.png")
+
+    sheet.save(QA_ROOT / "contact-sheet.png")
+
+
+def write_previews(frames_by_state: dict[str, list[Image.Image]]) -> None:
+    preview_dir = QA_ROOT / "previews"
+    preview_dir.mkdir(parents=True, exist_ok=True)
+    for state, frames in frames_by_state.items():
+        frames[0].save(
+            preview_dir / f"{state}.gif",
+            save_all=True,
+            append_images=frames[1:],
+            duration=FPS_MS,
+            loop=0,
+            disposal=2,
+            transparency=0,
+        )
 
 
 def main() -> None:
-    states: dict[str, tuple[str, str, Callable[[int, int], Image.Image]]] = {
-        "idle": ("DevinIdle", "devin-idle.png", idle_frame),
-        "thinking": ("DevinThinking", "devin-thinking.png", thinking_frame),
-        "tool": ("DevinToolCall", "devin-tool-call.png", tool_frame),
-        "compressing": ("DevinCompressing", "devin-compressing.png", compressing_frame),
-        "permission": ("DevinNeedsPermission", "devin-needs-permission.png", permission_frame),
-        "done": ("DevinDone", "devin-done.png", done_frame),
-        "failed": ("DevinFailed", "devin-failed.png", failed_frame),
-    }
-    for _, (asset, filename, factory) in states.items():
-        write_dataset(asset, filename, factory)
-    write_mark()
-    write_contact_sheet({name: factory(18, LOOP) for name, (_, _, factory) in states.items()})
-    print(f"Wrote Devin portrait assets from {SOURCE}")
-    print(f"Preview: {OUT / 'contact-sheet.png'}")
+    frames_by_state: dict[str, list[Image.Image]] = {}
+
+    for state, (asset, filename) in STATES.items():
+        strip = STRIP_ROOT / f"{state}.png"
+        if not strip.exists():
+            raise FileNotFoundError(f"Missing generated strip: {strip}")
+        frames = split_strip(strip)
+        if state == "idle":
+            frames = stabilize_frames(frames)
+        frames_by_state[state] = frames
+        write_frames(state, frames)
+        write_dataset(asset, filename, frames)
+
+    write_mark(frames_by_state)
+    write_contact_sheet(frames_by_state)
+    write_previews(frames_by_state)
+
+    print(f"Wrote Devin real animated portrait assets from {STRIP_ROOT}")
+    print(f"Contact sheet: {QA_ROOT / 'contact-sheet.png'}")
+    print(f"Frame previews: {QA_ROOT / 'previews'}")
 
 
 if __name__ == "__main__":
