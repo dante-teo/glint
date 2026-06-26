@@ -23,6 +23,7 @@
 		47BB527385B84454ABF8FC40 /* themes.json in Resources */ = {isa = PBXBuildFile; fileRef = 6860F8F626EFDB9A289FC727 /* themes.json */; };
 		49DF8EE59313B7CFE29DA303 /* PaneTreeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E646AABA8ADCE8A2A5C6F55 /* PaneTreeView.swift */; };
 		5157C5439862F21202BCC44D /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E67CF5D8552AE1F51386161 /* AppDelegate.swift */; };
+		623A28FE871F2B79A6D52835 /* SplitFocusDimTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEFA4685C0ED722B2B86A010 /* SplitFocusDimTests.swift */; };
 		657E526F46F719D1F9DEF150 /* Barlow-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = 771C4C951D83D876034A393F /* Barlow-Medium.otf */; };
 		692D1A7D490E07D796535EAA /* UpdaterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4408F9761E584DE2AB6630E2 /* UpdaterController.swift */; };
 		6D74FE6545631EB8193C82E1 /* PaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FC2FBC9E8729A5ECBF857C /* PaneView.swift */; };
@@ -110,6 +111,7 @@
 		8EDE0D7C434B8E9C76C4A297 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
 		9E67CF5D8552AE1F51386161 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A8C269A6E9AE87961C3356DC /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		AEFA4685C0ED722B2B86A010 /* SplitFocusDimTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitFocusDimTests.swift; sourceTree = "<group>"; };
 		BE9117F7FB3E54B8267A1843 /* DepartureMonoNerdFont-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "DepartureMonoNerdFont-Regular.otf"; sourceTree = "<group>"; };
 		C0656F7C1D48AE0429C1888B /* VisualEffectBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualEffectBackground.swift; sourceTree = "<group>"; };
 		C9E2B9ADF809766CE4278047 /* SafeJSON.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeJSON.swift; sourceTree = "<group>"; };
@@ -179,6 +181,7 @@
 				EBCC04C19D745AA867D961FD /* PaneAgentKindTests.swift */,
 				60E1B63E426D976C9BC97C48 /* PaneCloseTests.swift */,
 				89C2698EF53640338D55832D /* SleepAssertionTests.swift */,
+				AEFA4685C0ED722B2B86A010 /* SplitFocusDimTests.swift */,
 				83E4DF4C5180D50C381B4976 /* WorkspaceIconKindTests.swift */,
 			);
 			path = GlintTests;
@@ -411,6 +414,7 @@
 				ED46CD7A6E09551A775AD3B8 /* PaneAgentKindTests.swift in Sources */,
 				843C1174E4867CE9C8AA8D52 /* PaneCloseTests.swift in Sources */,
 				44060AE541F2E43558D44D01 /* SleepAssertionTests.swift in Sources */,
+				623A28FE871F2B79A6D52835 /* SplitFocusDimTests.swift in Sources */,
 				C748DE21F23B49B2FFD73DC7 /* WorkspaceIconKindTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

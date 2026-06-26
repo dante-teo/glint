@@ -34,6 +34,14 @@ struct PaneView: View {
         }
     }
 
+    /// Opacity for the black dim wash drawn over unfocused split panes.
+    /// Extracted so unit tests can verify focused panes stay undimmed and
+    /// unfocused panes receive the correct wash in both opaque and
+    /// translucent modes.
+    static func dimOverlayOpacity(isFocused: Bool, isTransparent: Bool) -> Double {
+        isFocused ? 0 : (isTransparent ? 0.18 : 0.28)
+    }
+
     private func paneBody(workspaceID: UUID,
                           focusedPane: PaneID,
                           cwd: String?) -> some View {
@@ -47,15 +55,17 @@ struct PaneView: View {
                 surfaceView: store.surfaceView(workspaceID: workspaceID, paneID: paneID, cwd: cwd),
                 focused: isFocused
             )
-            if !isFocused {
-                // Dim unfocused panes with a black wash in BOTH modes. A
-                // `Theme.bgPane` veil would re-opacify the desktop in
-                // translucent mode, and on a LIGHT theme bgPane (≈white) would
-                // wash the pane lighter instead of dimming it — a black wash
-                // de-emphasizes correctly regardless of theme/opacity.
-                Color.black.opacity(store.isTerminalTransparent ? 0.18 : 0.28)
-                    .allowsHitTesting(false)
-            }
+            // Dim unfocused panes with a black wash in BOTH modes. The
+            // overlay is always present (opacity 0 when focused) so its
+            // Core Animation layer is part of the initial render and sits
+            // above the IOSurface-backed Metal layer. A conditional `if`
+            // would insert the layer AFTER the surface is composited,
+            // causing it to land behind the IOSurface — leaving freshly
+            // split panes undimmed even after losing focus.
+            Color.black
+                .opacity(Self.dimOverlayOpacity(isFocused: isFocused,
+                                               isTransparent: store.isTerminalTransparent))
+                .allowsHitTesting(false)
         }
         .contentShape(Rectangle())
         .onTapGesture { store.focus(paneID) }

@@ -26,6 +26,10 @@ Only apply `@MainActor` to test classes that actually require it (i.e. those cal
 
 `DevinHookInstallerTests.testIsInstalledReturnsFalseByDefault` fails on machines that already have Devin hooks installed. This is a known environment-dependent failure — it does not indicate a regression.
 
+### Pane dim overlay and IOSurface compositing
+
+The unfocused-pane dim wash (`Color.black` in `PaneView.paneBody`) must be **always present** in the ZStack with its opacity toggled (0 when focused, 0.18/0.28 when unfocused). Do NOT convert it to a conditional `if !isFocused { ... }` — that causes the SwiftUI layer to be inserted *after* the `GhosttySurfaceView`'s IOSurface-backed Metal layer is already composited, and the overlay ends up behind the surface (invisible). Keeping the overlay in the initial render guarantees correct Core Animation z-ordering. This applies to any SwiftUI overlay placed above an `NSViewRepresentable` with a GPU-backed layer in a ZStack.
+
 ### Reacting to agent state changes
 
 `paneAgentState` on `WorkspaceStore` is a `@Published` dictionary mutated from ~18 sites (subscript writes, `removeValue`, bulk `filter` reassignment). All mutations trigger its `didSet` hook. To add a new side effect driven by agent state (as `updateSleepAssertion()` does), add a call in the `didSet` — do not scatter calls across individual mutation sites, which is fragile and easy to miss. IOKit is already linked in `project.yml`.
