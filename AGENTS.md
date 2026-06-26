@@ -22,6 +22,14 @@ Tests use XCTest in the `GlintTests` target. Follow red, green, refactor: add or
 
 To unit-test `WorkspaceStore` operations (tabs, splits, pane state), create a `WorkspaceStore()` and override `workspaces` and `selectedWorkspaceID` with test data. The init loads persisted state, but overwriting those two properties replaces it entirely. There are no live surface views in tests, so `focusedPaneLiveCwd()` falls back to the model — this is expected. See `CwdInheritanceTests.swift` for the canonical pattern.
 
+Only apply `@MainActor` to test classes that actually require it (i.e. those calling `@MainActor`-isolated code like `WorkspaceStore` methods). Tests for non-isolated types such as `SleepAssertionManager` should remain unannotated. If a test file would need `@MainActor` for only some tests, split them into separate files — each named after the behavior it covers.
+
+`DevinHookInstallerTests.testIsInstalledReturnsFalseByDefault` fails on machines that already have Devin hooks installed. This is a known environment-dependent failure — it does not indicate a regression.
+
+### Reacting to agent state changes
+
+`paneAgentState` on `WorkspaceStore` is a `@Published` dictionary mutated from ~18 sites (subscript writes, `removeValue`, bulk `filter` reassignment). All mutations trigger its `didSet` hook. To add a new side effect driven by agent state (as `updateSleepAssertion()` does), add a call in the `didSet` — do not scatter calls across individual mutation sites, which is fragile and easy to miss. IOKit is already linked in `project.yml`.
+
 ## Commit & Pull Request Guidelines
 
 Commit history uses concise Conventional Commit-style prefixes, including `fix(agent): ...`, `feat(agent): ...`, `chore: ...`, `ci: ...`, and `release: ...`. Keep commits scoped to one change. Pull requests should include a short summary, tests run, linked issues when relevant, and screenshots or recordings for visible UI changes.

@@ -1288,6 +1288,15 @@ private struct AgentsPane: View {
                 }
             }
         }
+
+        SettingsCard("Power",
+                     footer: "Prevents the idle-sleep timer from putting your Mac to sleep. Closing the lid still sleeps normally. The assertion is released as soon as every agent finishes.") {
+            SettingsRow("Prevent sleep while agents run",
+                        subtitle: "Keep the Mac awake whenever an agent is thinking, running tools, or waiting for approval.") {
+                Toggle("", isOn: $store.preventSleepWhileAgentsBusy)
+                    .toggleStyle(.switch).labelsHidden()
+            }
+        }
     }
 }
 

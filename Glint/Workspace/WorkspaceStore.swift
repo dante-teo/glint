@@ -409,7 +409,9 @@ final class WorkspaceStore: ObservableObject {
     /// Beats `paneProcesses` for icon/state because hooks carry live
     /// status (thinking/permission/…) the 1s name poll can't know.
     /// Non-persistent.
-    @Published var paneAgentState: [WorkspacePaneKey: PaneAgentState] = [:]
+    @Published var paneAgentState: [WorkspacePaneKey: PaneAgentState] = [:] {
+        didSet { updateSleepAssertion() }
+    }
 
     /// Drives the command-palette overlay. Toggled by the toolbar's ⌘
     /// button and the ⌘⇧P global shortcut.
@@ -817,6 +819,19 @@ final class WorkspaceStore: ObservableObject {
             .sorted()
         return names.isEmpty ? ["Basso", "Funk", "Glass"] : names
     }()
+
+    /// Prevent macOS from idle-sleeping while any agent pane is mid-turn.
+    /// Uses an `IOPMAssertion` (kIOPMAssertionTypePreventUserIdleSystemSleep)
+    /// which blocks the idle-timeout sleep path only — closing the lid still
+    /// sleeps. Defaults to off so there is no surprise battery drain.
+    @Published var preventSleepWhileAgentsBusy: Bool = (UserDefaults.standard.object(forKey: "glint.preventSleepWhileAgentsBusy") as? Bool) ?? false {
+        didSet {
+            UserDefaults.standard.set(preventSleepWhileAgentsBusy, forKey: "glint.preventSleepWhileAgentsBusy")
+            updateSleepAssertion()
+        }
+    }
+
+    private let sleepManager = SleepAssertionManager()
 
     /// Float workspaces whose agents just finished a turn (`.justCompleted`)
     /// to the top of the sidebar list. The status auto-clears when the user
@@ -2470,6 +2485,23 @@ extension WorkspaceStore {
         switch s {
         case .thinking, .tool, .compacting, .needsPermission: return true
         case .justCompleted, .failed, .idle:                  return false
+        }
+    }
+
+    /// True when at least one pane across all workspaces has an agent
+    /// mid-turn (thinking, tool, compacting, or awaiting permission).
+    var anyAgentBusy: Bool {
+        paneAgentState.values.contains { Self.isBusyStatus($0.status) }
+    }
+
+    /// Acquire or release the sleep-prevention assertion based on the
+    /// current setting and agent activity. Called from `didSet` on both
+    /// `paneAgentState` and `preventSleepWhileAgentsBusy`.
+    private func updateSleepAssertion() {
+        if preventSleepWhileAgentsBusy && anyAgentBusy {
+            sleepManager.acquire()
+        } else {
+            sleepManager.release()
         }
     }
 
