@@ -57,6 +57,47 @@ final class SplitFocusDimTests: XCTestCase {
                           "New pane should be unfocused after switching back to original")
     }
 
+    // MARK: - Focus click notification updates store
+
+    func testFocusClickNotificationUpdatesFocusedPane() {
+        let (store, wsID, original) = makeStore()
+        store.splitFocused(.horizontal)
+
+        let ws1 = store.workspaces.first { $0.id == wsID }!
+        let newPane = ws1.selectedTab!.focusedPane
+        XCTAssertNotEqual(newPane, original, "Sanity: split moved focus away")
+
+        // Simulate the notification that GhosttySurfaceView.mouseDown posts
+        // when the user clicks an unfocused pane.
+        let paneKey = "\(wsID.uuidString):\(original.value)"
+        NotificationCenter.default.post(
+            name: .glintPaneFocusClicked,
+            object: nil,
+            userInfo: ["pane": paneKey]
+        )
+
+        let ws2 = store.workspaces.first { $0.id == wsID }!
+        XCTAssertEqual(ws2.selectedTab!.focusedPane, original,
+                       "Focus click notification should update focusedPane to the clicked pane")
+    }
+
+    func testFocusClickNotificationSkipsRedundantWrite() {
+        let (store, wsID, original) = makeStore()
+
+        // Focus is already on `original`. Posting a notification for the same
+        // pane should be a no-op (no objectWillChange churn).
+        let paneKey = "\(wsID.uuidString):\(original.value)"
+        NotificationCenter.default.post(
+            name: .glintPaneFocusClicked,
+            object: nil,
+            userInfo: ["pane": paneKey]
+        )
+
+        let ws = store.workspaces.first { $0.id == wsID }!
+        XCTAssertEqual(ws.selectedTab!.focusedPane, original,
+                       "Redundant focus notification should leave focusedPane unchanged")
+    }
+
     // MARK: - Dim overlay opacity
 
     func testDimOpacityUnfocusedOpaque() {

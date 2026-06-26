@@ -30,6 +30,10 @@ Only apply `@MainActor` to test classes that actually require it (i.e. those cal
 
 The unfocused-pane dim wash (`Color.black` in `PaneView.paneBody`) must be **always present** in the ZStack with its opacity toggled (0 when focused, 0.18/0.28 when unfocused). Do NOT convert it to a conditional `if !isFocused { ... }` — that causes the SwiftUI layer to be inserted *after* the `GhosttySurfaceView`'s IOSurface-backed Metal layer is already composited, and the overlay ends up behind the surface (invisible). Keeping the overlay in the initial render guarantees correct Core Animation z-ordering. This applies to any SwiftUI overlay placed above an `NSViewRepresentable` with a GPU-backed layer in a ZStack.
 
+### Split pane focus click propagation
+
+`GhosttySurfaceView` (an NSView) handles `mouseDown` before SwiftUI's gesture system sees the event, so the `.onTapGesture { store.focus(paneID) }` on `PaneView`'s ZStack does NOT fire for clicks on the terminal surface. To propagate focus changes from clicks back to the store, `mouseDown` posts a `glintPaneFocusClicked` notification (same pattern as Esc/Return) with the pane key. The store observes this notification **synchronously** (`queue: nil` + `MainActor.assumeIsolated`) so that `focusedPane` updates before the next `updateNSView` pass can fight back and resign the first responder. Do NOT rely on `.onTapGesture` alone for focus — it only fires for clicks on SwiftUI-rendered areas, not on NSViewRepresentable content.
+
 ### Reacting to agent state changes
 
 `paneAgentState` on `WorkspaceStore` is a `@Published` dictionary mutated from ~18 sites (subscript writes, `removeValue`, bulk `filter` reassignment). All mutations trigger its `didSet` hook. To add a new side effect driven by agent state (as `updateSleepAssertion()` does), add a call in the `didSet` — do not scatter calls across individual mutation sites, which is fragile and easy to miss. IOKit is already linked in `project.yml`.

@@ -68,6 +68,9 @@ struct PaneView: View {
                 .allowsHitTesting(false)
         }
         .contentShape(Rectangle())
+        // Fallback: only fires for clicks on SwiftUI-rendered areas (the
+        // background fill visible during a resize). Clicks on the terminal
+        // surface go through mouseDown → glintPaneFocusClicked instead.
         .onTapGesture { store.focus(paneID) }
     }
 }

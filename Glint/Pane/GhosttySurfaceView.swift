@@ -1287,6 +1287,19 @@ final class GhosttySurfaceView: NSView, NSTextInputClient {
     override func mouseDown(with event: NSEvent) {
         if window?.firstResponder !== self {
             window?.makeFirstResponder(self)
+            // Notify the store so it can update focusedPane immediately.
+            // SwiftUI's .onTapGesture on the parent ZStack does NOT fire
+            // here because this NSView handles the event before SwiftUI's
+            // gesture system sees it. Without this notification the store
+            // never learns about the click, and the dim overlay stays on
+            // the wrong pane until updateNSView fights back ~1 s later.
+            if let pk = paneKey {
+                NotificationCenter.default.post(
+                    name: .glintPaneFocusClicked,
+                    object: nil,
+                    userInfo: ["pane": pk]
+                )
+            }
             swallowingFocusClick = true
             return
         }

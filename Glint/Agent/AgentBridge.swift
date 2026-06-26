@@ -217,4 +217,10 @@ extension Notification.Name {
     /// dedicated "approved" hook, so the store can clear the red waiting state
     /// optimistically until the next hook confirms the outcome.
     static let glintPaneReturnPressed = Notification.Name("glint.pane.returnPressed")
+    /// Posted by GhosttySurfaceView when the user clicks an unfocused split
+    /// pane, making it first responder via AppKit before SwiftUI's gesture
+    /// system can react. userInfo: ["pane": "<workspaceUUID>:<paneID>"].
+    /// The store observes this to update `focusedPane` synchronously so the
+    /// dim overlay follows the click immediately.
+    static let glintPaneFocusClicked = Notification.Name("glint.pane.focusClicked")
 }

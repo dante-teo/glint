@@ -7,7 +7,8 @@ import AppKit
 struct PaneSurfaceRepresentable: NSViewRepresentable {
     let surfaceView: GhosttySurfaceView
     /// Plain value, not a Binding: focus only flows store → AppKit here.
-    /// The reverse direction (clicks) goes through store.focus(_:), so a
+    /// The reverse direction (clicks on the terminal surface) goes through
+    /// the glintPaneFocusClicked notification posted by mouseDown, so a
     /// writable binding would just be a lie about the data flow.
     let focused: Bool
 

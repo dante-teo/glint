@@ -1177,6 +1177,18 @@ final class WorkspaceStore: ObservableObject {
         ) { [weak self] note in
             Task { @MainActor in self?.handlePaneReturn(note.userInfo) }
         })
+        // Focus-click: delivered synchronously (queue: nil) so the store
+        // updates focusedPane before the next updateNSView pass can fight
+        // back and resign the first responder the user just clicked.
+        observerTokens.append(NotificationCenter.default.addObserver(
+            forName: .glintPaneFocusClicked,
+            object: nil,
+            queue: nil
+        ) { [weak self] note in
+            MainActor.assumeIsolated {
+                self?.handlePaneFocusClick(note.userInfo)
+            }
+        })
     }
 
     deinit {
@@ -1508,6 +1520,24 @@ final class WorkspaceStore: ObservableObject {
         state.turnStartedAt = now
         paneAgentState[key] = state
         clearDockBadge(for: key)
+    }
+
+    /// User clicked an unfocused split pane. The NSView's mouseDown handled
+    /// the event (making it first responder) before SwiftUI's onTapGesture
+    /// could fire, so this notification is the only path back to the store.
+    /// Update focusedPane so the dim overlay follows the click immediately.
+    func handlePaneFocusClick(_ info: [AnyHashable: Any]?) {
+        guard let info,
+              let paneStr = info["pane"] as? String,
+              let key = Self.parsePaneKey(paneStr) else { return }
+        // Only update if the clicked pane belongs to the selected workspace
+        // and the current tab actually contains it.
+        guard key.workspace == selectedWorkspaceID,
+              let i = currentIndex,
+              let t = workspaces[i].selectedTabIndex,
+              workspaces[i].tabs[t].root.leaves.contains(key.pane),
+              workspaces[i].tabs[t].focusedPane != key.pane else { return }
+        workspaces[i].tabs[t].focusedPane = key.pane
     }
 
     /// Clear any `.justCompleted` / `.failed` panes back to `.idle` — but
@@ -1858,7 +1888,8 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func focus(_ id: PaneID) {
-        guard let i = currentIndex, let t = workspaces[i].selectedTabIndex else { return }
+        guard let i = currentIndex, let t = workspaces[i].selectedTabIndex,
+              workspaces[i].tabs[t].focusedPane != id else { return }
         workspaces[i].tabs[t].focusedPane = id
     }
 
