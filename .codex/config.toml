@@ -1,0 +1,2 @@
+[plugins."build-macos-apps@openai-curated"]
+enabled = true
