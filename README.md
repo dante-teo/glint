@@ -37,7 +37,7 @@ Developer notes and regression checks live in [docs/appearance.md](docs/appearan
 
 ## App and Agent Icons
 
-The app bundle icon is a conventional macOS `AppIcon.appiconset` under `Glint/Resources/Assets.xcassets`; Liquid Glass `.icon` source art lives outside bundled resources in `AppIconSource/`. See [docs/appearance.md](docs/appearance.md#app-icon-packaging) before changing app icon resources.
+The app bundle icon is a conventional macOS `AppIcon.appiconset` under `Glint/Resources/Assets.xcassets`; selectable Dock icon presets are generated from the portrait sources in `AppIconSource/`. See [docs/appearance.md](docs/appearance.md#app-icon-packaging) before changing app icon resources.
 
 Agent status icons are bundled in `Glint/Resources/Assets.xcassets`. Animated status assets are 128x128 transparent APNGs stored as `.png` files inside `.dataset` folders; compact marks are 24x24 and 48x48 rasters inside `.imageset` folders.
 

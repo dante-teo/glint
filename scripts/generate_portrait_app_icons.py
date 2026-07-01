@@ -20,6 +20,14 @@ from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageOp
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "AppIconSource/portrait/source-photo.png"
 LINEART_MASTER = ROOT / "AppIconSource/portrait/lineart-master.png"
+BUN_SOURCE = ROOT / "AppIconSource/portrait-bun/source-photo.png"
+BUN_LINEART_MASTER = ROOT / "AppIconSource/portrait-bun/lineart-master.png"
+LONGHAIR_SOURCE = ROOT / "AppIconSource/portrait-longhair/source-photo.png"
+LONGHAIR_LINEART_MASTER = ROOT / "AppIconSource/portrait-longhair/lineart-master.png"
+POUT_SOURCE = ROOT / "AppIconSource/portrait-pout/source-photo.png"
+POUT_LINEART_MASTER = ROOT / "AppIconSource/portrait-pout/lineart-master.png"
+BREEZE_SOURCE = ROOT / "AppIconSource/portrait-breeze/source-photo.png"
+BREEZE_LINEART_MASTER = ROOT / "AppIconSource/portrait-breeze/lineart-master.png"
 OUT_DESIGN = ROOT / "design/app-icon-portrait"
 ASSETS = ROOT / "Glint/Resources/Assets.xcassets"
 LIQUID = ROOT / "AppIconSource/liquid-glass/AppIcon.icon/Assets"
@@ -38,7 +46,7 @@ class Palette:
     glow: str
 
 
-PALETTES: dict[str, Palette] = {
+THEME_PALETTES: dict[str, Palette] = {
     "sunrise": Palette("#ffc56d", "#ff4e8d", "#4e43f5", "#211827", "#fff8f2", "#ffffff"),
     "classic": Palette("#ff4d93", "#8e54ff", "#2447ff", "#1f1830", "#fff8f7", "#ffffff"),
     "aurora": Palette("#58f4d5", "#7b69ff", "#ff5da2", "#171b34", "#f8fffb", "#ffffff"),
@@ -48,6 +56,18 @@ PALETTES: dict[str, Palette] = {
     "jade": Palette("#95ffd6", "#22c890", "#167577", "#102821", "#f7fff9", "#ffffff"),
     "ember": Palette("#ffd36f", "#ff744d", "#b42b57", "#2a1414", "#fff8ef", "#ffffff"),
     "graphite": Palette("#f3f4f6", "#8a909c", "#272c36", "#111318", "#ffffff", "#ffffff"),
+}
+
+THEME_NAMES: tuple[str, ...] = tuple(THEME_PALETTES)
+PORTRAIT_NAMES: tuple[str, ...] = ("bun", "longhair", "pout", "breeze")
+
+DEFAULT_PORTRAIT_LAYOUT: tuple[float, float, float] = (0.90, 0.03, 0.05)
+
+PORTRAIT_LAYOUTS: dict[str, tuple[float, float, float]] = {
+    "bun": (0.82, 0.02, -0.02),
+    "longhair": (0.88, 0.02, -0.01),
+    "pout": (0.96, -0.01, 0.02),
+    "breeze": (0.86, 0.02, 0.05),
 }
 
 APPICON_SIZES: tuple[tuple[str, int], ...] = (
@@ -146,6 +166,62 @@ def make_tile_background(size: int, palette: Palette) -> Image.Image:
     )
     tile.alpha_composite(rim)
     return tile
+
+
+def lineart_master_for(name: str) -> Path:
+    portrait_name = portrait_name_for(name)
+    lineart_masters = {
+        "bun": BUN_LINEART_MASTER,
+        "longhair": LONGHAIR_LINEART_MASTER,
+        "pout": POUT_LINEART_MASTER,
+        "breeze": BREEZE_LINEART_MASTER,
+    }
+    return lineart_masters.get(portrait_name, LINEART_MASTER)
+
+
+def portrait_name_for(name: str) -> str:
+    prefix = name.split("-", maxsplit=1)[0]
+    return prefix if prefix in PORTRAIT_NAMES else "portrait"
+
+
+def theme_name_for(name: str) -> str:
+    if name in THEME_PALETTES:
+        return name
+    if name in PORTRAIT_NAMES:
+        return "sunrise"
+    _, _, theme_name = name.partition("-")
+    if theme_name in THEME_PALETTES:
+        return theme_name
+    raise ValueError(f"Unknown app icon preset theme for {name!r}")
+
+
+def preset_names() -> list[str]:
+    names = list(THEME_NAMES)
+    for portrait_name in PORTRAIT_NAMES:
+        names.append(portrait_name)
+        names.extend(f"{portrait_name}-{theme_name}" for theme_name in THEME_NAMES if theme_name != "sunrise")
+    return names
+
+
+def ensure_imageset(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    contents = path / "Contents.json"
+    if not contents.exists():
+        contents.write_text(
+            '{\n'
+            '  "images": [\n'
+            '    {\n'
+            '      "idiom": "universal",\n'
+            '      "filename": "icon.png"\n'
+            '    }\n'
+            '  ],\n'
+            '  "info": {\n'
+            '    "author": "xcode",\n'
+            '    "version": 1\n'
+            '  }\n'
+            '}',
+            encoding="utf-8",
+        )
 
 
 @lru_cache(maxsize=1)
@@ -337,10 +413,10 @@ def portrait_layers() -> tuple[Image.Image, Image.Image, Image.Image]:
 
 @lru_cache(maxsize=None)
 def compose_icon(name: str, size: int = CANVAS, portrait_scale: float = 1.01) -> Image.Image:
-    palette = PALETTES[name]
+    palette = THEME_PALETTES[theme_name_for(name)]
     base = make_tile_background(CANVAS, palette)
     master = ImageOps.fit(
-        Image.open(LINEART_MASTER).convert("RGBA"),
+        Image.open(lineart_master_for(name)).convert("RGBA"),
         (CANVAS, CANVAS),
         method=Image.Resampling.LANCZOS,
         centering=(0.5, 0.5),
@@ -348,10 +424,14 @@ def compose_icon(name: str, size: int = CANVAS, portrait_scale: float = 1.01) ->
 
     # Preserve the generated line-art master as white-ground art. Theme color
     # lives in the shell/rim so the portrait does not become a tinted repaint.
-    portrait_size = int(CANVAS * 1.02)
+    scale, x_offset, y_offset = PORTRAIT_LAYOUTS.get(portrait_name_for(name), DEFAULT_PORTRAIT_LAYOUT)
+    portrait_size = int(CANVAS * scale)
     portrait = master.resize((portrait_size, portrait_size), Image.Resampling.LANCZOS)
     portrait_mask = Image.new("L", (portrait_size, portrait_size), 255)
-    offset = ((CANVAS - portrait_size) // 2, int(CANVAS * -0.01))
+    offset = (
+        (CANVAS - portrait_size) // 2 + int(CANVAS * x_offset),
+        (CANVAS - portrait_size) // 2 + int(CANVAS * y_offset),
+    )
 
     portrait_shell = Image.new("RGBA", (CANVAS, CANVAS), hex_rgba(palette.glow, 255))
     portrait_shell.alpha_composite(portrait, offset)
@@ -393,10 +473,12 @@ def write_assets() -> None:
     preview = compose_icon("sunrise")
     preview.save(OUT_DESIGN / "lineart-source-derived.png")
 
-    for name, palette in PALETTES.items():
+    for name in preset_names():
         icon = compose_icon(name)
         preset_dir = ASSETS / f"AppIconPreset-{name}.imageset"
         logo_dir = ASSETS / f"GlintLogo-{name}.imageset"
+        ensure_imageset(preset_dir)
+        ensure_imageset(logo_dir)
         icon.save(preset_dir / "icon.png")
         compose_icon(name, LOGO, portrait_scale=1.03).save(logo_dir / "icon.png")
 
@@ -405,13 +487,13 @@ def write_assets() -> None:
     for filename, pixels in APPICON_SIZES:
         default_icon.resize((pixels, pixels), Image.Resampling.LANCZOS).save(appicon_dir / filename)
 
-    make_tile_background(CANVAS, PALETTES["sunrise"]).save(LIQUID / "background.png")
+    make_tile_background(CANVAS, THEME_PALETTES["sunrise"]).save(LIQUID / "background.png")
     compose_foreground_source().save(LIQUID / "foreground.png")
 
 
 def contact_sheet() -> None:
     sizes = [1024, 512, 256, 128, 64, 32, 16]
-    labels = list(PALETTES.keys())
+    labels = preset_names()
     cell_w, cell_h = 170, 210
     sheet = Image.new("RGBA", (cell_w * len(labels), cell_h * len(sizes)), (246, 246, 246, 255))
     draw = ImageDraw.Draw(sheet)
@@ -429,6 +511,10 @@ def main() -> None:
     write_assets()
     contact_sheet()
     print(f"Wrote portrait app icons from {SOURCE}")
+    print(f"Wrote bun portrait app icon from {BUN_SOURCE}")
+    print(f"Wrote longhair portrait app icon from {LONGHAIR_SOURCE}")
+    print(f"Wrote pout portrait app icon from {POUT_SOURCE}")
+    print(f"Wrote breeze portrait app icon from {BREEZE_SOURCE}")
     print(f"Wrote QA contact sheet to {OUT_DESIGN / 'contact-sheet.png'}")
 
 

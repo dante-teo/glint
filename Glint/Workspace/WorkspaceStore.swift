@@ -2387,6 +2387,39 @@ enum DevinIconStyle: String, CaseIterable {
 enum AppIconPreset: String, CaseIterable, Identifiable {
     case `default`
     case sunrise, classic, aurora, arctic, steel, ultraviolet, jade, ember, graphite
+    case bun, longhair, pout, breeze
+    case bunClassic = "bun-classic"
+    case bunAurora = "bun-aurora"
+    case bunArctic = "bun-arctic"
+    case bunSteel = "bun-steel"
+    case bunUltraviolet = "bun-ultraviolet"
+    case bunJade = "bun-jade"
+    case bunEmber = "bun-ember"
+    case bunGraphite = "bun-graphite"
+    case longhairClassic = "longhair-classic"
+    case longhairAurora = "longhair-aurora"
+    case longhairArctic = "longhair-arctic"
+    case longhairSteel = "longhair-steel"
+    case longhairUltraviolet = "longhair-ultraviolet"
+    case longhairJade = "longhair-jade"
+    case longhairEmber = "longhair-ember"
+    case longhairGraphite = "longhair-graphite"
+    case poutClassic = "pout-classic"
+    case poutAurora = "pout-aurora"
+    case poutArctic = "pout-arctic"
+    case poutSteel = "pout-steel"
+    case poutUltraviolet = "pout-ultraviolet"
+    case poutJade = "pout-jade"
+    case poutEmber = "pout-ember"
+    case poutGraphite = "pout-graphite"
+    case breezeClassic = "breeze-classic"
+    case breezeAurora = "breeze-aurora"
+    case breezeArctic = "breeze-arctic"
+    case breezeSteel = "breeze-steel"
+    case breezeUltraviolet = "breeze-ultraviolet"
+    case breezeJade = "breeze-jade"
+    case breezeEmber = "breeze-ember"
+    case breezeGraphite = "breeze-graphite"
 
     var id: String { rawValue }
 
@@ -2408,17 +2441,33 @@ enum AppIconPreset: String, CaseIterable, Identifiable {
     }
 
     var displayName: String {
-        switch self {
-        case .default: return "Default"
-        case .sunrise: return "Sunrise"
-        case .classic: return "Classic"
-        case .aurora: return "Aurora"
-        case .arctic: return "Arctic"
-        case .steel: return "Steel"
-        case .ultraviolet: return "Ultraviolet"
-        case .jade: return "Jade"
-        case .ember: return "Ember"
-        case .graphite: return "Graphite"
+        if self == .default {
+            return "Default"
+        }
+
+        let parts = rawValue.split(separator: "-", maxSplits: 1).map(String.init)
+        if parts.count == 2 {
+            return "\(Self.displayName(for: parts[0])) \(Self.displayName(for: parts[1]))"
+        }
+        return Self.displayName(for: rawValue)
+    }
+
+    private static func displayName(for rawValue: String) -> String {
+        switch rawValue {
+        case "sunrise": return "Sunrise"
+        case "classic": return "Classic"
+        case "aurora": return "Aurora"
+        case "arctic": return "Arctic"
+        case "steel": return "Steel"
+        case "ultraviolet": return "Ultraviolet"
+        case "jade": return "Jade"
+        case "ember": return "Ember"
+        case "graphite": return "Graphite"
+        case "bun": return "Bun"
+        case "longhair": return "Long Hair"
+        case "pout": return "Pout"
+        case "breeze": return "Breeze"
+        default: return rawValue.capitalized
         }
     }
 }

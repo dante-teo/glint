@@ -1,5 +1,6 @@
 import AppKit
 import XCTest
+@testable import Glint
 
 final class AppIconAssetTests: XCTestCase {
     func testAppIconAssetCatalogProvidesCompleteMacIconSet() throws {
@@ -62,5 +63,27 @@ final class AppIconAssetTests: XCTestCase {
             XCTAssertEqual(bitmap.pixelsWide, icon.pixels)
             XCTAssertEqual(bitmap.pixelsHigh, icon.pixels)
         }
+    }
+
+    func testEverySelectableAppIconPresetHasRuntimeAndHeaderAssets() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let assetsRoot = repoRoot.appendingPathComponent("Glint/Resources/Assets.xcassets")
+
+        for preset in AppIconPreset.allCases where preset != .default {
+            let presetAsset = assetsRoot.appendingPathComponent("\(preset.previewAsset).imageset/icon.png")
+            let headerAsset = assetsRoot.appendingPathComponent("\(preset.headerLogoAsset).imageset/icon.png")
+
+            try assertPNG(at: presetAsset, width: 1024, height: 1024)
+            try assertPNG(at: headerAsset, width: 256, height: 256)
+        }
+    }
+
+    private func assertPNG(at url: URL, width: Int, height: Int, file: StaticString = #filePath, line: UInt = #line) throws {
+        let data = try Data(contentsOf: url)
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: data), "\(url.lastPathComponent) should decode", file: file, line: line)
+        XCTAssertEqual(bitmap.pixelsWide, width, file: file, line: line)
+        XCTAssertEqual(bitmap.pixelsHigh, height, file: file, line: line)
     }
 }
