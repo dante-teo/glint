@@ -44,6 +44,10 @@ final class DevinACPAdapter: AgentRuntimeAdapter {
         try await client.setMode(sessionID: sessionID, modeId: modeId)
     }
 
+    func setConfigOption(sessionID: String, configId: String, value: String) async throws -> [SessionConfigOption] {
+        try await client.setConfigOption(sessionID: sessionID, configId: configId, value: value)
+    }
+
     func closeSession(sessionID: String) async throws {
         try await client.closeSession(sessionID: sessionID)
     }

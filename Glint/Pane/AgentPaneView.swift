@@ -78,7 +78,17 @@ private struct AgentPaneContent: View {
                     notInstalledCard
                         .padding(28)
                         .frame(maxHeight: .infinity)
-                } else if case .starting = manager.status {
+                } else if case .starting = manager.status, manager.messages.isEmpty {
+                    // Only for a genuinely fresh session with nothing to
+                    // show yet. A *resumed* session's `connectIfNeeded()`
+                    // also reports `.starting` while it reconnects in the
+                    // background, but its transcript is already loaded
+                    // from disk — swapping the whole message list +
+                    // composer subtree out for a spinner (and back again a
+                    // moment later) would hide real history and force a
+                    // fresh ScrollView/composer layout pass each time,
+                    // which is exactly the kind of same-tick resize that
+                    // causes the composer to render mid-transition.
                     loadingView
                         .frame(maxHeight: .infinity)
                 } else if case .failed(let message) = manager.status, isAuthError(message) {

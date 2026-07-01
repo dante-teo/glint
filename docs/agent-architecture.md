@@ -19,6 +19,12 @@ The managed path is layered from stable domain state outward:
 
 `DevinSessionManager` remains as a compatibility typealias while the UI and tests migrate to provider-neutral names.
 
+**Current state vs. target state:** the layering above (`AgentSessionController` delegating transcript/tool/status projection to `AgentSessionReducer`) is the target architecture, not yet the live one. Today `AgentSessionController` (in `Glint/Agent/DevinSessionManager.swift`) still owns its own independent copy of that projection logic — its own `indexForChunk`/`appendChunk`, `mergeToolCall`, `abandonUnfinishedToolCalls`, etc. — and is the only path real ACP traffic flows through; `AgentSessionReducer.reduce(_:event:)` is exercised only by `AgentSessionReducerTests` and by `AgentConversationStore.replayJournal`, not by the live controller. Until the controller is migrated to actually call into the reducer, treat the two as duplicate implementations of the same contract that must be changed together by hand — e.g. the "message chunk merging only continues the transcript's tail" fix (see `AGENTS.md`, "Devin ACP protocol integration") was applied to both `indexForChunk` copies with matching regression tests in `DevinSessionManagerTests` and `AgentSessionReducerTests`. Don't add reducer-only behavior assuming the controller already delegates to it.
+
+**Session lifecycle:** `AgentSessionController.establishSession(client:projectPath:existingSessionID:)` is the one place a session gets started or resumed, called both lazily (right before the first/next `session/prompt`) and eagerly (`connectIfNeeded(projectPath:)`, driven by the composer appearing/getting a project path, so the UI's model/mode/reasoning pickers have real data before the user sends anything). It always prefers `session/load` over `session/new` when a persisted `sessionID` already exists from a prior app run, falling back to `session/new` only if the Agent no longer recognizes that id or there wasn't one. This matters for conversations restored via `AgentSessionController`'s own `loadPersistedConversation()`/`PersistedConversation` (see "Persistence" below — this is a separate mechanism from `AgentConversationStore`): without the `session/load` preference, resuming a workspace across app restarts would silently start a brand-new server-side session every time, abandoning the one the restored transcript claims to represent.
+
+**Model and reasoning-level selection** goes through the ACP v1 `session/set_config_option` mechanism (`SessionConfigOption`/`SessionConfigOptionValue` in `ACPTypes.swift`, `ACPClient.setConfigOption`, `AgentSessionController.selectConfigOption(_:value:)`), not the older unstable `session/set_model`/`models`/`currentModel` fields. See `AGENTS.md`'s "Composer plan mode vs. ACP mode/model switching" for the full protocol shape and UI wiring.
+
 ## State Contracts
 
 `AgentSessionSnapshot` is the UI read model. Views should consume this stable shape instead of interpreting raw ACP protocol details.
@@ -70,15 +76,19 @@ Terminal server requests should continue to return not implemented because Glint
 
 Snapshot saves are atomic and clear the journal after the snapshot is written. This prevents replaying events that are already included in the snapshot. Journal replay skips corrupted lines so one bad event does not lose the whole conversation.
 
+**This is the target persistence mechanism, not (yet) the live one** — same caveat as the reducer above. `AgentSessionController` currently persists via its own private `PersistedConversation` struct and `loadPersistedConversation()`/`scheduleSave()`, writing a single `<workspaceID>.json` blob (sessionID, models/currentModel, modes, configOptions, messages) to the same `~/.glint/sessions/` directory but in its own shape — not `AgentConversationStore`'s snapshot+journal format. `AgentConversationStore` is exercised only by `AgentConversationStoreTests`. Debounce timing (~250ms via `scheduleSave()`) and the "check `Task.isCancelled` after `try?`-wrapped `Task.sleep`" rule (see `AGENTS.md`, "Devin session teardown") apply to the live mechanism.
+
 Delete paths must remove both snapshot and journal files. Debounced saves must not resurrect a deleted conversation.
 
 ## Testing
 
 Keep pure behavior covered close to the core:
 
-- `AgentSessionReducerTests` for transcript merging, status transitions, stale tools, late notifications, pending interactions, usage/mode/config, and bounded retention.
+- `AgentSessionReducerTests` for transcript merging, status transitions, stale tools, late notifications, pending interactions, usage/mode/config, and bounded retention. Per the "current state vs. target state" note above, this covers the reducer's copy of the logic, not the live path.
 - `AgentProjectFileServiceTests` for root containment, symlink handling, missing leaves, directory reads, line slicing, and write behavior.
-- `AgentConversationStoreTests` for snapshot round-trip, journal replay, corrupted journal tolerance, snapshot/journal interaction, and delete safety.
+- `AgentConversationStoreTests` for snapshot round-trip, journal replay, corrupted journal tolerance, snapshot/journal interaction, and delete safety. Also covers only the target persistence mechanism, not the live one.
+
+`DevinSessionManagerTests` (`@MainActor`) is the live path's actual test suite — connect/resume (`session/load` vs `session/new`), the controller's own transcript-merge/tool-call copy, mode and config-option selection, permission/elicitation handling, notification-ordering/stuck-turn regressions, and the controller's own `PersistedConversation` round-trip. If you change `AgentSessionController`/`DevinSessionManager.swift` behavior, this is the suite that actually exercises it end to end via a fake `AgentRuntimeAdapter`.
 
 Run these checks after changing the managed agent stack:
 

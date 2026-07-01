@@ -16,6 +16,13 @@ final class DevinSessionManagerTests: XCTestCase {
         var promptCalls: [(sessionID: String, content: [ContentBlock])] = []
         var setModeCalls: [(sessionID: String, modeId: String)] = []
         var setModeError: Error?
+        var setConfigOptionCalls: [(sessionID: String, configId: String, value: String)] = []
+        var setConfigOptionError: Error?
+        var setConfigOptionResult: [SessionConfigOption]?
+        var createSessionCalls: [String] = []
+        var loadSessionCalls: [(sessionID: String, cwd: String)] = []
+        var loadSessionError: Error?
+        var loadSessionResult: LoadSessionResponse?
         var promptError: Error?
         /// When set, the next `prompt(sessionID:content:)` call suspends
         /// until this continuation is resumed, letting tests interleave a
@@ -36,11 +43,14 @@ final class DevinSessionManagerTests: XCTestCase {
         }
 
         func createSession(cwd: String) async throws -> NewSessionResponse {
-            NewSessionResponse(sessionId: "session-123", sessionID: nil, modes: nil, models: nil, configOptions: nil)
+            createSessionCalls.append(cwd)
+            return NewSessionResponse(sessionId: "session-123", sessionID: nil, modes: nil, models: nil, configOptions: nil)
         }
 
         func loadSession(sessionID: String, cwd: String) async throws -> LoadSessionResponse {
-            LoadSessionResponse(modes: nil, configOptions: nil)
+            loadSessionCalls.append((sessionID, cwd))
+            if let loadSessionError { throw loadSessionError }
+            return loadSessionResult ?? LoadSessionResponse(modes: nil, configOptions: nil)
         }
 
         private var shouldGateNextPrompt = false
@@ -69,6 +79,12 @@ final class DevinSessionManagerTests: XCTestCase {
         func setMode(sessionID: String, modeId: String) async throws {
             setModeCalls.append((sessionID, modeId))
             if let setModeError { throw setModeError }
+        }
+
+        func setConfigOption(sessionID: String, configId: String, value: String) async throws -> [SessionConfigOption] {
+            setConfigOptionCalls.append((sessionID, configId, value))
+            if let setConfigOptionError { throw setConfigOptionError }
+            return setConfigOptionResult ?? []
         }
 
         func closeSession(sessionID: String) async throws {}
@@ -132,6 +148,154 @@ final class DevinSessionManagerTests: XCTestCase {
         await waitUntil { client.promptCalls.count == 2 }
 
         XCTAssertEqual(client.promptCalls.map { $0.content.compactMap(\.plainText).joined() }, ["first", "second"])
+    }
+
+    func testConnectIfNeededCreatesNewSessionWithoutSendingAPrompt() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+
+        manager.connectIfNeeded(projectPath: "/tmp")
+
+        await waitUntil { client.createSessionCalls.count == 1 }
+        XCTAssertTrue(client.loadSessionCalls.isEmpty)
+        XCTAssertTrue(client.promptCalls.isEmpty)
+        await waitUntil { manager.sessionID == "session-123" }
+        await waitUntil { manager.status == .idle }
+    }
+
+    /// Regression test: reopening a workspace (or relaunching the app) with
+    /// a persisted conversation must resume the *same* ACP session via
+    /// `session/load` — not silently abandon it server-side by calling
+    /// `session/new` again just because there's no live process yet.
+    func testConnectIfNeededResumesPersistedSessionViaLoadSession() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("glint-devin-session-store", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: dir) }
+
+        let workspaceID = UUID()
+        let firstClient = FakeClient()
+        let original = DevinSessionManager(
+            workspaceID: workspaceID,
+            paneID: PaneID(value: 0),
+            onStatusChange: { _ in },
+            onSessionID: { _ in },
+            clientFactory: { firstClient },
+            sessionsDirectory: dir
+        )
+        original.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { firstClient.promptCalls.count == 1 }
+        try? await Task.sleep(nanoseconds: 400_000_000)
+
+        let resumedClient = FakeClient()
+        resumedClient.loadSessionResult = LoadSessionResponse(
+            modes: SessionModeState(currentModeId: "code", availableModes: [SessionMode(id: "code", name: "Code")]),
+            configOptions: [SessionConfigOption(id: "model", name: "Model", category: "model", type: "select", currentValue: .string("claude-opus-4-6"))]
+        )
+        let restored = DevinSessionManager(
+            workspaceID: workspaceID,
+            paneID: PaneID(value: 0),
+            onStatusChange: { _ in },
+            onSessionID: { _ in },
+            clientFactory: { resumedClient },
+            sessionsDirectory: dir
+        )
+        XCTAssertEqual(restored.sessionID, "session-123")
+
+        restored.connectIfNeeded(projectPath: "/tmp")
+
+        await waitUntil { !resumedClient.loadSessionCalls.isEmpty }
+        XCTAssertEqual(resumedClient.loadSessionCalls.first?.sessionID, "session-123")
+        XCTAssertTrue(resumedClient.createSessionCalls.isEmpty)
+        XCTAssertTrue(resumedClient.promptCalls.isEmpty)
+        await waitUntil { restored.currentMode == "code" }
+        await waitUntil { restored.configOptions.contains { $0.id == "model" } }
+        await waitUntil { restored.status == .idle }
+    }
+
+    /// If the Agent no longer recognizes a previously persisted session
+    /// (expired, or the CLI/process restarted), resuming must fall back to
+    /// starting a fresh one instead of leaving the pane stuck.
+    func testConnectIfNeededFallsBackToCreateSessionWhenResumeFails() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("glint-devin-session-store", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: dir) }
+
+        let workspaceID = UUID()
+        let firstClient = FakeClient()
+        let original = DevinSessionManager(
+            workspaceID: workspaceID,
+            paneID: PaneID(value: 0),
+            onStatusChange: { _ in },
+            onSessionID: { _ in },
+            clientFactory: { firstClient },
+            sessionsDirectory: dir
+        )
+        original.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { firstClient.promptCalls.count == 1 }
+        try? await Task.sleep(nanoseconds: 400_000_000)
+
+        let resumedClient = FakeClient()
+        resumedClient.loadSessionError = ACPClientError.requestTimedOut
+        let restored = DevinSessionManager(
+            workspaceID: workspaceID,
+            paneID: PaneID(value: 0),
+            onStatusChange: { _ in },
+            onSessionID: { _ in },
+            clientFactory: { resumedClient },
+            sessionsDirectory: dir
+        )
+
+        restored.connectIfNeeded(projectPath: "/tmp")
+
+        await waitUntil { !resumedClient.createSessionCalls.isEmpty }
+        XCTAssertEqual(resumedClient.loadSessionCalls.count, 1)
+        await waitUntil { restored.status == .idle }
+    }
+
+    /// Sending a message on a resumed pane (no live client yet, but a
+    /// persisted `sessionID`) must resume via `session/load` too, not just
+    /// the dedicated `connectIfNeeded()` path.
+    func testSendPromptOnResumedSessionUsesLoadSessionNotCreateSession() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("glint-devin-session-store", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: dir) }
+
+        let workspaceID = UUID()
+        let firstClient = FakeClient()
+        let original = DevinSessionManager(
+            workspaceID: workspaceID,
+            paneID: PaneID(value: 0),
+            onStatusChange: { _ in },
+            onSessionID: { _ in },
+            clientFactory: { firstClient },
+            sessionsDirectory: dir
+        )
+        original.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { firstClient.promptCalls.count == 1 }
+        try? await Task.sleep(nanoseconds: 400_000_000)
+
+        let resumedClient = FakeClient()
+        let restored = DevinSessionManager(
+            workspaceID: workspaceID,
+            paneID: PaneID(value: 0),
+            onStatusChange: { _ in },
+            onSessionID: { _ in },
+            clientFactory: { resumedClient },
+            sessionsDirectory: dir
+        )
+
+        restored.sendPrompt(text: "resume me", projectPath: "/tmp")
+
+        await waitUntil { resumedClient.promptCalls.count == 1 }
+        XCTAssertEqual(resumedClient.loadSessionCalls.first?.sessionID, "session-123")
+        XCTAssertTrue(resumedClient.createSessionCalls.isEmpty)
+        XCTAssertEqual(resumedClient.promptCalls.first?.content.compactMap(\.plainText).joined(), "resume me")
     }
 
     /// Regression test for `sendPrompt`'s content-array construction: a
@@ -215,6 +379,46 @@ final class DevinSessionManagerTests: XCTestCase {
 
         await waitUntil { manager.messages.contains { $0.role == .assistant && $0.text == "hello" } }
         XCTAssertEqual(manager.messages.filter { $0.role == .assistant }.count, 1)
+    }
+
+    /// Regression test for the "answers appear above questions" bug:
+    /// `indexForChunk` used to scan the *entire* transcript history for the
+    /// last assistant message with no `messageId` (which is what Devin
+    /// actually sends), so a second turn's reply chunks kept getting glued
+    /// onto the first turn's reply bubble instead of starting a new one —
+    /// even though a new user prompt had already been appended in between.
+    /// Chunks without a `messageId` must only continue the message that is
+    /// currently last in the transcript, never reach back past later
+    /// messages.
+    func testAgentChunksWithoutMessageIdDoNotMergeAcrossLaterTurns() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.promptCalls.count == 1 }
+
+        client.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
+            sessionId: "session-123",
+            update: .agentMessageChunk(MessageChunkUpdate(sessionUpdate: "agent_message_chunk", messageId: nil, content: .text("answer one")))
+        ))))
+        await waitUntil { manager.messages.contains { $0.role == .assistant && $0.text == "answer one" } }
+
+        manager.sendPrompt(text: "second")
+        await waitUntil { client.promptCalls.count == 2 }
+
+        client.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
+            sessionId: "session-123",
+            update: .agentMessageChunk(MessageChunkUpdate(sessionUpdate: "agent_message_chunk", messageId: nil, content: .text("answer two")))
+        ))))
+        await waitUntil { manager.messages.contains { $0.role == .assistant && $0.text == "answer two" } }
+
+        let assistantTexts = manager.messages.filter { $0.role == .assistant }.map(\.text)
+        XCTAssertEqual(assistantTexts, ["answer one", "answer two"])
+
+        let idxAnswerOne = try XCTUnwrap(manager.messages.firstIndex { $0.text == "answer one" })
+        let idxSecondPrompt = try XCTUnwrap(manager.messages.firstIndex { $0.text == "second" })
+        let idxAnswerTwo = try XCTUnwrap(manager.messages.firstIndex { $0.text == "answer two" })
+        XCTAssertLessThan(idxAnswerOne, idxSecondPrompt)
+        XCTAssertLessThan(idxSecondPrompt, idxAnswerTwo)
     }
 
     func testToolCallUpdateReplacesExistingToolCall() async throws {
@@ -431,6 +635,88 @@ final class DevinSessionManagerTests: XCTestCase {
 
         await waitUntil { manager.currentMode == nil }
         XCTAssertTrue(manager.messages.contains { $0.role == .system && $0.text.contains("Couldn't switch mode") })
+    }
+
+    func testSelectConfigOptionCallsSetConfigOptionAndAdoptsResponse() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.promptCalls.count == 1 }
+
+        client.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
+            sessionId: "session-123",
+            update: .configOptionUpdate(ConfigOptionUpdate(configOptions: [
+                SessionConfigOption(
+                    id: "model",
+                    name: "Model",
+                    category: "model",
+                    type: "select",
+                    currentValue: .string("claude-sonnet-5-high"),
+                    options: [
+                        SessionConfigOptionValue(value: .string("claude-sonnet-5-high"), name: "Claude Sonnet 5 High"),
+                        SessionConfigOptionValue(value: .string("claude-opus-4-6-thinking"), name: "Claude Opus 4.6 Thinking")
+                    ]
+                )
+            ]))
+        ))))
+        await waitUntil { manager.configOptions.contains { $0.id == "model" } }
+
+        client.setConfigOptionResult = [
+            SessionConfigOption(
+                id: "model",
+                name: "Model",
+                category: "model",
+                type: "select",
+                currentValue: .string("claude-opus-4-6-thinking"),
+                options: [
+                    SessionConfigOptionValue(value: .string("claude-sonnet-5-high"), name: "Claude Sonnet 5 High"),
+                    SessionConfigOptionValue(value: .string("claude-opus-4-6-thinking"), name: "Claude Opus 4.6 Thinking")
+                ]
+            )
+        ]
+
+        manager.selectConfigOption("model", value: "claude-opus-4-6-thinking")
+
+        await waitUntil { client.setConfigOptionCalls.contains { $0.value == "claude-opus-4-6-thinking" } }
+        XCTAssertEqual(client.setConfigOptionCalls.first?.sessionID, "session-123")
+        XCTAssertEqual(client.setConfigOptionCalls.first?.configId, "model")
+        await waitUntil {
+            manager.configOptions.first { $0.id == "model" }?.resolvedCurrentValue?.stringValue == "claude-opus-4-6-thinking"
+        }
+    }
+
+    func testSelectConfigOptionRevertsOnFailure() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.promptCalls.count == 1 }
+
+        client.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
+            sessionId: "session-123",
+            update: .configOptionUpdate(ConfigOptionUpdate(configOptions: [
+                SessionConfigOption(
+                    id: "model",
+                    name: "Model",
+                    category: "model",
+                    type: "select",
+                    currentValue: .string("claude-sonnet-5-high"),
+                    options: [
+                        SessionConfigOptionValue(value: .string("claude-sonnet-5-high"), name: "Claude Sonnet 5 High"),
+                        SessionConfigOptionValue(value: .string("claude-opus-4-6-thinking"), name: "Claude Opus 4.6 Thinking")
+                    ]
+                )
+            ]))
+        ))))
+        await waitUntil { manager.configOptions.contains { $0.id == "model" } }
+
+        client.setConfigOptionError = ACPClientError.requestTimedOut
+
+        manager.selectConfigOption("model", value: "claude-opus-4-6-thinking")
+
+        await waitUntil {
+            manager.configOptions.first { $0.id == "model" }?.resolvedCurrentValue?.stringValue == "claude-sonnet-5-high"
+        }
+        XCTAssertTrue(manager.messages.contains { $0.role == .system && $0.text.contains("Couldn't change model") })
     }
 
     func testConfigOptionUpdateStoresOptions() async throws {

@@ -13,6 +13,9 @@
     "%@" : {
 
     },
+    "%@ events" : {
+
+    },
     "%@:" : {
 
     },
@@ -64,9 +67,6 @@
     "AI" : {
 
     },
-    "AI Auto-Review" : {
-
-    },
     "Allow external control" : {
       "extractionState" : "manual"
     },
@@ -112,6 +112,9 @@
     "Connecting to Devin..." : {
 
     },
+    "Context Window" : {
+
+    },
     "Count background panes that need approval, just finished, or failed." : {
       "extractionState" : "manual"
     },
@@ -135,6 +138,9 @@
 
     },
     "Devin CLI Not Installed" : {
+
+    },
+    "Devin did not expose model switching for this session." : {
 
     },
     "Devin workspace is ready. The chat UI lands in the next phase." : {
@@ -188,9 +194,6 @@
     "main" : {
 
     },
-    "Manual" : {
-
-    },
     "New Tab" : {
 
     },
@@ -198,6 +201,12 @@
 
     },
     "NEW WORKSPACE" : {
+
+    },
+    "No ACP events recorded yet." : {
+
+    },
+    "No models reported" : {
 
     },
     "No results" : {
@@ -213,6 +222,9 @@
 
     },
     "Pick a project folder below, then describe your task to begin." : {
+
+    },
+    "Plan" : {
 
     },
     "Play notification chimes even when the agent's pane is focused. When off, only background workspaces trigger sounds." : {
@@ -246,6 +258,9 @@
       "extractionState" : "manual"
     },
     "Search" : {
+
+    },
+    "Session diagnostics" : {
 
     },
     "Session Error" : {

@@ -244,11 +244,7 @@ struct AgentToolCallRow: View {
 
                         statusBadge
 
-                        if let durationText {
-                            Text(durationText)
-                                .font(AppFonts.ui(10.5, weight: .medium))
-                                .foregroundStyle(Theme.text4)
-                        }
+                        durationLabel
 
                         Spacer(minLength: 0)
                     }
@@ -384,9 +380,35 @@ struct AgentToolCallRow: View {
         )
     }
 
-    private var durationText: String? {
-        guard let start = message.toolStartedAt else { return nil }
-        let end = message.toolCompletedAt ?? message.toolUpdatedAt ?? Date()
+    /// Terminal tool calls show a frozen duration against their real
+    /// completion time. Anything still in flight (no `toolCompletedAt` yet)
+    /// must keep measuring against a live "now" via `TimelineView` below —
+    /// previously this fell back to `toolUpdatedAt`, which freezes the
+    /// instant the last notification arrived. A tool call that's genuinely
+    /// stuck (no further notifications ever arrive) then shows whatever
+    /// tiny duration it had at that last update forever (e.g. "<1s"),
+    /// which looks like it just started rather than like something a user
+    /// needs to notice and cancel.
+    @ViewBuilder
+    private var durationLabel: some View {
+        if let start = message.toolStartedAt {
+            if let completed = message.toolCompletedAt {
+                Text(Self.formattedDuration(from: start, to: completed))
+                    .font(AppFonts.ui(10.5, weight: .medium))
+                    .foregroundStyle(Theme.text4)
+            } else {
+                TimelineView(.periodic(from: start, by: 1)) { context in
+                    Text(Self.formattedDuration(from: start, to: context.date))
+                        .font(AppFonts.ui(10.5, weight: .medium))
+                        .foregroundStyle(Theme.text4)
+                }
+            }
+        }
+    }
+
+    /// Formats an elapsed duration as a short "<1s" / "12s" / "1m 12s"
+    /// label. Pure so it's unit-testable without a live view hierarchy.
+    static func formattedDuration(from start: Date, to end: Date) -> String {
         let seconds = max(0, end.timeIntervalSince(start))
         if seconds < 1 {
             return "<1s"

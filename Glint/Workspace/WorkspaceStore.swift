@@ -2060,6 +2060,7 @@ final class WorkspaceStore: ObservableObject {
         if let old = selectedWorkspaceID, old != id,
            let oldIdx = workspaces.firstIndex(where: { $0.id == old }),
            !workspaces[oldIdx].committed {
+            closeAgentSessions(forWorkspaceID: old)
             workspaces.remove(at: oldIdx)
         }
         selectedWorkspaceID = id
@@ -2365,6 +2366,9 @@ final class WorkspaceStore: ObservableObject {
         // Match selectWorkspace()/addAgentWorkspace(): an uncommitted agent
         // workspace has no user message or session to preserve, so creating a
         // terminal from it should not leave a hidden workspace in memory.
+        for discarded in workspaces where !discarded.committed {
+            closeAgentSessions(forWorkspaceID: discarded.id)
+        }
         workspaces.removeAll { !$0.committed }
 
         let palette = [
@@ -2391,6 +2395,9 @@ final class WorkspaceStore: ObservableObject {
         }()
         // Clean up any existing uncommitted workspace first (e.g. user opened
         // the folder picker twice without sending a message).
+        for discarded in workspaces where !discarded.committed {
+            closeAgentSessions(forWorkspaceID: discarded.id)
+        }
         workspaces.removeAll { !$0.committed }
 
         let palette = [
@@ -2477,6 +2484,24 @@ final class WorkspaceStore: ObservableObject {
             }
         }
         return true
+    }
+
+    /// Closes and drops any live `agentSessions` entries for `workspaceID`.
+    /// `AgentComposer.connectIfNeeded()` can start a real ACP process (and
+    /// resolve/create a live session) as soon as an agent pane appears —
+    /// before the user ever sends a first message and therefore before
+    /// `commitAgentWorkspace(_:)` runs. The uncommitted-workspace
+    /// auto-cleanup paths (`selectWorkspace`, `addWorkspace`,
+    /// `addAgentWorkspace`) only ever did a bare `workspaces` array
+    /// removal, which was safe when an uncommitted workspace truly
+    /// couldn't populate `agentSessions` with anything live — that
+    /// assumption no longer holds, so those paths must call this first or
+    /// they leak the process/session.
+    private func closeAgentSessions(forWorkspaceID workspaceID: UUID) {
+        for key in agentSessions.keys where key.workspace == workspaceID {
+            agentSessions[key]?.closeSession()
+            agentSessions.removeValue(forKey: key)
+        }
     }
 
     func agentSession(workspaceID: UUID, paneID: PaneID) -> DevinSessionManager {

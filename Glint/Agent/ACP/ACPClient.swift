@@ -193,6 +193,20 @@ final class ACPClient: @unchecked Sendable {
         )
     }
 
+    /// Changes a session config option (model, mode, or reasoning level)
+    /// via `session/set_config_option` — the current stable ACP mechanism,
+    /// which supersedes `session/set_mode` and the older unstable
+    /// `session/set_model`. Returns the complete, updated configuration
+    /// state, since the Agent may adjust dependent options (e.g. available
+    /// reasoning levels changing with the model).
+    func setConfigOption(sessionID: String, configId: String, value: String) async throws -> [SessionConfigOption] {
+        let response: SetConfigOptionResponse = try await request(
+            method: "session/set_config_option",
+            params: SetConfigOptionRequest(sessionId: sessionID, configId: configId, value: value)
+        )
+        return response.configOptions
+    }
+
     func closeSession(sessionID: String) async throws {
         let _: CloseSessionResponse = try await request(
             method: "session/close",

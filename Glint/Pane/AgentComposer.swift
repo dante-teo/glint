@@ -60,7 +60,13 @@ struct ComposerAttachment: Identifiable, Equatable {
 
 private extension SessionConfigOption {
     var stableID: String {
-        id ?? name ?? type ?? value?.prettyPrinted ?? "unknown-config-option"
+        id ?? name ?? type ?? resolvedCurrentValue?.prettyPrinted ?? "unknown-config-option"
+    }
+}
+
+private extension SessionConfigOptionValue {
+    var stableID: String {
+        value?.stringValue ?? name ?? value?.prettyPrinted ?? "unknown-config-option-value"
     }
 }
 
@@ -239,25 +245,44 @@ struct AgentComposer: View {
                 projectSection
             }
 
-            // Toolbar Row
-            HStack(spacing: 8) {
+            // Toolbar Row. Mirrors the common "left cluster of pickers,
+            // flexible gap, right cluster of icon-only actions" composer
+            // layout (e.g. Codex's model/reasoning pickers on the left,
+            // send button on the right): every pill/icon here is
+            // `.fixedSize()` so it hugs its own content instead of
+            // stretching to fill the row — without that, SwiftUI's `Menu`
+            // on macOS can claim more width than its label actually needs,
+            // which visually reads as huge, uneven gaps between controls.
+            HStack(spacing: 6) {
                 plusMenu
+                modelMenu
                 approvalMenu
                 if mode == .plan {
                     planModeLabel
                 }
-                contextUsageButton
                 Spacer(minLength: 8)
-                modelMenu
+                contextUsageButton
                 sendButton
             }
             .frame(minHeight: 30)
         }
         .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Theme.overlay(0.06))
-        )
+        // A flat, near-transparent fill (previously `Theme.overlay(0.06)` —
+        // 6% white/black tint, no real blur) let message text bleed
+        // straight through the card on any layout hiccup (e.g. a same-tick
+        // resize/scroll settling a frame late), reading as a broken overlap
+        // rather than a floating card. Give it a genuine
+        // `NSVisualEffectView` blur — via the same `liquidGlass` treatment
+        // the command palette and toolbar islands use — so the card is
+        // always opaque enough to fully occlude whatever's behind it,
+        // whether or not Liquid Glass itself is enabled.
+        .liquidGlass(enabled: store.glassEffect, cornerRadius: 16, tint: Theme.glassTint) {
+            ZStack {
+                VisualEffectBackground(material: .menu)
+                Theme.overlay(0.06)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Theme.overlay(isFocused ? 0.22 : 0.10), lineWidth: 1)
@@ -266,9 +291,11 @@ struct AgentComposer: View {
         .onAppear {
             isFocused = true
             validateProject()
+            connectIfNeeded()
         }
         .onChange(of: workspace.agentProjectPath) { _, _ in
             validateProject()
+            connectIfNeeded()
         }
         .onChange(of: manager.status) { _, status in
             if !status.isBusy && manager.pendingPermission == nil && manager.pendingElicitation == nil {
@@ -363,6 +390,7 @@ struct AgentComposer: View {
             controlIcon("plus")
         }
         .menuStyle(.borderlessButton)
+        .fixedSize()
         .help("Add content or commands")
     }
 
@@ -388,6 +416,7 @@ struct AgentComposer: View {
             controlPill(icon: approvalIcon, title: store.permissionReviewMode.title, maxWidth: 116)
         }
         .menuStyle(.borderlessButton)
+        .fixedSize()
         .help(store.permissionReviewMode.subtitle)
     }
 
@@ -474,9 +503,34 @@ struct AgentComposer: View {
         .frame(width: 220, alignment: .leading)
     }
 
+    /// The live model selector, exposed by Devin (and any other ACP v1
+    /// provider following the current spec) as a `SessionConfigOption`
+    /// with `category == "model"` — see `agentclientprotocol.com/protocol/
+    /// v1/session-config-options`. This supersedes the older unstable
+    /// `models`/`currentModel` fields, which Devin's ACP server no longer
+    /// populates.
+    private var modelConfigOption: SessionConfigOption? {
+        manager.configOptions.first { $0.category == "model" }
+    }
+
     private var modelMenu: some View {
         Menu {
-            if manager.models.isEmpty {
+            if let option = modelConfigOption, let choices = option.options, !choices.isEmpty {
+                Section("Model") {
+                    ForEach(choices, id: \.stableID) { choice in
+                        Button {
+                            select(choice, in: option)
+                        } label: {
+                            HStack {
+                                Text(choice.name ?? choice.value?.stringValue ?? "Model")
+                                if isCurrentChoice(choice, in: option) {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if manager.models.isEmpty {
                 Text("No models reported")
             } else {
                 Section("Model") {
@@ -492,27 +546,51 @@ struct AgentComposer: View {
                         .disabled(true)
                     }
                 }
+                Divider()
+                Text("Devin did not expose model switching for this session.")
             }
 
             if !reasoningOptions.isEmpty {
                 Section("Reasoning Effort") {
                     ForEach(reasoningOptions, id: \.stableID) { option in
-                        Button(reasoningLabel(for: option)) {}
-                            .disabled(true)
+                        if let choices = option.options, !choices.isEmpty {
+                            ForEach(choices, id: \.stableID) { choice in
+                                Button {
+                                    select(choice, in: option)
+                                } label: {
+                                    HStack {
+                                        Text(choice.name ?? choice.value?.stringValue ?? "Reasoning")
+                                        if isCurrentChoice(choice, in: option) {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            Button(reasoningLabel(for: option)) {}
+                                .disabled(true)
+                        }
                     }
                 }
             }
-
-            Divider()
-            Text("Devin did not expose model switching for this session.")
         } label: {
             controlPill(icon: "cpu", title: modelMenuLabel, maxWidth: 150)
         }
         .menuStyle(.borderlessButton)
-        .help("Model and reasoning are read-only until Devin exposes a supported switcher.")
+        .fixedSize()
+        .help(modelConfigOption != nil
+            ? String(localized: "Change the model used for this session.")
+            : String(localized: "Model and reasoning are read-only until Devin exposes a supported switcher."))
     }
 
     private var modelMenuLabel: String {
+        if let option = modelConfigOption {
+            let currentValue = option.resolvedCurrentValue?.stringValue
+            if let match = option.options?.first(where: { $0.value?.stringValue == currentValue }) {
+                return match.name ?? currentValue ?? String(localized: "Model")
+            }
+            if let currentValue { return currentValue }
+        }
         if let modelName = manager.currentModel?.name ?? manager.currentModel?.id {
             return modelName
         }
@@ -527,8 +605,14 @@ struct AgentComposer: View {
         return manager.models
     }
 
+    /// Devin's ACP server tags its reasoning-effort selector with
+    /// `category == "thought_level"` per the current spec. Older/other
+    /// providers that only send a bare `name`/`id` are matched by
+    /// substring as a fallback.
     private var reasoningOptions: [SessionConfigOption] {
-        manager.configOptions.filter { option in
+        let byCategory = manager.configOptions.filter { $0.category == "thought_level" }
+        if !byCategory.isEmpty { return byCategory }
+        return manager.configOptions.filter { option in
             let key = [option.id, option.name, option.type]
                 .compactMap { $0?.lowercased() }
                 .joined(separator: " ")
@@ -538,13 +622,22 @@ struct AgentComposer: View {
 
     private func reasoningLabel(for option: SessionConfigOption) -> String {
         let name = option.name ?? option.id ?? String(localized: "Reasoning")
-        guard let value = option.value else { return name }
+        guard let value = option.resolvedCurrentValue else { return name }
         return "\(name): \(value.stringValue ?? value.prettyPrinted)"
     }
 
     private func isCurrentModel(_ model: SessionModel) -> Bool {
         guard let current = manager.currentModel else { return false }
         return (model.id ?? model.name) == (current.id ?? current.name)
+    }
+
+    private func isCurrentChoice(_ choice: SessionConfigOptionValue, in option: SessionConfigOption) -> Bool {
+        choice.value?.stringValue == option.resolvedCurrentValue?.stringValue
+    }
+
+    private func select(_ choice: SessionConfigOptionValue, in option: SessionConfigOption) {
+        guard let configId = option.id, let value = choice.value?.stringValue else { return }
+        manager.selectConfigOption(configId, value: value)
     }
 
     private func insertDraftToken(_ token: String) {
@@ -712,6 +805,18 @@ struct AgentComposer: View {
         } else {
             projectError = nil
         }
+    }
+
+    /// Establishes the ACP connection as soon as we know where (pane
+    /// appears with an already-chosen project, or a project just got
+    /// picked) instead of waiting for the user's first message — so the
+    /// model/mode/reasoning pickers reflect real session data right away.
+    /// `DevinSessionManager.connectIfNeeded` itself is idempotent/no-ops
+    /// once connected, so calling this from both `.onAppear` and
+    /// `.onChange(of: workspace.agentProjectPath)` is safe.
+    private func connectIfNeeded() {
+        guard let projectPath, projectIsValid else { return }
+        manager.connectIfNeeded(projectPath: projectPath)
     }
 }
 

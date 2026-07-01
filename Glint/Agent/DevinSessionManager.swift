@@ -11,6 +11,7 @@ protocol AgentRuntimeAdapter: AnyObject {
     func loadSession(sessionID: String, cwd: String) async throws -> LoadSessionResponse
     func prompt(sessionID: String, content: [ContentBlock]) async throws -> PromptResponse
     func setMode(sessionID: String, modeId: String) async throws
+    func setConfigOption(sessionID: String, configId: String, value: String) async throws -> [SessionConfigOption]
     func closeSession(sessionID: String) async throws
     func cancelSession(sessionID: String)
     func close()
@@ -124,6 +125,10 @@ final class AgentSessionController: ObservableObject {
     /// content from those notifications is still recorded either way.
     private var isTurnActive = false
     private var projectPath: String?
+    /// Set while `connectIfNeeded()`'s background connect is in flight, so
+    /// a second call (e.g. from both `.onAppear` and a `.onChange` firing
+    /// in quick succession) doesn't spin up a second ACP process.
+    private var isConnecting = false
     private var saveTask: Task<Void, Never>?
     private var permissionContinuation: CheckedContinuation<ACPJSONValue, Never>?
     private var elicitationContinuation: CheckedContinuation<ACPJSONValue, Never>?
@@ -205,6 +210,10 @@ final class AgentSessionController: ObservableObject {
         denyPendingInteractions()
         runID = UUID()
         isTurnActive = false
+        // See `stop()`'s matching comment: bumping `runID` fences off any
+        // in-flight `connectIfNeeded()` task before it reaches
+        // `finishConnecting()`, so reset the flag here too.
+        isConnecting = false
         status = .cancelling
         let client = self.client
         self.client = nil
@@ -262,6 +271,13 @@ final class AgentSessionController: ObservableObject {
         denyPendingInteractions()
         runID = UUID()
         isTurnActive = false
+        // Bumping `runID` above fences off any in-flight `connectIfNeeded()`
+        // task: its `isCurrentRun(runID)` guard will now fail, so it returns
+        // early *without* reaching `finishConnecting()`. Reset the flag here
+        // instead of relying on that task to do it, or `isConnecting` stays
+        // stuck `true` forever and `connectIfNeeded()` never runs again for
+        // this pane (see `finishConnecting()`).
+        isConnecting = false
         client?.close()
         client = nil
         notificationCancellable = nil
@@ -321,20 +337,20 @@ final class AgentSessionController: ObservableObject {
         observeNotifications(from: client)
         observeDiagnostics(from: client)
         self.client = client
+        let existingSessionID = sessionID
 
-        Task.detached { [weak self, client, runID] in
+        Task.detached { [weak self, client, runID, projectPath, existingSessionID] in
             do {
-                try client.start()
-                let initialize = try await client.initialize()
-                let session = try await client.createSession(cwd: projectPath)
-                guard let sessionID = session.resolvedSessionId, !sessionID.isEmpty else {
-                    throw ACPClientError.invalidResponse(String(localized: "Devin ACP did not return a session id."))
-                }
+                let resolved = try await Self.establishSession(
+                    client: client,
+                    projectPath: projectPath,
+                    existingSessionID: existingSessionID
+                )
                 guard await self?.isCurrentRun(runID) == true else { return }
-                await self?.applyInitialize(initialize)
-                await self?.applySession(sessionID: sessionID, response: session)
+                await self?.applyInitialize(resolved.initialize)
+                await self?.applyResolvedSession(resolved)
                 await self?.markThinking()
-                _ = try await client.prompt(sessionID: sessionID, content: content)
+                _ = try await client.prompt(sessionID: resolved.sessionID, content: content)
                 guard await self?.isCurrentRun(runID) == true else { return }
                 await self?.finishActiveTurn(reason: String(localized: "Turn ended before the tool reported completion."))
             } catch {
@@ -343,6 +359,99 @@ final class AgentSessionController: ObservableObject {
                     ?? error.localizedDescription
                 await self?.markFailed(message)
             }
+        }
+    }
+
+    /// Establishes the ACP connection for this pane — starting the process
+    /// and resuming or creating a session — without sending a prompt, so
+    /// the composer's model/mode/reasoning pickers have real data as soon
+    /// as the pane is shown rather than only after the user's first
+    /// message. Safe to call repeatedly: no-ops while already
+    /// connected/connecting or mid-turn.
+    func connectIfNeeded(projectPath: String) {
+        guard client == nil, !isConnecting, !status.isBusy else { return }
+        self.projectPath = projectPath
+        isConnecting = true
+        status = .starting
+        let client = clientFactory()
+        installHandlers(on: client, projectRoot: projectPath)
+        observeNotifications(from: client)
+        observeDiagnostics(from: client)
+        self.client = client
+        let runID = UUID()
+        self.runID = runID
+        let existingSessionID = sessionID
+
+        Task.detached { [weak self, client, runID, projectPath, existingSessionID] in
+            do {
+                let resolved = try await Self.establishSession(
+                    client: client,
+                    projectPath: projectPath,
+                    existingSessionID: existingSessionID
+                )
+                guard await self?.isCurrentRun(runID) == true else { return }
+                await self?.applyInitialize(resolved.initialize)
+                await self?.applyResolvedSession(resolved)
+                await self?.finishConnecting()
+            } catch {
+                guard await self?.isCurrentRun(runID) == true else { return }
+                let message = (error as? LocalizedError)?.errorDescription
+                    ?? error.localizedDescription
+                await self?.markFailed(message)
+                await self?.finishConnecting()
+            }
+        }
+    }
+
+    private func finishConnecting() {
+        isConnecting = false
+        if status == .starting { status = .idle }
+    }
+
+    private struct ResolvedSession {
+        var sessionID: String
+        var initialize: InitializeResponse
+        var created: NewSessionResponse?
+        var loaded: LoadSessionResponse?
+    }
+
+    /// Starts `client` and resolves an active session: resumes
+    /// `existingSessionID` via `session/load` when we already have one
+    /// (e.g. restored from a persisted conversation across app restarts),
+    /// falling back to `session/new` if the Agent no longer recognizes it
+    /// (expired, or the process was restarted). Always creates fresh when
+    /// there's no existing session id. Runs off the main actor; callers
+    /// hop back via `self?.apply...` for state mutation. Must stay
+    /// `nonisolated`: `AgentSessionController` is `@MainActor`, and static
+    /// members of a `@MainActor` type are themselves MainActor-isolated by
+    /// default (see the `selectOption`/`outcomeJSON` statics above) —
+    /// without this, `await Self.establishSession(...)` would hop back onto
+    /// the main actor to run `client.start()`/`initialize()`/`loadSession`/
+    /// `createSession` synchronously, defeating the whole point of calling
+    /// it from `Task.detached`.
+    nonisolated private static func establishSession(
+        client: AgentRuntimeAdapter,
+        projectPath: String,
+        existingSessionID: String?
+    ) async throws -> ResolvedSession {
+        try client.start()
+        let initialize = try await client.initialize()
+        if let existingSessionID, !existingSessionID.isEmpty,
+           let loaded = try? await client.loadSession(sessionID: existingSessionID, cwd: projectPath) {
+            return ResolvedSession(sessionID: existingSessionID, initialize: initialize, created: nil, loaded: loaded)
+        }
+        let session = try await client.createSession(cwd: projectPath)
+        guard let newSessionID = session.resolvedSessionId, !newSessionID.isEmpty else {
+            throw ACPClientError.invalidResponse(String(localized: "Devin ACP did not return a session id."))
+        }
+        return ResolvedSession(sessionID: newSessionID, initialize: initialize, created: session, loaded: nil)
+    }
+
+    private func applyResolvedSession(_ resolved: ResolvedSession) {
+        if let loaded = resolved.loaded {
+            applyLoadedSession(sessionID: resolved.sessionID, response: loaded)
+        } else if let created = resolved.created {
+            applySession(sessionID: resolved.sessionID, response: created)
         }
     }
 
@@ -384,6 +493,56 @@ final class AgentSessionController: ObservableObject {
         currentMode = previousMode
         let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         messages.append(Message(role: .system, text: String(format: String(localized: "Couldn't switch mode: %@"), message)))
+        scheduleSave()
+    }
+
+    /// Changes a session config option (model, mode, reasoning level, ...)
+    /// via `session/set_config_option` — the current stable ACP mechanism
+    /// (see `SessionConfigOption`) that Devin uses to expose model
+    /// switching. Can be called at any point, whether idle or generating a
+    /// response. The Agent always responds with the complete, updated
+    /// configuration state (it may adjust dependent options, e.g. available
+    /// reasoning levels changing with the model), so on success we adopt
+    /// that response wholesale rather than patching a single field.
+    func selectConfigOption(_ configId: String, value: String) {
+        guard let client, let sessionID else { return }
+        guard let option = configOptions.first(where: { $0.id == configId }),
+              option.resolvedCurrentValue?.stringValue != value else { return }
+        let previousOptions = configOptions
+        if let idx = configOptions.firstIndex(where: { $0.id == configId }) {
+            configOptions[idx].currentValue = .string(value)
+        }
+        Task.detached { [weak self, client, sessionID, configId, value] in
+            do {
+                let updated = try await client.setConfigOption(sessionID: sessionID, configId: configId, value: value)
+                await self?.applyConfigOptions(updated)
+            } catch {
+                await self?.revertConfigOption(to: previousOptions, failedConfigId: configId, attemptedValue: value, error: error)
+            }
+        }
+    }
+
+    private func applyConfigOptions(_ options: [SessionConfigOption]) {
+        configOptions = options
+        scheduleSave()
+    }
+
+    private func revertConfigOption(to previousOptions: [SessionConfigOption],
+                                    failedConfigId: String,
+                                    attemptedValue: String,
+                                    error: Error) {
+        // Revert only the option that actually failed, not the whole
+        // array: `configOptions` holds independent selectors (model, mode,
+        // reasoning level, ...), so if the user changed a *different*
+        // option while this one's request was still in flight,
+        // wholesale-restoring `previousOptions` would silently discard
+        // that other, possibly-already-applied change too.
+        guard let idx = configOptions.firstIndex(where: { $0.id == failedConfigId }),
+              configOptions[idx].resolvedCurrentValue?.stringValue == attemptedValue,
+              let previous = previousOptions.first(where: { $0.id == failedConfigId }) else { return }
+        configOptions[idx] = previous
+        let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        messages.append(Message(role: .system, text: String(format: String(localized: "Couldn't change %@: %@"), failedConfigId, message)))
         scheduleSave()
     }
 
@@ -525,13 +684,18 @@ final class AgentSessionController: ObservableObject {
         }
     }
 
+    /// Chunks only ever continue the message currently at the *tail* of the
+    /// transcript, never one further back. Devin commonly streams chunks
+    /// with no `messageId`, and scanning the whole history for "the last
+    /// message with a matching role" would happily glue a brand-new turn's
+    /// reply onto an old bubble from several turns ago as long as nothing
+    /// else of that same role happened to sit between them — even though a
+    /// new user prompt (and possibly tool calls) had already been appended
+    /// after it. That produced merged bubbles rendered above later user
+    /// messages instead of a fresh bubble below them.
     private func indexForChunk(role: Message.Role, messageId: String?) -> Int? {
-        if let messageId {
-            return messages.lastIndex { $0.role == role && $0.messageId == messageId }
-        }
-        return messages.indices.reversed().first { idx in
-            messages[idx].role == role && messages[idx].messageId == nil
-        }
+        guard let lastIndex = messages.indices.last, messages[lastIndex].role == role else { return nil }
+        return messages[lastIndex].messageId == messageId ? lastIndex : nil
     }
 
     private func mergeToolCall(id: String,
@@ -758,6 +922,23 @@ final class AgentSessionController: ObservableObject {
             self.models = models
             currentModel = models.first
         }
+        if let modes = response.modes {
+            self.modes = modes.availableModes ?? []
+            currentMode = modes.currentModeId
+        }
+        if let configOptions = response.configOptions {
+            self.configOptions = configOptions
+        }
+        scheduleSave()
+    }
+
+    /// Mirrors `applySession(sessionID:response:)` for `session/load`'s
+    /// response, which (per the ACP spec) carries `modes`/`configOptions`
+    /// but no `models`/`sessionId` of its own — the id is already known
+    /// since we're the one who asked to resume it.
+    private func applyLoadedSession(sessionID: String, response: LoadSessionResponse) {
+        self.sessionID = sessionID
+        onSessionID(sessionID)
         if let modes = response.modes {
             self.modes = modes.availableModes ?? []
             currentMode = modes.currentModeId

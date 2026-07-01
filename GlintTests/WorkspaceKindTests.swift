@@ -172,6 +172,31 @@ final class WorkspaceKindTests: XCTestCase {
         XCTAssertEqual(store.selectedWorkspaceID, terminalID)
     }
 
+    /// Regression test: `AgentComposer.connectIfNeeded()` can start a real
+    /// ACP process for an agent pane as soon as it appears, before the
+    /// user ever sends a first message. Auto-cleanup removing an
+    /// uncommitted agent workspace from `workspaces` must also close and
+    /// drop its `agentSession`, or that live process/session leaks
+    /// forever with nothing left to reference it.
+    func testAutoCleanupOnWorkspaceSwitchClosesAgentSession() {
+        let (store, terminalID) = makeStore()
+        store.addAgentWorkspace(provider: .devin)
+        let agentID = store.workspaces.first { $0.kind == .agent }!.id
+        let paneID = PaneID(value: 0)
+        let sessionBefore = store.agentSession(workspaceID: agentID, paneID: paneID)
+
+        store.selectWorkspace(terminalID)
+
+        // The workspace is gone, but `agentSession(workspaceID:paneID:)`
+        // doesn't consult `workspaces` at all — it's keyed independently,
+        // so the only way to observe whether the old session was actually
+        // torn down (vs. left dangling in the private `agentSessions`
+        // dictionary) is that asking for the same key again must produce a
+        // *new* instance, not the same leaked one.
+        let sessionAfter = store.agentSession(workspaceID: agentID, paneID: paneID)
+        XCTAssertFalse(sessionBefore === sessionAfter)
+    }
+
     func testAutoCleanupSkipsCommittedWorkspace() {
         let (store, terminalID) = makeStore()
         store.addAgentWorkspace(provider: .devin)

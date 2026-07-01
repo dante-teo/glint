@@ -376,6 +376,22 @@ struct SetSessionModeRequest: Codable, Equatable, Sendable {
     var modeId: String
 }
 
+/// Request for `session/set_config_option`, the current stable mechanism
+/// for changing a session's model, mode, or reasoning level (see
+/// `SessionConfigOption`). `value` must be one of the values listed in the
+/// target option's `options` array.
+struct SetConfigOptionRequest: Codable, Equatable, Sendable {
+    var sessionId: String
+    var configId: String
+    var value: String
+}
+
+/// The Agent always responds with the complete, updated configuration
+/// state for the session.
+struct SetConfigOptionResponse: Codable, Equatable, Sendable {
+    var configOptions: [SessionConfigOption]
+}
+
 struct CloseSessionResponse: Codable, Equatable, Sendable {
     init() {}
 
@@ -899,11 +915,39 @@ struct SessionMode: Codable, Equatable, Sendable {
     var description: String?
 }
 
+/// A session config option as sent via `session/new`/`session/load`
+/// (`configOptions`) and the `config_option_update` notification. This is
+/// the stable, current ACP mechanism (`agentclientprotocol.com/protocol/v1/
+/// session-config-options`) that supersedes the older unstable `models`/
+/// `currentModel` fields — Devin exposes its model, mode, and reasoning
+/// selectors this way, each as one option with `category` set to `"model"`,
+/// `"mode"`, or `"thought_level"` respectively.
 struct SessionConfigOption: Codable, Equatable, Sendable {
     var id: String?
     var name: String?
+    var description: String?
+    var category: String?
     var type: String?
+    /// The option's currently selected value, per the current stable
+    /// schema (JSON key `currentValue`).
+    var currentValue: ACPJSONValue?
+    /// The selectable values for this option, per the current stable
+    /// schema. `nil`/empty for option kinds that aren't a `select`.
+    var options: [SessionConfigOptionValue]?
+    /// Older/unstable-schema alias for `currentValue`. Kept only for
+    /// backward compatibility with payloads (and tests) written against
+    /// the pre-stabilization shape; prefer `resolvedCurrentValue`.
     var value: ACPJSONValue?
+
+    /// The option's current value regardless of which schema generation
+    /// populated it.
+    var resolvedCurrentValue: ACPJSONValue? { currentValue ?? value }
+}
+
+struct SessionConfigOptionValue: Codable, Equatable, Sendable {
+    var value: ACPJSONValue?
+    var name: String?
+    var description: String?
 }
 
 /// The `toolCall` field nested inside a `session/request_permission`

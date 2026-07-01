@@ -138,13 +138,15 @@ enum AgentSessionReducer {
         }
     }
 
+    /// See the matching comment on `DevinSessionManager.indexForChunk`: a
+    /// chunk may only continue the message currently at the tail of the
+    /// transcript, never reach back past later messages (e.g. a user prompt
+    /// from a subsequent turn) just because it shares a role.
     private static func indexForChunk(in messages: [AgentTranscriptItem],
                                       role: AgentTranscriptItem.Role,
                                       messageId: String?) -> Int? {
-        if let messageId {
-            return messages.lastIndex { $0.role == role && $0.messageId == messageId }
-        }
-        return messages.indices.reversed().first { messages[$0].role == role && messages[$0].messageId == nil }
+        guard let lastIndex = messages.indices.last, messages[lastIndex].role == role else { return nil }
+        return messages[lastIndex].messageId == messageId ? lastIndex : nil
     }
 
     private static func mergeToolCall(in state: inout AgentSessionSnapshot,

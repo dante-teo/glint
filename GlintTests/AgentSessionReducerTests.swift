@@ -20,6 +20,30 @@ final class AgentSessionReducerTests: XCTestCase {
         XCTAssertEqual(state.messages.first?.text, "hello")
     }
 
+    /// Regression test mirroring `DevinSessionManagerTests
+    /// .testAgentChunksWithoutMessageIdDoNotMergeAcrossLaterTurns`: chunks
+    /// without a `messageId` must only continue the message currently at
+    /// the tail of the transcript, never reach back past a later message
+    /// (e.g. a user prompt from a subsequent turn) just because it shares a
+    /// role. Otherwise a second turn's reply keeps getting glued onto the
+    /// first turn's bubble instead of starting a new one.
+    func testChunksWithoutMessageIdDoNotMergeAcrossLaterTurns() {
+        var state = makeState()
+
+        AgentSessionReducer.reduce(&state, event: .messageChunk(role: .assistant, messageId: nil, content: .text("answer one")))
+        AgentSessionReducer.reduce(&state, event: .userPromptQueued(text: "second"))
+        AgentSessionReducer.reduce(&state, event: .messageChunk(role: .assistant, messageId: nil, content: .text("answer two")))
+
+        let assistantTexts = state.messages.filter { $0.role == .assistant }.map(\.text)
+        XCTAssertEqual(assistantTexts, ["answer one", "answer two"])
+
+        let idxAnswerOne = try! XCTUnwrap(state.messages.firstIndex { $0.text == "answer one" })
+        let idxSecondPrompt = try! XCTUnwrap(state.messages.firstIndex { $0.text == "second" })
+        let idxAnswerTwo = try! XCTUnwrap(state.messages.firstIndex { $0.text == "answer two" })
+        XCTAssertLessThan(idxAnswerOne, idxSecondPrompt)
+        XCTAssertLessThan(idxSecondPrompt, idxAnswerTwo)
+    }
+
     func testToolUpdatePreservesExistingFields() {
         var state = makeState()
         let started = Date(timeIntervalSince1970: 10)
