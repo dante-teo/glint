@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct AgentMessageView: View {
@@ -181,6 +182,9 @@ struct AgentThoughtRow: View {
 struct AgentToolCallRow: View {
     let message: DevinSessionManager.Message
     @State private var isExpanded = false
+    @State private var showFullInput = false
+    @State private var showFullOutput = false
+    @State private var showFullRaw = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -198,8 +202,16 @@ struct AgentToolCallRow: View {
                         Text(message.text)
                             .font(AppFonts.ui(13, weight: .semibold))
                             .foregroundStyle(Theme.text1)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
 
                         statusBadge
+
+                        if let durationText {
+                            Text(durationText)
+                                .font(AppFonts.ui(10.5, weight: .medium))
+                                .foregroundStyle(Theme.text4)
+                        }
 
                         Image(systemName: "chevron.right")
                             .font(.system(size: 8, weight: .bold))
@@ -210,13 +222,25 @@ struct AgentToolCallRow: View {
                 .buttonStyle(.plain)
 
                 if isExpanded {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let reason = message.toolAbandonedReason {
+                            detailSection(title: "Status", text: reason, color: Theme.orange)
+                        }
                         if let kind = message.toolKind {
-                            metadataItem(label: "Kind", value: String(describing: kind))
+                            metadataItem(label: "Kind", value: kind.description)
                         }
                         if let id = message.toolCallId {
                             metadataItem(label: "ID", value: id)
                         }
+                        if let locations = message.toolLocations, !locations.isEmpty {
+                            detailSection(title: "Locations", text: locationsText(locations), color: Theme.text3)
+                        }
+                        rawJSONSection(title: "Input", value: message.toolRawInput, showFull: $showFullInput)
+                        rawJSONSection(title: "Output", value: message.toolRawOutput, showFull: $showFullOutput)
+                        if let content = message.toolContent, !content.isEmpty {
+                            detailSection(title: "Content", text: contentText(content), color: Theme.text3)
+                        }
+                        detailSection(title: "Raw Tool JSON", text: rawToolJSON, color: Theme.text3, showFull: $showFullRaw)
                     }
                     .padding(.top, 4)
                 }
@@ -257,6 +281,9 @@ struct AgentToolCallRow: View {
     }
 
     private var statusBadgeSpec: (label: String, color: Color, bgColor: Color) {
+        if message.toolAbandonedReason != nil {
+            return ("Stale", Theme.orange, Theme.orange.opacity(0.12))
+        }
         switch message.toolStatus {
         case .pending:
             return ("Pending", Theme.text3, Theme.overlay(0.08))
@@ -283,7 +310,20 @@ struct AgentToolCallRow: View {
             )
             .overlay(
                 Capsule().stroke(spec.color.opacity(0.2), lineWidth: 1)
-            )
+        )
+    }
+
+    private var durationText: String? {
+        guard let start = message.toolStartedAt else { return nil }
+        let end = message.toolCompletedAt ?? message.toolUpdatedAt ?? Date()
+        let seconds = max(0, end.timeIntervalSince(start))
+        if seconds < 1 {
+            return "<1s"
+        }
+        if seconds < 60 {
+            return "\(Int(seconds.rounded()))s"
+        }
+        return "\(Int(seconds / 60))m \(Int(seconds.truncatingRemainder(dividingBy: 60)))s"
     }
 
     private func metadataItem(label: String, value: String) -> some View {
@@ -296,6 +336,103 @@ struct AgentToolCallRow: View {
                 .foregroundStyle(Theme.text2)
                 .textSelection(.enabled)
         }
+    }
+
+    @ViewBuilder
+    private func rawJSONSection(title: String, value: ACPJSONValue?, showFull: Binding<Bool>) -> some View {
+        if let value {
+            detailSection(title: title, text: value.prettyPrinted, color: Theme.text3, showFull: showFull)
+        } else {
+            detailSection(title: title, text: "No \(title.lowercased()) provided by agent.", color: Theme.text4)
+        }
+    }
+
+    private func detailSection(title: String,
+                               text: String,
+                               color: Color,
+                               showFull: Binding<Bool>? = nil) -> some View {
+        let fullText = text.isEmpty ? "(empty)" : text
+        let truncated = fullText.count > 4000 && showFull?.wrappedValue != true
+        let displayText = truncated ? String(fullText.prefix(4000)) + "\n..." : fullText
+
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 8) {
+                Text(title)
+                    .font(AppFonts.ui(10.5, weight: .bold))
+                    .foregroundStyle(Theme.text4)
+                Spacer()
+                Button {
+                    copy(fullText)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Theme.text4)
+                .help("Copy \(title)")
+                if let showFull, fullText.count > 4000 {
+                    Button(showFull.wrappedValue ? "Less" : "Full") {
+                        showFull.wrappedValue.toggle()
+                    }
+                    .buttonStyle(.plain)
+                    .font(AppFonts.ui(10.5, weight: .semibold))
+                    .foregroundStyle(Theme.text3)
+                }
+            }
+            Text(displayText)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(color)
+                .textSelection(.enabled)
+                .lineLimit(showFull?.wrappedValue == true ? nil : 80)
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Theme.overlay(0.04))
+                )
+        }
+        .frame(maxWidth: 680, alignment: .leading)
+    }
+
+    private func locationsText(_ locations: [ToolCallLocation]) -> String {
+        locations.map { location in
+            if let path = location.path, let line = location.line {
+                return "\(path):\(line)"
+            }
+            return location.path ?? String(localized: "Unknown location")
+        }
+        .joined(separator: "\n")
+    }
+
+    private func contentText(_ content: [ToolCallContent]) -> String {
+        content.map { item in
+            switch item {
+            case .content(let block):
+                return block.plainText ?? String(describing: block)
+            case .diff(let raw):
+                return raw.prettyPrinted
+            case .unknown(let type, let raw):
+                return "Unknown content (\(type))\n\(raw.prettyPrinted)"
+            }
+        }
+        .joined(separator: "\n\n")
+    }
+
+    private var rawToolJSON: String {
+        var object: [String: ACPJSONValue] = [:]
+        if let id = message.toolCallId { object["toolCallId"] = .string(id) }
+        object["title"] = .string(message.text)
+        if let kind = message.toolKind { object["kind"] = .string(kind.description) }
+        if let status = message.toolStatus { object["status"] = .string(String(describing: status)) }
+        if let rawInput = message.toolRawInput { object["rawInput"] = rawInput }
+        if let rawOutput = message.toolRawOutput { object["rawOutput"] = rawOutput }
+        if let reason = message.toolAbandonedReason { object["abandonedReason"] = .string(reason) }
+        return ACPJSONValue.object(object).prettyPrinted
+    }
+
+    private func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 }
 

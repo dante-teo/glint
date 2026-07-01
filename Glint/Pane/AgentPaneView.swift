@@ -26,6 +26,7 @@ private struct AgentPaneContent: View {
     @State private var projectError: String?
     @State private var isNearBottom = true
     @State private var elicitationInput = ""
+    @State private var showDiagnostics = false
 
     private var projectPath: String? {
         workspace.agentProjectPath
@@ -64,6 +65,12 @@ private struct AgentPaneContent: View {
 
                 Divider()
                     .overlay(Theme.divider)
+
+                if showDiagnostics {
+                    diagnosticsPanel
+                    Divider()
+                        .overlay(Theme.divider)
+                }
 
                 if !devinInstalled {
                     notInstalledCard
@@ -165,6 +172,20 @@ private struct AgentPaneContent: View {
 
             Spacer()
 
+            Button {
+                showDiagnostics.toggle()
+            } label: {
+                Image(systemName: "waveform.path.ecg.rectangle")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(showDiagnostics ? store.accent : Theme.text3)
+                    .frame(width: 28, height: 28)
+                    .background(
+                        Circle().fill(Theme.overlay(showDiagnostics ? 0.10 : 0.05))
+                    )
+            }
+            .buttonStyle(.plain)
+            .help("Session diagnostics")
+
             // Quick mode toggle if any
             if let currentMode = manager.currentMode {
                 Text(currentMode.uppercased())
@@ -176,6 +197,87 @@ private struct AgentPaneContent: View {
                         Capsule().fill(store.accent.opacity(0.12))
                     )
             }
+        }
+    }
+
+    private var diagnosticsPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Session diagnostics")
+                    .font(AppFonts.ui(11.5, weight: .bold))
+                    .foregroundStyle(Theme.text3)
+                Spacer()
+                Text("\(manager.diagnostics.count) events")
+                    .font(AppFonts.ui(10.5, weight: .medium))
+                    .foregroundStyle(Theme.text4)
+            }
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 6) {
+                    if manager.diagnostics.isEmpty {
+                        Text("No ACP events recorded yet.")
+                            .font(AppFonts.ui(11.5))
+                            .foregroundStyle(Theme.text4)
+                    } else {
+                        ForEach(manager.diagnostics.suffix(40)) { event in
+                            diagnosticRow(event)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 170)
+        }
+        .padding(.horizontal, 28)
+        .padding(.vertical, 10)
+        .background(Theme.overlay(0.035))
+    }
+
+    private func diagnosticRow(_ event: ACPDiagnosticEvent) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                Text(event.kind.rawValue)
+                    .font(AppFonts.ui(9.5, weight: .bold))
+                    .foregroundStyle(diagnosticColor(event.kind))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1.5)
+                    .background(Capsule().fill(diagnosticColor(event.kind).opacity(0.12)))
+                Text(event.title)
+                    .font(AppFonts.ui(11, weight: .semibold))
+                    .foregroundStyle(Theme.text2)
+                    .lineLimit(1)
+                Spacer()
+            }
+            if let detail = event.detail, !detail.isEmpty {
+                Text(detail)
+                    .font(.system(size: 10.5, design: .monospaced))
+                    .foregroundStyle(Theme.text4)
+                    .lineLimit(2)
+                    .textSelection(.enabled)
+            } else if let payload = event.payload {
+                Text(payload.prettyPrinted)
+                    .font(.system(size: 10.5, design: .monospaced))
+                    .foregroundStyle(Theme.text4)
+                    .lineLimit(2)
+                    .textSelection(.enabled)
+            }
+        }
+    }
+
+    private func diagnosticColor(_ kind: ACPDiagnosticEvent.Kind) -> Color {
+        switch kind {
+        case .error, .malformed:
+            return Theme.pink
+        case .stderr:
+            return Theme.orange
+        case .request, .serverRequest:
+            return Theme.cyan
+        case .response:
+            return Theme.green
+        case .notification:
+            return store.accent
+        case .lifecycle:
+            return Theme.text3
         }
     }
 

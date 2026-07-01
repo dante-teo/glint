@@ -62,6 +62,7 @@ final class ACPClient: @unchecked Sendable {
     private let stateLock = NSLock()
     private let writeLock = NSLock()
     private let notificationSubject = PassthroughSubject<ACPNotification, Never>()
+    private let diagnosticSubject = PassthroughSubject<ACPDiagnosticEvent, Never>()
     private var stderrData = Data()
     private var nextID = 1
     private var pending: [Int: PendingRequest] = [:]
@@ -72,6 +73,10 @@ final class ACPClient: @unchecked Sendable {
 
     var notifications: AnyPublisher<ACPNotification, Never> {
         notificationSubject.eraseToAnyPublisher()
+    }
+
+    var diagnostics: AnyPublisher<ACPDiagnosticEvent, Never> {
+        diagnosticSubject.eraseToAnyPublisher()
     }
 
     var stderrText: String {
@@ -101,12 +106,15 @@ final class ACPClient: @unchecked Sendable {
         }
 
         process.terminationHandler = { [weak self] _ in
-            self?.failPending(ACPClientError.processExited(self?.stderrText ?? ""))
+            let stderr = self?.stderrText ?? ""
+            self?.emitDiagnostic(.init(kind: .lifecycle, title: "ACP process exited", detail: stderr.isEmpty ? nil : stderr))
+            self?.failPending(ACPClientError.processExited(stderr))
         }
 
         do {
             try process.run()
             didStart = true
+            emitDiagnostic(.init(kind: .lifecycle, title: "Started Devin ACP process", detail: devinURL.path))
             startReader()
         } catch {
             throw ACPClientError.processLaunchFailed(error.localizedDescription)
@@ -217,8 +225,10 @@ final class ACPClient: @unchecked Sendable {
         if process.isRunning {
             process.terminate()
         }
+        emitDiagnostic(.init(kind: .lifecycle, title: "Closed ACP client"))
         failPending(ACPClientError.requestCancelled)
         notificationSubject.send(completion: .finished)
+        diagnosticSubject.send(completion: .finished)
     }
 
     private func request<Result: Decodable, Params: Encodable>(
@@ -229,6 +239,7 @@ final class ACPClient: @unchecked Sendable {
         let id = nextRequestID()
         let envelope = ACPRequest(id: id, method: method, params: params)
         let payload = try JSONEncoder.acp.encode(envelope)
+        emitDiagnostic(.init(kind: .request, title: method, detail: "id \(id)"))
 
         let timeoutTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
@@ -295,14 +306,17 @@ final class ACPClient: @unchecked Sendable {
     private func handleIncomingLine(_ line: Data) {
         guard let message = try? JSONDecoder.acp.decode(ACPIncomingMessage.self, from: line) else {
             NSLog("[glint] Devin ACP sent malformed JSON line (\(line.count) bytes)")
+            emitDiagnostic(.init(kind: .malformed, title: "Malformed JSON line", detail: String(data: line, encoding: .utf8)))
             return
         }
 
         if let id = message.id, message.method == nil {
             handleResponse(id: id, result: message.result, error: message.error)
         } else if let id = message.id, let method = message.method {
+            emitDiagnostic(.init(kind: .serverRequest, title: method, detail: "id \(id)", payload: message.params))
             handleServerRequest(ACPServerRequest(id: id, method: method, params: message.params))
         } else if let method = message.method {
+            emitDiagnostic(.init(kind: .notification, title: method, payload: message.params))
             notificationSubject.send(ACPNotification(method: method, params: message.params))
         }
     }
@@ -310,11 +324,14 @@ final class ACPClient: @unchecked Sendable {
     private func handleResponse(id: Int, result: ACPJSONValue?, error: ACPErrorPayload?) {
         guard let pending = removePending(id: id) else {
             NSLog("[glint] Devin ACP response for unknown id \(id)")
+            emitDiagnostic(.init(kind: .response, title: "Unknown response id", detail: "id \(id)", payload: result))
             return
         }
         if let error {
+            emitDiagnostic(.init(kind: .error, title: "Response error", detail: "id \(id): \(error.message)", payload: error.data))
             pending.complete(.failure(ACPClientError.serverError(error.message)))
         } else {
+            emitDiagnostic(.init(kind: .response, title: "Response", detail: "id \(id)", payload: result))
             pending.complete(.success(result ?? .null))
         }
     }
@@ -345,6 +362,7 @@ final class ACPClient: @unchecked Sendable {
             try write(JSONEncoder.acp.encode(envelope))
         } catch {
             NSLog("[glint] failed to write Devin ACP response: \(error)")
+            emitDiagnostic(.init(kind: .error, title: "Failed to write ACP response", detail: error.localizedDescription))
         }
     }
 
@@ -401,6 +419,11 @@ final class ACPClient: @unchecked Sendable {
         stateLock.lock()
         stderrData.append(data)
         stateLock.unlock()
+        emitDiagnostic(.init(kind: .stderr, title: "stderr", detail: String(data: data, encoding: .utf8)))
+    }
+
+    private func emitDiagnostic(_ event: ACPDiagnosticEvent) {
+        diagnosticSubject.send(event)
     }
 
     private static func devinExecutableURL() -> URL? {

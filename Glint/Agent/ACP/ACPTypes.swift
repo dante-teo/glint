@@ -51,6 +51,19 @@ enum ACPJSONValue: Codable, Equatable, Sendable {
     func decoded<T: Decodable>(_ type: T.Type, using decoder: JSONDecoder = JSONDecoder()) throws -> T {
         try decoder.decode(T.self, from: JSONEncoder.acp.encode(self))
     }
+
+    var prettyPrinted: String {
+        guard let data = try? JSONEncoder.acp.encode(self),
+              let object = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) else {
+            return String(describing: self)
+        }
+        if JSONSerialization.isValidJSONObject(object),
+           let pretty = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]),
+           let string = String(data: pretty, encoding: .utf8) {
+            return string
+        }
+        return String(data: data, encoding: .utf8) ?? String(describing: self)
+    }
 }
 
 extension JSONEncoder {
@@ -122,6 +135,33 @@ struct ACPRawResponse: Decodable {
 struct ACPNotification: Decodable, Equatable, Sendable {
     let method: String
     let params: ACPJSONValue?
+}
+
+struct ACPDiagnosticEvent: Identifiable, Codable, Equatable, Sendable {
+    enum Kind: String, Codable, Sendable {
+        case lifecycle
+        case request
+        case response
+        case notification
+        case serverRequest
+        case stderr
+        case malformed
+        case error
+    }
+
+    var id = UUID()
+    var timestamp = Date()
+    var kind: Kind
+    var title: String
+    var detail: String?
+    var payload: ACPJSONValue?
+
+    init(kind: Kind, title: String, detail: String? = nil, payload: ACPJSONValue? = nil) {
+        self.kind = kind
+        self.title = title
+        self.detail = detail
+        self.payload = payload
+    }
 }
 
 struct ACPServerRequest: Decodable, Equatable, Sendable {
@@ -666,6 +706,23 @@ enum ToolKind: Codable, Equatable, Sendable {
     }
 }
 
+extension ToolKind: CustomStringConvertible {
+    var description: String {
+        switch self {
+        case .read: return "read"
+        case .edit: return "edit"
+        case .delete: return "delete"
+        case .move: return "move"
+        case .search: return "search"
+        case .execute: return "execute"
+        case .think: return "think"
+        case .fetch: return "fetch"
+        case .other: return "other"
+        case .unknown(let value): return value
+        }
+    }
+}
+
 enum ToolCallStatus: Codable, Equatable, Sendable {
     case pending
     case inProgress
@@ -692,6 +749,17 @@ enum ToolCallStatus: Codable, Equatable, Sendable {
         case .completed: try container.encode("completed")
         case .failed: try container.encode("failed")
         case .unknown(let value): try container.encode(value)
+        }
+    }
+}
+
+extension ToolCallStatus {
+    var isTerminal: Bool {
+        switch self {
+        case .completed, .failed:
+            return true
+        case .pending, .inProgress, .unknown:
+            return false
         }
     }
 }

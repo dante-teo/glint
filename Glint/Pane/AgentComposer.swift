@@ -354,7 +354,7 @@ struct AgentComposer: View {
 
     private var sendButton: some View {
         Button {
-            manager.status.isBusy ? manager.stop() : onSend()
+            manager.status.isBusy ? manager.cancelTurn() : onSend()
         } label: {
             Image(systemName: manager.status.isBusy ? "stop.fill" : "arrow.up")
                 .font(.system(size: 12, weight: .bold))

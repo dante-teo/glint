@@ -7,6 +7,8 @@ final class DevinSessionManagerTests: XCTestCase {
     private final class FakeClient: DevinACPClient {
         let subject = PassthroughSubject<ACPNotification, Never>()
         var notifications: AnyPublisher<ACPNotification, Never> { subject.eraseToAnyPublisher() }
+        let diagnosticSubject = PassthroughSubject<ACPDiagnosticEvent, Never>()
+        var diagnostics: AnyPublisher<ACPDiagnosticEvent, Never> { diagnosticSubject.eraseToAnyPublisher() }
         var handlers: [String: ACPServerRequestHandler] = [:]
         var started = false
         var closed = false
@@ -14,6 +16,7 @@ final class DevinSessionManagerTests: XCTestCase {
         var promptCalls: [(sessionID: String, content: [ContentBlock])] = []
         var setModeCalls: [(sessionID: String, modeId: String)] = []
         var setModeError: Error?
+        var promptError: Error?
         /// When set, the next `prompt(sessionID:content:)` call suspends
         /// until this continuation is resumed, letting tests interleave a
         /// notification between "prompt sent" and "prompt resolved" to
@@ -59,6 +62,7 @@ final class DevinSessionManagerTests: XCTestCase {
                     promptGate = continuation
                 }
             }
+            if let promptError { throw promptError }
             return PromptResponse(stopReason: .endTurn)
         }
 
@@ -221,15 +225,136 @@ final class DevinSessionManagerTests: XCTestCase {
 
         client.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
             sessionId: "session-123",
-            update: .toolCall(ToolCallUpdate(toolCallId: "tool-1", title: "Reading", kind: .read, status: .pending))
+            update: .toolCall(ToolCallUpdate(
+                toolCallId: "tool-1",
+                title: "Reading",
+                kind: .read,
+                status: .pending,
+                content: [.content(.text("reading file"))],
+                locations: [ToolCallLocation(path: "/tmp/file.swift", line: 12)],
+                rawInput: .object(["path": .string("/tmp/file.swift")]),
+                rawOutput: nil
+            ))
         ))))
         client.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
             sessionId: "session-123",
-            update: .toolCallUpdate(ToolCallDelta(toolCallId: "tool-1", title: "Read file", status: .completed))
+            update: .toolCallUpdate(ToolCallDelta(
+                toolCallId: "tool-1",
+                title: "Read file",
+                kind: nil,
+                status: .completed,
+                content: nil,
+                locations: nil,
+                rawInput: nil,
+                rawOutput: .object(["ok": .bool(true)])
+            ))
         ))))
 
         await waitUntil { manager.messages.contains { $0.toolCallId == "tool-1" && $0.toolStatus == .completed } }
+        let message = try XCTUnwrap(manager.messages.first { $0.toolCallId == "tool-1" })
         XCTAssertEqual(manager.messages.filter { $0.toolCallId == "tool-1" }.count, 1)
+        XCTAssertEqual(message.toolKind, .read)
+        XCTAssertEqual(message.toolContent, [.content(.text("reading file"))])
+        XCTAssertEqual(message.toolLocations, [ToolCallLocation(path: "/tmp/file.swift", line: 12)])
+        XCTAssertEqual(message.toolRawInput, .object(["path": .string("/tmp/file.swift")]))
+        XCTAssertEqual(message.toolRawOutput, .object(["ok": .bool(true)]))
+        XCTAssertNotNil(message.toolStartedAt)
+        XCTAssertNotNil(message.toolCompletedAt)
+    }
+
+    func testToolCallUpdateBeforeCreateBuildsInspectablePlaceholder() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.promptCalls.count == 1 }
+
+        client.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
+            sessionId: "session-123",
+            update: .toolCallUpdate(ToolCallDelta(
+                toolCallId: "late-tool",
+                title: nil,
+                kind: .execute,
+                status: .inProgress,
+                content: nil,
+                locations: nil,
+                rawInput: .object(["command": .string("swift test")]),
+                rawOutput: nil
+            ))
+        ))))
+
+        await waitUntil { manager.messages.contains { $0.toolCallId == "late-tool" } }
+        let message = try XCTUnwrap(manager.messages.first { $0.toolCallId == "late-tool" })
+        XCTAssertEqual(message.text, "Tool call")
+        XCTAssertEqual(message.toolKind, .execute)
+        XCTAssertEqual(message.toolStatus, .inProgress)
+        XCTAssertEqual(message.toolRawInput, .object(["command": .string("swift test")]))
+    }
+
+    func testToolCallUpdateWithoutTitlePreservesExistingTitle() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.promptCalls.count == 1 }
+
+        client.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
+            sessionId: "session-123",
+            update: .toolCall(ToolCallUpdate(toolCallId: "tool-1", title: "Read file", kind: .read, status: .pending))
+        ))))
+        client.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
+            sessionId: "session-123",
+            update: .toolCallUpdate(ToolCallDelta(toolCallId: "tool-1", title: nil, status: .completed))
+        ))))
+
+        await waitUntil { manager.messages.contains { $0.toolCallId == "tool-1" && $0.toolStatus == .completed } }
+        XCTAssertEqual(manager.messages.first { $0.toolCallId == "tool-1" }?.text, "Read file")
+    }
+
+    func testPromptCompletionMarksUnfinishedToolCallStale() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        client.armPromptGate()
+        addTeardownBlock { client.releasePromptGate() }
+
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.promptCalls.count == 1 }
+
+        client.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
+            sessionId: "session-123",
+            update: .toolCall(ToolCallUpdate(toolCallId: "tool-1", title: "Running", kind: .execute, status: .inProgress))
+        ))))
+        await waitUntil { manager.status == .tool }
+
+        client.releasePromptGate()
+
+        await waitUntil {
+            manager.messages.contains { $0.toolCallId == "tool-1" && $0.toolAbandonedReason != nil }
+        }
+        XCTAssertEqual(manager.status, .idle)
+    }
+
+    func testPromptFailureMarksActiveToolCallStaleAndFailed() async throws {
+        let client = FakeClient()
+        client.promptError = ACPClientError.processExited("boom")
+        let manager = makeManager(client: client)
+        client.armPromptGate()
+        addTeardownBlock { client.releasePromptGate() }
+
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.promptCalls.count == 1 }
+
+        client.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
+            sessionId: "session-123",
+            update: .toolCall(ToolCallUpdate(toolCallId: "tool-1", title: "Running", kind: .execute, status: .inProgress))
+        ))))
+        await waitUntil { manager.status == .tool }
+
+        client.releasePromptGate()
+
+        await waitUntil {
+            if case .failed = manager.status { return true }
+            return false
+        }
+        XCTAssertTrue(manager.messages.contains { $0.toolCallId == "tool-1" && $0.toolAbandonedReason?.contains("boom") == true })
     }
 
     /// Regression test for the "stuck tool call" bug: cancelling a turn
@@ -338,6 +463,38 @@ final class DevinSessionManagerTests: XCTestCase {
         } else {
             XCTFail("Expected permission success")
         }
+    }
+
+    func testCancelTurnRespondsToPendingPermissionWithCancelledOutcome() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.handlers["session/request_permission"] != nil }
+        let handler = try XCTUnwrap(client.handlers["session/request_permission"])
+
+        let task = Task {
+            await handler(ACPServerRequest(
+                id: 12,
+                method: "session/request_permission",
+                params: try jsonValue(RequestPermissionRequest(
+                    sessionId: "session-123",
+                    toolCall: PermissionToolCallInfo(toolCallId: "tool-1", title: "Run", kind: .execute),
+                    options: [PermissionOption(optionId: "allow-once", name: "Allow once", kind: .allowOnce)]
+                ))
+            ))
+        }
+
+        await waitUntil { manager.pendingPermission != nil }
+        manager.cancelTurn()
+        let result = try await task.value
+
+        if case .success(let value) = result {
+            XCTAssertEqual(value, .object(["outcome": .object(["outcome": .string("cancelled")])]))
+        } else {
+            XCTFail("Expected permission success")
+        }
+        XCTAssertNil(manager.pendingPermission)
+        XCTAssertEqual(manager.status, .idle)
     }
 
     /// Regression test: denying must select a `reject_*` option by its
@@ -558,6 +715,20 @@ final class DevinSessionManagerTests: XCTestCase {
         )
         manager.sendFirstPrompt(text: "persist me", projectPath: "/tmp")
         await waitUntil { client.promptCalls.count == 1 }
+        client.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
+            sessionId: "session-123",
+            update: .toolCall(ToolCallUpdate(
+                toolCallId: "persisted-tool",
+                title: "Persisted read",
+                kind: .read,
+                status: .completed,
+                content: [.content(.text("persisted content"))],
+                locations: [ToolCallLocation(path: "/tmp/persisted.txt", line: 1)],
+                rawInput: .object(["path": .string("/tmp/persisted.txt")]),
+                rawOutput: .object(["content": .string("hello")])
+            ))
+        ))))
+        await waitUntil { manager.messages.contains { $0.toolCallId == "persisted-tool" } }
         try? await Task.sleep(nanoseconds: 400_000_000)
 
         let restored = DevinSessionManager(
@@ -571,6 +742,12 @@ final class DevinSessionManagerTests: XCTestCase {
 
         XCTAssertEqual(restored.sessionID, "session-123")
         XCTAssertTrue(restored.messages.contains { $0.role == .user && $0.text == "persist me" })
+        let tool = try XCTUnwrap(restored.messages.first { $0.toolCallId == "persisted-tool" })
+        XCTAssertEqual(tool.toolKind, .read)
+        XCTAssertEqual(tool.toolContent, [.content(.text("persisted content"))])
+        XCTAssertEqual(tool.toolLocations, [ToolCallLocation(path: "/tmp/persisted.txt", line: 1)])
+        XCTAssertEqual(tool.toolRawInput, .object(["path": .string("/tmp/persisted.txt")]))
+        XCTAssertEqual(tool.toolRawOutput, .object(["content": .string("hello")]))
     }
 
     // MARK: - Phase 5: archive/delete/quit teardown

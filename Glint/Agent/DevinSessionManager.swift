@@ -3,6 +3,7 @@ import Foundation
 
 protocol DevinACPClient: AnyObject {
     var notifications: AnyPublisher<ACPNotification, Never> { get }
+    var diagnostics: AnyPublisher<ACPDiagnosticEvent, Never> { get }
     func start() throws
     func setRequestHandler(method: String, handler: ACPServerRequestHandler?)
     func initialize() async throws -> InitializeResponse
@@ -61,6 +62,20 @@ final class DevinSessionManager: ObservableObject {
         var toolCallId: String?
         var toolStatus: ToolCallStatus?
         var toolKind: ToolKind?
+        var toolContent: [ToolCallContent]?
+        var toolLocations: [ToolCallLocation]?
+        var toolRawInput: ACPJSONValue?
+        var toolRawOutput: ACPJSONValue?
+        var toolStartedAt: Date?
+        var toolUpdatedAt: Date?
+        var toolCompletedAt: Date?
+        var toolAbandonedReason: String?
+
+        var isUnfinishedToolCall: Bool {
+            guard role == .toolCall else { return false }
+            if toolAbandonedReason != nil { return false }
+            return !(toolStatus?.isTerminal ?? false)
+        }
     }
 
     struct PendingPermission: Identifiable, Equatable {
@@ -99,6 +114,7 @@ final class DevinSessionManager: ObservableObject {
     @Published private(set) var currentModel: SessionModel?
     @Published private(set) var modes: [SessionMode] = []
     @Published private(set) var currentMode: String?
+    @Published private(set) var diagnostics: [ACPDiagnosticEvent] = []
 
     private struct PersistedConversation: Codable {
         var workspaceID: UUID
@@ -122,6 +138,7 @@ final class DevinSessionManager: ObservableObject {
     private let sessionsDirectory: URL
     private var client: DevinACPClient?
     private var notificationCancellable: AnyCancellable?
+    private var diagnosticCancellable: AnyCancellable?
     private var runID = UUID()
     /// Whether a turn is currently in flight. Session/update notifications
     /// for a turn the agent process keeps emitting after the user cancels
@@ -134,6 +151,7 @@ final class DevinSessionManager: ObservableObject {
     private var saveTask: Task<Void, Never>?
     private var permissionContinuation: CheckedContinuation<ACPJSONValue, Never>?
     private var elicitationContinuation: CheckedContinuation<ACPJSONValue, Never>?
+    private static let maxDiagnostics = 200
 
     init(workspaceID: UUID,
          paneID: PaneID,
@@ -198,8 +216,8 @@ final class DevinSessionManager: ObservableObject {
         status = .cancelling
         client?.cancelSession(sessionID: sessionID)
         runID = UUID()
-        isTurnActive = false
-        status = .idle
+        denyPendingInteractions()
+        finishActiveTurn(reason: String(localized: "Cancelled by user."))
     }
 
     /// Common teardown shared by `closeSession()` and `closeSessionForQuit()`:
@@ -215,6 +233,8 @@ final class DevinSessionManager: ObservableObject {
         let client = self.client
         self.client = nil
         notificationCancellable = nil
+        diagnosticCancellable = nil
+        abandonUnfinishedToolCalls(reason: String(localized: "Session closed before the tool finished."))
         return (client, currentSessionID)
     }
 
@@ -269,6 +289,8 @@ final class DevinSessionManager: ObservableObject {
         client?.close()
         client = nil
         notificationCancellable = nil
+        diagnosticCancellable = nil
+        finishActiveTurn(reason: String(localized: "Session stopped before the tool finished."))
         status = .idle
     }
 
@@ -334,6 +356,7 @@ final class DevinSessionManager: ObservableObject {
         let client = clientFactory()
         installHandlers(on: client, projectRoot: projectPath)
         observeNotifications(from: client)
+        observeDiagnostics(from: client)
         self.client = client
 
         Task.detached { [weak self, client, runID] in
@@ -350,7 +373,7 @@ final class DevinSessionManager: ObservableObject {
                 await self?.markThinking()
                 _ = try await client.prompt(sessionID: sessionID, content: content)
                 guard await self?.isCurrentRun(runID) == true else { return }
-                await self?.markIdle()
+                await self?.finishActiveTurn(reason: String(localized: "Turn ended before the tool reported completion."))
             } catch {
                 guard await self?.isCurrentRun(runID) == true else { return }
                 let message = (error as? LocalizedError)?.errorDescription
@@ -367,7 +390,7 @@ final class DevinSessionManager: ObservableObject {
             do {
                 _ = try await client.prompt(sessionID: sessionID, content: content)
                 guard await self?.isCurrentRun(runID) == true else { return }
-                await self?.markIdle()
+                await self?.finishActiveTurn(reason: String(localized: "Turn ended before the tool reported completion."))
             } catch {
                 guard await self?.isCurrentRun(runID) == true else { return }
                 let message = (error as? LocalizedError)?.errorDescription
@@ -449,10 +472,21 @@ final class DevinSessionManager: ObservableObject {
             }
     }
 
+    private func observeDiagnostics(from client: DevinACPClient) {
+        diagnosticCancellable = client.diagnostics
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                MainActor.assumeIsolated {
+                    self?.appendDiagnostic(event)
+                }
+            }
+    }
+
     private func handleNotification(_ notification: ACPNotification) {
         guard notification.method == "session/update",
               let params = notification.params,
               let session = try? params.decoded(SessionNotification.self) else {
+            appendDiagnostic(.init(kind: .notification, title: notification.method, payload: notification.params))
             return
         }
         applySessionUpdate(session.update)
@@ -469,10 +503,28 @@ final class DevinSessionManager: ObservableObject {
             appendChunk(role: .thought, messageId: chunk.messageId, content: chunk.content)
             if isTurnActive { status = .thinking }
         case .toolCall(let tool):
-            upsertToolCall(id: tool.toolCallId, title: tool.title, status: tool.status, kind: tool.kind)
+            mergeToolCall(
+                id: tool.toolCallId,
+                title: tool.title,
+                status: tool.status,
+                kind: tool.kind,
+                content: tool.content,
+                locations: tool.locations,
+                rawInput: tool.rawInput,
+                rawOutput: tool.rawOutput
+            )
             if isTurnActive { status = .tool }
         case .toolCallUpdate(let tool):
-            upsertToolCall(id: tool.toolCallId, title: tool.title, status: tool.status, kind: tool.kind)
+            mergeToolCall(
+                id: tool.toolCallId,
+                title: tool.title,
+                status: tool.status,
+                kind: tool.kind,
+                content: tool.content,
+                locations: tool.locations,
+                rawInput: tool.rawInput,
+                rawOutput: tool.rawOutput
+            )
             if isTurnActive { status = .tool }
         case .plan(let plan):
             let text = plan.entries.map(\.content).joined(separator: "\n")
@@ -493,6 +545,7 @@ final class DevinSessionManager: ObservableObject {
         case .availableCommandsUpdate, .configOptionUpdate:
             break
         case .unknown:
+            appendDiagnostic(.init(kind: .notification, title: "Unknown session update", detail: String(describing: update)))
             break
         }
         scheduleSave()
@@ -516,14 +569,46 @@ final class DevinSessionManager: ObservableObject {
         }
     }
 
-    private func upsertToolCall(id: String, title: String?, status: ToolCallStatus?, kind: ToolKind?) {
+    private func mergeToolCall(id: String,
+                               title: String?,
+                               status: ToolCallStatus?,
+                               kind: ToolKind?,
+                               content: [ToolCallContent]?,
+                               locations: [ToolCallLocation]?,
+                               rawInput: ACPJSONValue?,
+                               rawOutput: ACPJSONValue?) {
         let display = title ?? String(localized: "Tool call")
+        let now = Date()
         if let idx = messages.firstIndex(where: { $0.toolCallId == id }) {
-            messages[idx].text = display
+            if let title {
+                messages[idx].text = title
+            }
             messages[idx].toolStatus = status ?? messages[idx].toolStatus
             messages[idx].toolKind = kind ?? messages[idx].toolKind
+            messages[idx].toolContent = content ?? messages[idx].toolContent
+            messages[idx].toolLocations = locations ?? messages[idx].toolLocations
+            messages[idx].toolRawInput = rawInput ?? messages[idx].toolRawInput
+            messages[idx].toolRawOutput = rawOutput ?? messages[idx].toolRawOutput
+            messages[idx].toolUpdatedAt = now
+            if (status ?? messages[idx].toolStatus)?.isTerminal == true {
+                messages[idx].toolCompletedAt = messages[idx].toolCompletedAt ?? now
+                messages[idx].toolAbandonedReason = nil
+            }
         } else {
-            messages.append(Message(role: .toolCall, text: display, toolCallId: id, toolStatus: status, toolKind: kind))
+            messages.append(Message(
+                role: .toolCall,
+                text: display,
+                toolCallId: id,
+                toolStatus: status,
+                toolKind: kind,
+                toolContent: content,
+                toolLocations: locations,
+                toolRawInput: rawInput,
+                toolRawOutput: rawOutput,
+                toolStartedAt: now,
+                toolUpdatedAt: now,
+                toolCompletedAt: status?.isTerminal == true ? now : nil
+            ))
         }
     }
 
@@ -561,6 +646,7 @@ final class DevinSessionManager: ObservableObject {
         ]
         let params = (try? request.decodeParams(RequestPermissionRequest.self))
             ?? RequestPermissionRequest(sessionId: sessionID ?? "", options: fallbackOptions)
+        attachPermissionDetails(params)
 
         // 1. Check user permission review mode
         let mode = WorkspaceStore.current?.permissionReviewMode ?? .manual
@@ -670,6 +756,21 @@ final class DevinSessionManager: ObservableObject {
         }
     }
 
+    private func attachPermissionDetails(_ request: RequestPermissionRequest) {
+        guard let toolCall = request.toolCall else { return }
+        mergeToolCall(
+            id: toolCall.toolCallId,
+            title: toolCall.title ?? String(localized: "Permission request"),
+            status: toolCall.status ?? .pending,
+            kind: toolCall.kind,
+            content: nil,
+            locations: nil,
+            rawInput: toolCall.rawInput,
+            rawOutput: nil
+        )
+        scheduleSave()
+    }
+
     private func validatedProjectFileURL(path: String, projectRoot: String, allowMissingLeaf: Bool = false) throws -> URL {
         let fm = FileManager.default
         let root = URL(fileURLWithPath: projectRoot).standardizedFileURL.resolvingSymlinksInPath()
@@ -729,11 +830,40 @@ final class DevinSessionManager: ObservableObject {
         scheduleSave()
     }
 
+    private func finishActiveTurn(reason: String) {
+        isTurnActive = false
+        abandonUnfinishedToolCalls(reason: reason)
+        status = pendingPermission != nil || pendingElicitation != nil ? .needsPermission : .idle
+        scheduleSave()
+    }
+
     private func markFailed(_ message: String) {
         isTurnActive = false
+        abandonUnfinishedToolCalls(reason: message)
         messages.append(Message(role: .system, text: message))
         status = .failed(message)
         scheduleSave()
+    }
+
+    private func abandonUnfinishedToolCalls(reason: String) {
+        let now = Date()
+        var changed = false
+        for idx in messages.indices where messages[idx].isUnfinishedToolCall {
+            messages[idx].toolUpdatedAt = now
+            messages[idx].toolCompletedAt = messages[idx].toolCompletedAt ?? now
+            messages[idx].toolAbandonedReason = reason
+            changed = true
+        }
+        if changed {
+            appendDiagnostic(.init(kind: .lifecycle, title: "Marked unfinished tools stale", detail: reason))
+        }
+    }
+
+    private func appendDiagnostic(_ event: ACPDiagnosticEvent) {
+        diagnostics.append(event)
+        if diagnostics.count > Self.maxDiagnostics {
+            diagnostics.removeFirst(diagnostics.count - Self.maxDiagnostics)
+        }
     }
 
     private func scheduleSave() {
