@@ -98,27 +98,27 @@ User clicks "Devin Agent" in popover
 
 ### Phase 2: New Workspace Popover + Folder Picker
 
-- [ ] Create `Glint/Chrome/NewWorkspacePopover.swift`
-  - [ ] Terminal row: shell icon + "Terminal" + "Shell workspace" subtitle
-  - [ ] Devin Agent row: Devin icon + "Devin Agent" + "AI coding agent" subtitle
-  - [ ] Check `DevinHookInstaller.isAgentPresent()` for "Not installed" badge
-  - [ ] Hover states, Theme colors, AppFonts, rounded rects
-- [ ] Create `Glint/Chrome/FolderPicker.swift`
-  - [ ] `static func pickProjectFolder() async -> URL?`
-  - [ ] NSOpenPanel: `canChooseDirectories = true, canChooseFiles = false`
-- [ ] Modify `Glint/Chrome/SidebarView.swift`
-  - [ ] Attach `.popover(isPresented: $store.newWorkspacePopoverOpen)` to `newWorkspaceCard`
-  - [ ] `filteredActiveWorkspaces`: also filter `committed`
-  - [ ] Agent workspace card context menu: "Archive Session" / "Resume Session"
-  - [ ] Agent workspace `workspaceMetadataRow`: show project folder name instead of "N tabs . M panes"
-- [ ] Modify `Glint/Chrome/ContentView.swift`
-  - [ ] `WorkspaceSwitcherPopover`: filter out `!committed` workspaces
-  - [ ] `newWorkspaceRow`: set `store.newWorkspacePopoverOpen = true` instead of direct `addWorkspace()`
-- [ ] Modify `Glint/Chrome/CommandPalette.swift`
-  - [ ] Replace single "New Workspace" with "New Terminal" + "New Devin Agent"
-  - [ ] Hide "Split Right" / "Split Down" when selected workspace is `.agent`
-- [ ] Modify `Glint/App/GlintApp.swift`
-  - [ ] Cmd+N: call `workspaceStore.showNewWorkspacePopover()` instead of `addWorkspace()`
+- [x] Create `Glint/Chrome/NewWorkspacePopover.swift`
+  - [x] Terminal row: shell icon + "Terminal" + "Shell workspace" subtitle
+  - [x] Devin Agent row: Devin icon + "Devin Agent" + "AI coding agent" subtitle
+  - [x] Check `DevinHookInstaller.isAgentPresent()` for "Not installed" badge
+  - [x] Hover states, Theme colors, AppFonts, rounded rects
+- [x] Create `Glint/Chrome/FolderPicker.swift`
+  - [x] `static func pickProjectFolder() async -> URL?`
+  - [x] NSOpenPanel: `canChooseDirectories = true, canChooseFiles = false`
+- [x] Modify `Glint/Chrome/SidebarView.swift`
+  - [x] Attach `.popover(isPresented: $store.newWorkspacePopoverOpen)` to `newWorkspaceCard`
+  - [x] `filteredActiveWorkspaces`: also filter `committed`
+  - [x] Agent workspace card context menu: "Archive Session" / "Resume Session"
+  - [x] Agent workspace `workspaceMetadataRow`: show project folder name instead of "N tabs . M panes"
+- [x] Modify `Glint/Chrome/ContentView.swift`
+  - [x] `WorkspaceSwitcherPopover`: filter out `!committed` workspaces
+  - [x] `newWorkspaceRow`: set `store.newWorkspacePopoverOpen = true` instead of direct `addWorkspace()`
+- [x] Modify `Glint/Chrome/CommandPalette.swift`
+  - [x] Replace single "New Workspace" with "New Terminal" + "New Devin Agent"
+  - [x] Hide "Split Right" / "Split Down" when selected workspace is `.agent`
+- [x] Modify `Glint/App/GlintApp.swift`
+  - [x] Cmd+N: call `workspaceStore.showNewWorkspacePopover()` instead of `addWorkspace()`
 
 ### Phase 3: ACP Client (Devin Integration Layer)
 
