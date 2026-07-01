@@ -38,6 +38,18 @@ The unfocused-pane dim wash (`Color.black` in `PaneView.paneBody`) must be **alw
 
 `paneAgentState` on `WorkspaceStore` is a `@Published` dictionary mutated from ~18 sites (subscript writes, `removeValue`, bulk `filter` reassignment). All mutations trigger its `didSet` hook. To add a new side effect driven by agent state (as `updateSleepAssertion()` does), add a call in the `didSet` — do not scatter calls across individual mutation sites, which is fragile and easy to miss. IOKit is already linked in `project.yml`.
 
+### Agent workspace domain model
+
+`WorkspaceKind` (`.terminal` | `.agent`) and `AgentProvider` (`.devin`) distinguish terminal from agent workspaces. Agent workspaces carry extra fields on `Workspace`: `kind`, `agentProvider`, `committed`, `agentProjectPath`, `agentSessionID`. All default to terminal-safe values (`.terminal`, `nil`, `true`, `nil`, `nil`) so old `state.json` files decode unchanged via `decodeIfPresent`. The encoder omits default values — terminal workspaces produce no extra JSON keys.
+
+**Committed vs uncommitted:** Agent workspaces start `committed = false` (hidden from sidebar, stripped from `persist()`). Calling `commitAgentWorkspace(_:)` after the user sends their first message sets `committed = true`, making the workspace visible in `activeWorkspaces` and persistent across launches. Terminals are always committed.
+
+**Auto-cleanup:** `selectWorkspace(_:)` silently removes the old workspace if it was uncommitted (user navigated away without sending a message). `addAgentWorkspace(provider:projectPath:)` also removes any prior uncommitted workspaces before creating a new one. Both paths currently do a bare array removal — side-state cleanup (surfaceViews, paneAgentState, etc.) will be added when the UI wiring lands in Phase 2+, since uncommitted workspaces cannot currently populate those dictionaries.
+
+**Guards:** `splitFocused()` and `newTab()` beep and return for `.agent` workspaces (one session per workspace, v1). `liveIconKind(for:)` short-circuits to the provider's icon (`.devin`) for agent workspaces.
+
+**Tests:** Store-dependent tests live in `WorkspaceKindTests.swift` (`@MainActor`). Pure Codable round-trip tests for the agent fields live in `WorkspaceAgentCodableTests.swift` (unannotated), following the `@MainActor` split convention documented above.
+
 ### App icon preset architecture
 
 The Dock icon picker in Settings uses a two-level model: `PortraitStyle` (line art) x `IconColorTheme` (color palette) = `AppIconPreset` (the flat enum persisted to UserDefaults). The resolution helpers on `AppIconPreset` (`portraitStyle`, `colorTheme`, `preset(portrait:color:)`) map between the two representations.

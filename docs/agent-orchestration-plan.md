@@ -70,31 +70,31 @@ User clicks "Devin Agent" in popover
 
 ### Phase 1: Domain Model
 
-- [ ] Add `WorkspaceKind` enum (`.terminal`, `.agent`) to `WorkspaceStore.swift`
-- [ ] Add `AgentProvider` enum (`.devin`) to `WorkspaceStore.swift`
-- [ ] Add fields to `Workspace` struct: `kind`, `agentProvider`, `committed`, `agentProjectPath`, `agentSessionID`
-- [ ] Backward-compatible decoding: `decodeIfPresent` with defaults (`.terminal`, `true`, nil, nil, nil)
-- [ ] Add `@Published var newWorkspacePopoverOpen: Bool` to `WorkspaceStore`
-- [ ] Add `showNewWorkspacePopover()` method (auto-expand sidebar if collapsed, set flag)
-- [ ] Modify `activeWorkspaces`: filter out `!committed` workspaces
-- [ ] Add `addAgentWorkspace(provider:projectPath:)` method
-- [ ] Add `commitAgentWorkspace(_ id: UUID)` method
-- [ ] Auto-cleanup uncommitted workspaces in `selectWorkspace()`
-- [ ] Strip uncommitted workspaces in `Persistence.save()`
-- [ ] Guard `splitFocused()`: no-op + beep for `.agent` workspaces
-- [ ] Guard `newTab()`: beep for `.agent` workspaces (v1: one session per workspace)
-- [ ] Modify `liveIconKind(for:)`: short-circuit to `.devin` for agent workspaces
-- [ ] Modify `archiveWorkspace()`: close agent session before archiving
-- [ ] Modify `deleteWorkspace()`: close session + remove conversation file
-- [ ] Create `GlintTests/WorkspaceKindTests.swift`
-  - [ ] Old state.json decodes with `kind = .terminal, committed = true`
-  - [ ] `addAgentWorkspace` sets correct fields
-  - [ ] `activeWorkspaces` excludes uncommitted
-  - [ ] `commitAgentWorkspace` makes workspace visible
-  - [ ] Auto-cleanup on workspace switch
-  - [ ] `splitFocused` no-op for agent workspace
-  - [ ] `liveIconKind` returns `.devin` for agent workspace
-  - [ ] `save()` strips uncommitted workspaces
+- [x] Add `WorkspaceKind` enum (`.terminal`, `.agent`) to `WorkspaceStore.swift`
+- [x] Add `AgentProvider` enum (`.devin`) to `WorkspaceStore.swift`
+- [x] Add fields to `Workspace` struct: `kind`, `agentProvider`, `committed`, `agentProjectPath`, `agentSessionID`
+- [x] Backward-compatible decoding: `decodeIfPresent` with defaults (`.terminal`, `true`, nil, nil, nil)
+- [x] Add `@Published var newWorkspacePopoverOpen: Bool` to `WorkspaceStore`
+- [x] Add `showNewWorkspacePopover()` method (auto-expand sidebar if collapsed, set flag)
+- [x] Modify `activeWorkspaces`: filter out `!committed` workspaces
+- [x] Add `addAgentWorkspace(provider:projectPath:)` method
+- [x] Add `commitAgentWorkspace(_ id: UUID)` method
+- [x] Auto-cleanup uncommitted workspaces in `selectWorkspace()`
+- [x] Strip uncommitted workspaces in `Persistence.save()`
+- [x] Guard `splitFocused()`: no-op + beep for `.agent` workspaces
+- [x] Guard `newTab()`: beep for `.agent` workspaces (v1: one session per workspace)
+- [x] Modify `liveIconKind(for:)`: short-circuit to `.devin` for agent workspaces
+- [x] Modify `archiveWorkspace()`: close agent session before archiving (TODO marker for Phase 5)
+- [x] Modify `deleteWorkspace()`: close session + remove conversation file (TODO marker for Phase 5)
+- [x] Create `GlintTests/WorkspaceKindTests.swift` + `WorkspaceAgentCodableTests.swift`
+  - [x] Old state.json decodes with `kind = .terminal, committed = true`
+  - [x] `addAgentWorkspace` sets correct fields
+  - [x] `activeWorkspaces` excludes uncommitted
+  - [x] `commitAgentWorkspace` makes workspace visible
+  - [x] Auto-cleanup on workspace switch
+  - [x] `splitFocused` no-op for agent workspace
+  - [x] `liveIconKind` returns `.devin` for agent workspace
+  - [x] `save()` strips uncommitted workspaces
 
 ### Phase 2: New Workspace Popover + Folder Picker
 
