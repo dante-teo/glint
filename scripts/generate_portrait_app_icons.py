@@ -89,6 +89,55 @@ def hex_rgba(value: str, alpha: int = 255) -> tuple[int, int, int, int]:
     return (int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16), alpha)
 
 
+def hex_rgb(value: str) -> tuple[int, int, int]:
+    return hex_rgba(value)[:3]
+
+
+def lerp_channel(a: int, b: int, t: float) -> int:
+    return round(a * (1 - t) + b * t)
+
+
+def lerp_rgb(a: tuple[int, int, int], b: tuple[int, int, int], t: float) -> tuple[int, int, int]:
+    return tuple(lerp_channel(a[i], b[i], t) for i in range(3))
+
+
+def srgb_channel_to_linear(value: int) -> float:
+    c = value / 255
+    if c <= 0.03928:
+        return c / 12.92
+    return ((c + 0.055) / 1.055) ** 2.4
+
+
+def relative_luminance(rgb: tuple[int, int, int]) -> float:
+    r, g, b = (srgb_channel_to_linear(channel) for channel in rgb)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def contrast_ratio(a: tuple[int, int, int], b: tuple[int, int, int]) -> float:
+    l1 = relative_luminance(a)
+    l2 = relative_luminance(b)
+    light, dark = max(l1, l2), min(l1, l2)
+    return (light + 0.05) / (dark + 0.05)
+
+
+def ensure_ink_contrast(
+    rgb: tuple[int, int, int],
+    background: tuple[int, int, int] = (248, 248, 246),
+    minimum: float = 4.8,
+) -> tuple[int, int, int]:
+    """Darken bright theme colors until line art reads on the pale tile."""
+    if contrast_ratio(rgb, background) >= minimum:
+        return rgb
+
+    anchor = (18, 24, 34)
+    adjusted = rgb
+    for step in range(1, 13):
+        adjusted = lerp_rgb(rgb, anchor, step / 12)
+        if contrast_ratio(adjusted, background) >= minimum:
+            return adjusted
+    return adjusted
+
+
 def rounded_mask(size: int, inset: int = 88) -> Image.Image:
     mask = Image.new("L", (size, size), 0)
     draw = ImageDraw.Draw(mask)
@@ -98,6 +147,42 @@ def rounded_mask(size: int, inset: int = 88) -> Image.Image:
         fill=255,
     )
     return mask
+
+
+def theme_ink_stops(palette: Palette) -> tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]]:
+    upper = ensure_ink_contrast(hex_rgb(palette.middle))
+    middle = ensure_ink_contrast(lerp_rgb(hex_rgb(palette.middle), hex_rgb(palette.bottom), 0.42))
+    lower = ensure_ink_contrast(hex_rgb(palette.bottom))
+    return upper, middle, lower
+
+
+def ink_gradient(size: int, palette: Palette, alpha: int = 255) -> Image.Image:
+    upper, middle, lower = theme_ink_stops(palette)
+    img = Image.new("RGBA", (size, size))
+    draw = ImageDraw.Draw(img)
+    for y in range(size):
+        v = y / (size - 1)
+        if v < 0.54:
+            color = lerp_rgb(upper, middle, v / 0.54)
+        else:
+            color = lerp_rgb(middle, lower, (v - 0.54) / 0.46)
+        draw.line((0, y, size, y), fill=(*color, alpha))
+
+    # A very slight diagonal polish keeps the ink from looking flat without
+    # returning to the previous translucent color-wash treatment.
+    diagonal = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    diag_draw = ImageDraw.Draw(diagonal)
+    highlight = lerp_rgb(upper, (255, 255, 255), 0.18)
+    shadow = lerp_rgb(lower, (0, 0, 0), 0.18)
+    diag_draw.polygon(
+        [(0, 0), (int(size * 0.64), 0), (0, int(size * 0.46))],
+        fill=(*highlight, 32),
+    )
+    diag_draw.polygon(
+        [(size, size), (int(size * 0.32), size), (size, int(size * 0.44))],
+        fill=(*shadow, 36),
+    )
+    return Image.alpha_composite(img, diagonal.filter(ImageFilter.GaussianBlur(size * 0.09)))
 
 
 def gradient(size: int, palette: Palette) -> Image.Image:
@@ -127,24 +212,30 @@ def gradient(size: int, palette: Palette) -> Image.Image:
 
 def make_tile_background(size: int, palette: Palette) -> Image.Image:
     mask = rounded_mask(size)
-    bg = gradient(size, palette)
+    bg = Image.new("RGBA", (size, size), (248, 248, 246, 255))
 
-    # Add broad glassy light and lower depth, clipped to the rounded tile.
+    # Keep the tile mostly neutral. The theme belongs to the ink, with only a
+    # whisper of color in the edge lighting.
     overlay = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
+    upper, _, lower = theme_ink_stops(palette)
     draw.ellipse(
-        (int(size * 0.18), int(size * 0.04), int(size * 0.90), int(size * 0.70)),
-        fill=(255, 255, 255, 42),
+        (int(size * 0.03), int(size * -0.10), int(size * 0.86), int(size * 0.58)),
+        fill=(255, 255, 255, 82),
     )
-    draw.rectangle(
-        (int(size * 0.10), int(size * 0.73), int(size * 0.90), int(size * 0.90)),
-        fill=(0, 0, 0, 30),
+    draw.ellipse(
+        (int(size * -0.22), int(size * 0.46), int(size * 0.70), int(size * 1.12)),
+        fill=(*upper, 14),
     )
-    bg = Image.alpha_composite(bg, overlay.filter(ImageFilter.GaussianBlur(size * 0.055)))
+    draw.ellipse(
+        (int(size * 0.38), int(size * 0.54), int(size * 1.22), int(size * 1.16)),
+        fill=(*lower, 12),
+    )
+    bg = Image.alpha_composite(bg, overlay.filter(ImageFilter.GaussianBlur(size * 0.07)))
 
     tile = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     shadow = mask.filter(ImageFilter.GaussianBlur(size * 0.035))
-    shadow_layer = Image.new("RGBA", (size, size), (0, 0, 0, 90))
+    shadow_layer = Image.new("RGBA", (size, size), (20, 24, 34, 58))
     shadow_tile = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     shadow_tile.alpha_composite(shadow_layer, (0, int(size * 0.035)))
     shadow_tile.putalpha(shadow)
@@ -161,8 +252,15 @@ def make_tile_background(size: int, palette: Palette) -> Image.Image:
     rim_draw.rounded_rectangle(
         (inset, inset, size - inset, size - inset),
         radius=int(size * 0.21),
-        outline=(255, 255, 255, 72),
+        outline=(255, 255, 255, 112),
         width=max(1, size // 96),
+    )
+    inner = int(size * 0.096)
+    rim_draw.rounded_rectangle(
+        (inner, inner, size - inner, size - inner),
+        radius=int(size * 0.20),
+        outline=(*lower, 26),
+        width=max(1, size // 180),
     )
     tile.alpha_composite(rim)
     return tile
@@ -411,43 +509,65 @@ def portrait_layers() -> tuple[Image.Image, Image.Image, Image.Image]:
     return bust, ink, cut.resize((CANVAS, CANVAS), Image.Resampling.LANCZOS)
 
 
+def lineart_alpha(master: Image.Image, strengthen: float = 1.0) -> Image.Image:
+    gray = ImageOps.grayscale(master.convert("RGB"))
+    alpha = gray.point(lambda p: 0 if p >= 248 else min(255, round((248 - p) * 3.6 * strengthen)))
+    alpha = ImageEnhance.Contrast(alpha).enhance(1.24)
+
+    # Several generated masters include faint frame/corner artifacts. The app
+    # icon supplies its own tile, so remove accidental edge marks here.
+    clean = Image.new("L", alpha.size, 255)
+    draw = ImageDraw.Draw(clean)
+    inset = max(14, round(min(alpha.size) * 0.034))
+    draw.rectangle((0, 0, alpha.width, inset), fill=0)
+    draw.rectangle((0, alpha.height - inset, alpha.width, alpha.height), fill=0)
+    draw.rectangle((0, 0, inset, alpha.height), fill=0)
+    draw.rectangle((alpha.width - inset, 0, alpha.width, alpha.height), fill=0)
+    alpha = ImageChops.multiply(alpha, clean.filter(ImageFilter.GaussianBlur(inset * 0.18)))
+    return alpha.filter(ImageFilter.GaussianBlur(0.12))
+
+
+def colored_lineart(mask: Image.Image, palette: Palette, strength: float = 1.0) -> Image.Image:
+    alpha = mask
+    if strength > 1.0:
+        alpha = ImageEnhance.Contrast(alpha).enhance(strength)
+
+    ink = ink_gradient(alpha.width, palette, alpha=255)
+    ink.putalpha(alpha)
+
+    support_alpha = alpha.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.GaussianBlur(0.28))
+    support_alpha = support_alpha.point(lambda p: min(78, round(p * 0.28)))
+    _, _, lower = theme_ink_stops(palette)
+    support = Image.new("RGBA", alpha.size, (*lerp_rgb(lower, (0, 0, 0), 0.12), 0))
+    support.putalpha(support_alpha)
+
+    return Image.alpha_composite(support, ink)
+
+
 @lru_cache(maxsize=None)
 def compose_icon(name: str, size: int = CANVAS, portrait_scale: float = 1.01) -> Image.Image:
     palette = THEME_PALETTES[theme_name_for(name)]
     base = make_tile_background(CANVAS, palette)
     master = ImageOps.fit(
-        Image.open(lineart_master_for(name)).convert("RGBA"),
+        Image.open(lineart_master_for(name)).convert("RGB"),
         (CANVAS, CANVAS),
         method=Image.Resampling.LANCZOS,
         centering=(0.5, 0.5),
     )
 
-    # Preserve the generated line-art master as white-ground art. Theme color
-    # lives in the shell/rim so the portrait does not become a tinted repaint.
     scale, x_offset, y_offset = PORTRAIT_LAYOUTS.get(portrait_name_for(name), DEFAULT_PORTRAIT_LAYOUT)
     portrait_size = int(CANVAS * scale)
-    portrait = master.resize((portrait_size, portrait_size), Image.Resampling.LANCZOS)
-    portrait_mask = Image.new("L", (portrait_size, portrait_size), 255)
+    mask = lineart_alpha(master).resize((portrait_size, portrait_size), Image.Resampling.LANCZOS)
+    portrait = colored_lineart(mask, palette, strength=1.12 if size <= LOGO else 1.0)
     offset = (
         (CANVAS - portrait_size) // 2 + int(CANVAS * x_offset),
         (CANVAS - portrait_size) // 2 + int(CANVAS * y_offset),
     )
 
-    portrait_shell = Image.new("RGBA", (CANVAS, CANVAS), hex_rgba(palette.glow, 255))
+    portrait_shell = Image.new("RGBA", (CANVAS, CANVAS), (0, 0, 0, 0))
     portrait_shell.alpha_composite(portrait, offset)
-
-    # Subtle colored wash at the bottom edge keeps presets distinct without
-    # altering facial identity or line quality.
-    tint = Image.new("RGBA", (CANVAS, CANVAS), (0, 0, 0, 0))
-    tint_draw = ImageDraw.Draw(tint)
-    tint_draw.rectangle(
-        (int(CANVAS * 0.08), int(CANVAS * 0.76), int(CANVAS * 0.92), int(CANVAS * 0.91)),
-        fill=hex_rgba(palette.middle, 34),
-    )
-    portrait_shell = Image.alpha_composite(portrait_shell, tint.filter(ImageFilter.GaussianBlur(22)))
-
     inner_mask = rounded_mask(CANVAS, inset=88)
-    portrait_shell.putalpha(inner_mask)
+    portrait_shell.putalpha(ImageChops.multiply(portrait_shell.getchannel("A"), inner_mask))
     base.alpha_composite(portrait_shell)
 
     clipped = Image.new("RGBA", (CANVAS, CANVAS), (0, 0, 0, 0))
@@ -459,12 +579,14 @@ def compose_icon(name: str, size: int = CANVAS, portrait_scale: float = 1.01) ->
 
 
 def compose_foreground_source() -> Image.Image:
-    _, ink_mask, _ = portrait_layers()
-    fg = Image.new("RGBA", (CANVAS, CANVAS), (255, 255, 255, 0))
-    ink = Image.new("RGBA", (CANVAS, CANVAS), (255, 255, 255, 245))
-    ink.putalpha(ink_mask)
-    fg.alpha_composite(ink)
-    return fg
+    palette = THEME_PALETTES["sunrise"]
+    master = ImageOps.fit(
+        Image.open(lineart_master_for("sunrise")).convert("RGB"),
+        (CANVAS, CANVAS),
+        method=Image.Resampling.LANCZOS,
+        centering=(0.5, 0.5),
+    )
+    return colored_lineart(lineart_alpha(master), palette, strength=1.08)
 
 
 def write_assets() -> None:
