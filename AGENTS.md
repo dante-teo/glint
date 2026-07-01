@@ -38,6 +38,16 @@ The unfocused-pane dim wash (`Color.black` in `PaneView.paneBody`) must be **alw
 
 `paneAgentState` on `WorkspaceStore` is a `@Published` dictionary mutated from ~18 sites (subscript writes, `removeValue`, bulk `filter` reassignment). All mutations trigger its `didSet` hook. To add a new side effect driven by agent state (as `updateSleepAssertion()` does), add a call in the `didSet` — do not scatter calls across individual mutation sites, which is fragile and easy to miss. IOKit is already linked in `project.yml`.
 
+### App icon preset architecture
+
+The Dock icon picker in Settings uses a two-level model: `PortraitStyle` (line art) x `IconColorTheme` (color palette) = `AppIconPreset` (the flat enum persisted to UserDefaults). The resolution helpers on `AppIconPreset` (`portraitStyle`, `colorTheme`, `preset(portrait:color:)`) map between the two representations.
+
+**Naming asymmetry:** The original portrait uses bare color names as raw values (`sunrise`, `classic`, `aurora`, ...), while the other portraits use `<portrait>` for their sunrise/default variant and `<portrait>-<color>` for the rest (e.g. `bun`, `bun-classic`, `bun-aurora`). The `preset(portrait:color:)` resolver handles this branching. Do not assume a uniform `<portrait>-<color>` pattern for all presets.
+
+**To add a new portrait style:** Add the base case and all color-variant cases to `AppIconPreset`, add a case to `PortraitStyle`, update the exhaustive switches in `portraitStyle` and `colorTheme`, add the corresponding `AppIconPreset-<name>` and `GlintLogo-<name>` image sets to `Assets.xcassets`, and run `xcodegen generate`. The compiler enforces exhaustive switches, so missing a case is a build error. The round-trip tests in `AppIconPresetGroupingTests` will catch any resolution/decomposition mismatch.
+
+**To add a new color theme:** Add the themed cases for every portrait to `AppIconPreset`, add a case to `IconColorTheme` (including `swatchColor`), update the exhaustive switches, add image sets, and run `xcodegen generate`.
+
 ## Commit & Pull Request Guidelines
 
 Commit history uses concise Conventional Commit-style prefixes, including `fix(agent): ...`, `feat(agent): ...`, `chore: ...`, `ci: ...`, and `release: ...`. Keep commits scoped to one change. Pull requests should include a short summary, tests run, linked issues when relevant, and screenshots or recordings for visible UI changes.

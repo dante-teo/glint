@@ -461,6 +461,7 @@ private struct UpdatesCard: View {
 private struct AppearancePane: View {
     @EnvironmentObject var store: WorkspaceStore
     @State private var browsingThemes = false
+    @State private var selectedPortrait: PortraitStyle?
 
     /// Settings shows featured themes plus Follow Ghostty. The full catalog
     /// lives in the browser; if a catalog theme is selected, include it here
@@ -599,30 +600,95 @@ private struct AppearancePane: View {
 
         SettingsCard("App icon",
                      footer: "Switch the Dock icon. Default keeps the Liquid Glass icon on macOS 26; the other presets are static icons.") {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 14) {
-                ForEach(AppIconPreset.allCases) { preset in
+            // Level 1 — Portrait line-art selection
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 10) {
+                // Default (Liquid Glass) — first in the row
+                let isDefault = store.appIconPreset == .default
+                VStack(spacing: 5) {
+                    Image("AppIconPreset-sunrise")
+                        .resizable().interpolation(.high)
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 64, height: 64)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(isDefault ? Theme.overlay(0.16) : .clear)
+                                .padding(-5)
+                        )
+                        .scaleEffect(isDefault ? 1.06 : 1.0)
+                        .animation(.easeOut(duration: 0.15), value: store.appIconPreset)
+                    Text("Default")
+                        .font(AppFonts.ui(10, weight: isDefault ? .semibold : .regular))
+                        .foregroundStyle(isDefault ? Theme.text1 : Theme.text2)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    selectedPortrait = nil
+                    store.appIconPreset = .default
+                }
+
+                // 5 portrait styles
+                ForEach(PortraitStyle.allCases) { portrait in
+                    let isSelected = selectedPortrait == portrait && store.appIconPreset != .default
                     VStack(spacing: 5) {
-                        Image(preset.previewAsset)
+                        Image(portrait.representativePreset.previewAsset)
                             .resizable().interpolation(.high)
                             .aspectRatio(contentMode: .fit)
-                            .frame(width: 46, height: 46)
+                            .frame(width: 64, height: 64)
                             .background(
-                                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                                    .fill(preset == store.appIconPreset ? Theme.overlay(0.16) : .clear)
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(isSelected ? Theme.overlay(0.16) : .clear)
                                     .padding(-5)
                             )
-                            .scaleEffect(preset == store.appIconPreset ? 1.06 : 1.0)
-                            .animation(.easeOut(duration: 0.15), value: store.appIconPreset)
-                        Text(preset.displayName)
-                            .font(AppFonts.ui(9.5, weight: preset == store.appIconPreset ? .semibold : .regular))
-                            .foregroundStyle(preset == store.appIconPreset ? Theme.text1 : Theme.text2)
+                            .scaleEffect(isSelected ? 1.06 : 1.0)
+                            .animation(.easeOut(duration: 0.15), value: selectedPortrait)
+                        Text(portrait.displayName)
+                            .font(AppFonts.ui(10, weight: isSelected ? .semibold : .regular))
+                            .foregroundStyle(isSelected ? Theme.text1 : Theme.text2)
                     }
                     .contentShape(Rectangle())
-                    .onTapGesture { store.appIconPreset = preset }
+                    .onTapGesture {
+                        selectedPortrait = portrait
+                        let color = store.appIconPreset.colorTheme ?? .sunrise
+                        store.appIconPreset = .preset(portrait: portrait, color: color)
+                    }
                 }
             }
             .padding(.vertical, 4)
+
+            // Level 2 — Color theme swatches (hidden when Default is selected)
+            if let portrait = selectedPortrait, store.appIconPreset != .default {
+                SettingsDivider()
+                HStack(spacing: 8) {
+                    ForEach(IconColorTheme.allCases) { color in
+                        let isSelected = store.appIconPreset.colorTheme == color
+                        VStack(spacing: 4) {
+                            Circle()
+                                .fill(color.swatchColor)
+                                .frame(width: 18, height: 18)
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(
+                                            isSelected ? Color.white : Theme.overlay(0.15),
+                                            lineWidth: isSelected ? 1.5 : 0.5
+                                        )
+                                )
+                                .scaleEffect(isSelected ? 1.15 : 1.0)
+                                .animation(.easeOut(duration: 0.15), value: store.appIconPreset)
+                            Text(color.displayName)
+                                .font(AppFonts.ui(9, weight: isSelected ? .semibold : .regular))
+                                .foregroundStyle(isSelected ? Theme.text1 : Theme.text3)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            store.appIconPreset = .preset(portrait: portrait, color: color)
+                        }
+                    }
+                }
+                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity)
+            }
         }
+        .onAppear { selectedPortrait = store.appIconPreset.portraitStyle }
     }
 
     enum AccentOption: String, CaseIterable, Identifiable {

@@ -2440,34 +2440,122 @@ enum AppIconPreset: String, CaseIterable, Identifiable {
         self == .default ? "GlintLogo-sunrise" : "GlintLogo-\(rawValue)"
     }
 
-    var displayName: String {
-        if self == .default {
-            return "Default"
-        }
+    // MARK: - Two-level grouping helpers
 
-        let parts = rawValue.split(separator: "-", maxSplits: 1).map(String.init)
-        if parts.count == 2 {
-            return "\(Self.displayName(for: parts[0])) \(Self.displayName(for: parts[1]))"
+    /// Which portrait line-art this preset belongs to, or `nil` for `.default`.
+    var portraitStyle: PortraitStyle? {
+        switch self {
+        case .default: return nil
+        case .sunrise, .classic, .aurora, .arctic, .steel, .ultraviolet, .jade, .ember, .graphite:
+            return .original
+        case .bun, .bunClassic, .bunAurora, .bunArctic, .bunSteel, .bunUltraviolet, .bunJade, .bunEmber, .bunGraphite:
+            return .bun
+        case .longhair, .longhairClassic, .longhairAurora, .longhairArctic, .longhairSteel, .longhairUltraviolet, .longhairJade, .longhairEmber, .longhairGraphite:
+            return .longhair
+        case .pout, .poutClassic, .poutAurora, .poutArctic, .poutSteel, .poutUltraviolet, .poutJade, .poutEmber, .poutGraphite:
+            return .pout
+        case .breeze, .breezeClassic, .breezeAurora, .breezeArctic, .breezeSteel, .breezeUltraviolet, .breezeJade, .breezeEmber, .breezeGraphite:
+            return .breeze
         }
-        return Self.displayName(for: rawValue)
     }
 
-    private static func displayName(for rawValue: String) -> String {
-        switch rawValue {
-        case "sunrise": return "Sunrise"
-        case "classic": return "Classic"
-        case "aurora": return "Aurora"
-        case "arctic": return "Arctic"
-        case "steel": return "Steel"
-        case "ultraviolet": return "Ultraviolet"
-        case "jade": return "Jade"
-        case "ember": return "Ember"
-        case "graphite": return "Graphite"
-        case "bun": return "Bun"
-        case "longhair": return "Long Hair"
-        case "pout": return "Pout"
-        case "breeze": return "Breeze"
-        default: return rawValue.capitalized
+    /// Which color palette this preset uses, or `nil` for `.default`.
+    var colorTheme: IconColorTheme? {
+        switch self {
+        case .default: return nil
+        case .sunrise, .bun, .longhair, .pout, .breeze:
+            return .sunrise
+        case .classic, .bunClassic, .longhairClassic, .poutClassic, .breezeClassic:
+            return .classic
+        case .aurora, .bunAurora, .longhairAurora, .poutAurora, .breezeAurora:
+            return .aurora
+        case .arctic, .bunArctic, .longhairArctic, .poutArctic, .breezeArctic:
+            return .arctic
+        case .steel, .bunSteel, .longhairSteel, .poutSteel, .breezeSteel:
+            return .steel
+        case .ultraviolet, .bunUltraviolet, .longhairUltraviolet, .poutUltraviolet, .breezeUltraviolet:
+            return .ultraviolet
+        case .jade, .bunJade, .longhairJade, .poutJade, .breezeJade:
+            return .jade
+        case .ember, .bunEmber, .longhairEmber, .poutEmber, .breezeEmber:
+            return .ember
+        case .graphite, .bunGraphite, .longhairGraphite, .poutGraphite, .breezeGraphite:
+            return .graphite
+        }
+    }
+
+    /// Resolve a portrait + color pair back to the flat `AppIconPreset` case.
+    /// The original portrait uses bare color names (`sunrise`, `classic`, …)
+    /// while the other portraits prefix their name (`bun`, `bun-classic`, …),
+    /// with the bare portrait name doubling as its sunrise variant.
+    static func preset(portrait: PortraitStyle, color: IconColorTheme) -> AppIconPreset {
+        let raw: String = {
+            switch portrait {
+            case .original:
+                return color.rawValue
+            default:
+                return color == .sunrise ? portrait.rawValue : "\(portrait.rawValue)-\(color.rawValue)"
+            }
+        }()
+        return AppIconPreset(rawValue: raw)!
+    }
+}
+
+/// Portrait line-art variants for the two-level app icon picker.
+enum PortraitStyle: String, CaseIterable, Identifiable {
+    case original, bun, longhair, pout, breeze
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .original: return "Original"
+        case .bun: return "Bun"
+        case .longhair: return "Long Hair"
+        case .pout: return "Pout"
+        case .breeze: return "Breeze"
+        }
+    }
+
+    /// The sunrise/base preset for this portrait, used as the hero-card preview.
+    var representativePreset: AppIconPreset {
+        AppIconPreset.preset(portrait: self, color: .sunrise)
+    }
+}
+
+/// Color palette options for a given portrait line art.
+enum IconColorTheme: String, CaseIterable, Identifiable {
+    case sunrise, classic, aurora, arctic, steel, ultraviolet, jade, ember, graphite
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .sunrise: return "Sunrise"
+        case .classic: return "Classic"
+        case .aurora: return "Aurora"
+        case .arctic: return "Arctic"
+        case .steel: return "Steel"
+        case .ultraviolet: return "Ultraviolet"
+        case .jade: return "Jade"
+        case .ember: return "Ember"
+        case .graphite: return "Graphite"
+        }
+    }
+
+    /// Representative swatch color for the dot picker. These approximate
+    /// the dominant hue of each palette so the picker reads at a glance.
+    var swatchColor: Color {
+        switch self {
+        case .sunrise:     return Color(red: 0.95, green: 0.55, blue: 0.25)
+        case .classic:     return Color(red: 0.55, green: 0.25, blue: 0.70)
+        case .aurora:      return Color(red: 0.20, green: 0.75, blue: 0.45)
+        case .arctic:      return Color(red: 0.55, green: 0.80, blue: 0.95)
+        case .steel:       return Color(red: 0.55, green: 0.58, blue: 0.65)
+        case .ultraviolet: return Color(red: 0.45, green: 0.20, blue: 0.85)
+        case .jade:        return Color(red: 0.20, green: 0.65, blue: 0.55)
+        case .ember:       return Color(red: 0.90, green: 0.30, blue: 0.20)
+        case .graphite:    return Color(red: 0.40, green: 0.40, blue: 0.42)
         }
     }
 }
