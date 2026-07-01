@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		03298F74C2B7C43FF6E7CE15 /* DevinSessionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9363739CF4F4BF53C1CD19BC /* DevinSessionManagerTests.swift */; };
 		03A10F3C2A6E3D55B543D7E6 /* THIRD_PARTY_FONT_LICENSES.md in Resources */ = {isa = PBXBuildFile; fileRef = D8CAD184E9D0547B876C8AFE /* THIRD_PARTY_FONT_LICENSES.md */; };
+		04E1EF2B97B308BECB652D52 /* AgentComposerEditorHeightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111A8A77D30E87CDDB69867B /* AgentComposerEditorHeightTests.swift */; };
 		04E75EAD5165E8D96C1C5517 /* MascotAssetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 349714D49AE52D84995314FD /* MascotAssetTests.swift */; };
 		1115F230E14FBE3C1FC754A2 /* GhosttySurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E298AD81B1615CBBFD69F48A /* GhosttySurfaceView.swift */; };
 		13F72CF42254CD4C9ED3A64F /* AgentBusyStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FADAA48EED9EC6EB9662C6D1 /* AgentBusyStatusTests.swift */; };
@@ -107,6 +108,7 @@
 		05F2CA2243872C8111048EF2 /* AgentBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBridge.swift; sourceTree = "<group>"; };
 		08FC2FBC9E8729A5ECBF857C /* PaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneView.swift; sourceTree = "<group>"; };
 		0F58E2127BAE2C9F5155CF07 /* DevinHookInstallerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevinHookInstallerTests.swift; sourceTree = "<group>"; };
+		111A8A77D30E87CDDB69867B /* AgentComposerEditorHeightTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentComposerEditorHeightTests.swift; sourceTree = "<group>"; };
 		150EEF32284061D527E51866 /* GlintTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlintTheme.swift; sourceTree = "<group>"; };
 		16137B405E48DBE262A15B6D /* PaneSurfaceRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneSurfaceRepresentable.swift; sourceTree = "<group>"; };
 		1C99C33FACE17BCC7A228F36 /* AgentCoreTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentCoreTypes.swift; sourceTree = "<group>"; };
@@ -231,6 +233,7 @@
 			children = (
 				8DD4866639B7A52FBED29DB9 /* ACPTypesTests.swift */,
 				FADAA48EED9EC6EB9662C6D1 /* AgentBusyStatusTests.swift */,
+				111A8A77D30E87CDDB69867B /* AgentComposerEditorHeightTests.swift */,
 				050DF854AB59D9630BA51EFA /* AgentConversationStoreTests.swift */,
 				4EEF00CBEF45A9D60423A207 /* AgentKindResolutionTests.swift */,
 				2974A3C91DDAC996BBE3C39E /* AgentPresentationTests.swift */,
@@ -504,6 +507,7 @@
 			files = (
 				2E295621951BC5A53BB9830F /* ACPTypesTests.swift in Sources */,
 				13F72CF42254CD4C9ED3A64F /* AgentBusyStatusTests.swift in Sources */,
+				04E1EF2B97B308BECB652D52 /* AgentComposerEditorHeightTests.swift in Sources */,
 				65C5ACB4B13E7FA5D9818786 /* AgentConversationStoreTests.swift in Sources */,
 				81532B36FEC3039B8EAD9CB1 /* AgentKindResolutionTests.swift in Sources */,
 				7630C58AEA27FCD47686D024 /* AgentPresentationTests.swift in Sources */,

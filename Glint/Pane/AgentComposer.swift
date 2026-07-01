@@ -91,6 +91,31 @@ struct AgentComposer: View {
     @State private var isPickingImages = false
     @State private var showContextUsage = false
     @State private var isModeLabelHovered = false
+    @State private var editorHeight: CGFloat = AgentComposer.minEditorHeight
+
+    // Two lines at the composer's 14pt font plus its 8pt top/bottom padding,
+    // and a generous cap so a long paste doesn't swallow the whole pane.
+    // Kept as named constants (rather than inlined into `.frame`) so the
+    // clamping math below is unit-testable without a live view hierarchy.
+    static let minEditorHeight: CGFloat = 52
+    static let maxEditorHeight: CGFloat = 140
+
+    // The floating card's own max width. `AgentPaneView.messageListSection`
+    // caps message bubbles to this same width so they never extend past
+    // the composer's edges — keep both call sites on this shared constant
+    // rather than duplicating the literal, or the two can silently drift
+    // apart and reintroduce that overlap.
+    static let maxWidth: CGFloat = 760
+
+    /// Clamps a measured text height into the editor's allowed range.
+    /// Pure so it can be exercised directly in tests.
+    static func clampedEditorHeight(
+        for measuredHeight: CGFloat,
+        min minHeight: CGFloat = AgentComposer.minEditorHeight,
+        max maxHeight: CGFloat = AgentComposer.maxEditorHeight
+    ) -> CGFloat {
+        Swift.min(Swift.max(measuredHeight, minHeight), maxHeight)
+    }
 
     private var projectPath: String? {
         workspace.agentProjectPath
@@ -135,6 +160,11 @@ struct AgentComposer: View {
             }
 
             // Text Editor
+            // Height is measured from the actual draft content (via the
+            // hidden mirror `Text` below) and clamped to [minEditorHeight,
+            // maxEditorHeight], so the card starts at a real two-line
+            // minimum and grows only as far as the text needs — rather than
+            // sitting at a fixed height regardless of content.
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $draft)
                     .font(AppFonts.ui(14))
@@ -143,7 +173,7 @@ struct AgentComposer: View {
                     .focused($isFocused)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
-                    .frame(minHeight: 40, maxHeight: 140)
+                    .frame(height: editorHeight)
                     .onKeyPress(phases: .down) { press in
                         guard press.key == .return, !press.modifiers.contains(.shift) else {
                             return .ignored
@@ -166,6 +196,42 @@ struct AgentComposer: View {
                         .padding(.horizontal, 15)
                         .padding(.vertical, 8)
                         .allowsHitTesting(false)
+                }
+
+                // Invisible mirror of the draft, laid out with the same
+                // font/padding as the TextEditor, used purely to measure how
+                // tall the real content wants to be at the current width.
+                // `.fixedSize(vertical: true)` makes it report its true,
+                // unbounded ideal height, and a ZStack's own size is the
+                // union of all its children's sizes — so without the
+                // `.frame(maxHeight:)` cap below, a long paste would balloon
+                // this hidden sibling (and therefore the whole card) far
+                // past `maxEditorHeight`, even though the *visible*
+                // TextEditor stays correctly capped via `editorHeight`. The
+                // cap is applied after the `GeometryReader` background so
+                // the preference still reports the true, uncapped height.
+                Text(draft.isEmpty ? " " : draft)
+                    .font(AppFonts.ui(14))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear
+                                .preference(key: ComposerTextHeightPreferenceKey.self, value: geo.size.height)
+                        }
+                    )
+                    .frame(maxHeight: AgentComposer.maxEditorHeight, alignment: .top)
+                    .opacity(0)
+                    .allowsHitTesting(false)
+            }
+            .onPreferenceChange(ComposerTextHeightPreferenceKey.self) { measuredHeight in
+                let target = Self.clampedEditorHeight(for: measuredHeight)
+                if abs(target - editorHeight) > 0.5 {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        editorHeight = target
+                    }
                 }
             }
 
@@ -646,5 +712,13 @@ struct AgentComposer: View {
         } else {
             projectError = nil
         }
+    }
+}
+
+// MARK: - Helper Preferences
+private struct ComposerTextHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = AgentComposer.minEditorHeight
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }

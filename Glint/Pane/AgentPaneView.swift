@@ -113,7 +113,7 @@ private struct AgentPaneContent: View {
                                 pendingModeDirective: $pendingModeDirective,
                                 onSend: send
                             )
-                            .frame(maxWidth: 760)
+                            .frame(maxWidth: AgentComposer.maxWidth)
                             Spacer(minLength: 0)
                         }
                         .padding(.horizontal, 28)
@@ -289,32 +289,50 @@ private struct AgentPaneContent: View {
     private var messageListSection: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 14) {
-                    if manager.messages.isEmpty {
-                        emptyState
-                    } else {
-                        ForEach(manager.messages) { message in
-                            AgentMessageView(
-                                message: message,
-                                isLast: message.id == manager.messages.last?.id,
-                                status: manager.status
-                            )
-                        }
-                    }
-
-                    // Bottom Anchor
-                    Color.clear
-                        .frame(height: 1)
-                        .id("bottom")
-                        .background(
-                            GeometryReader { geo in
-                                Color.clear
-                                    .preference(key: ScrollOffsetPreferenceKey.self, value: geo.frame(in: .global).minY)
+                // Capped to the same max width as `AgentComposer` (shared
+                // via `AgentComposer.maxWidth`) and centered the same way
+                // (`Spacer`s either side), so message bubbles never extend
+                // past the composer's edges. Without this, right-aligned
+                // user bubbles hug the full pane width while the floating
+                // composer stays capped, letting the two visually collide
+                // in wide panes.
+                HStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    LazyVStack(alignment: .leading, spacing: 14) {
+                        if manager.messages.isEmpty {
+                            emptyState
+                        } else {
+                            ForEach(manager.messages) { message in
+                                AgentMessageView(
+                                    message: message,
+                                    isLast: message.id == manager.messages.last?.id,
+                                    status: manager.status
+                                )
                             }
-                        )
+                        }
+
+                        // Bottom Anchor
+                        Color.clear
+                            .frame(height: 1)
+                            .id("bottom")
+                            .background(
+                                GeometryReader { geo in
+                                    Color.clear
+                                        .preference(key: ScrollOffsetPreferenceKey.self, value: geo.frame(in: .global).minY)
+                                }
+                            )
+                    }
+                    .frame(maxWidth: AgentComposer.maxWidth)
+                    Spacer(minLength: 0)
                 }
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, 28)
                 .padding(.vertical, 20)
+                // Extra clearance below the last message, on top of the
+                // composer's own `safeAreaInset` reservation, so a
+                // same-tick composer resize (e.g. draft cleared on send)
+                // can never leave a message rendered under the card.
+                .padding(.bottom, 24)
             }
             .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
                 // Detect if user is near bottom
@@ -751,8 +769,14 @@ private struct AgentPaneContent: View {
         store.commitAgentWorkspace(workspace.id)
         let images = attachments.map { DevinSessionManager.ImageAttachment(base64Data: $0.base64Data, mimeType: $0.mimeType) }
         manager.sendPrompt(text: promptText, projectPath: standardized, images: images)
-        draft = ""
-        attachments = []
+        // Animated (matching messageListSection's own scrollTo duration) so
+        // the composer's height collapse and the new message's arrival
+        // settle together instead of the card snapping smaller on a frame
+        // where the scroll position hasn't caught up yet.
+        withAnimation(.easeOut(duration: 0.2)) {
+            draft = ""
+            attachments = []
+        }
     }
 
     private func preparedPromptText() -> String? {
