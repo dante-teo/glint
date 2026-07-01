@@ -1085,6 +1085,7 @@ final class WorkspaceStore: ObservableObject {
     /// Persistent NSView per global pane identity. Surfaces are keyed by
     /// (workspaceID, paneID) so switching workspaces doesn't destroy them.
     private var surfaceViews: [WorkspacePaneKey: GhosttySurfaceView] = [:]
+    private var agentSessions: [WorkspacePaneKey: DevinSessionManager] = [:]
     private var dockBadgePaneStatuses: [WorkspacePaneKey: PaneAgentStatus] = [:]
 
     private var saveCancellable: AnyCancellable?
@@ -1931,6 +1932,8 @@ final class WorkspaceStore: ObservableObject {
         // Clean up the TTY lookup file before dropping the view reference.
         surfaceViews[key]?.removeTTYLookupFile()
         surfaceViews.removeValue(forKey: key)
+        agentSessions[key]?.stop()
+        agentSessions.removeValue(forKey: key)
         // The pane is gone for good — drop its scrollback snapshot too.
         ScrollbackArchive.delete(
             id: ScrollbackArchive.fileID(forPaneKey: "\(workspaces[i].id.uuidString):\(target.value)"))
@@ -2132,6 +2135,8 @@ final class WorkspaceStore: ObservableObject {
             workspaces[i].panes.removeValue(forKey: pane)
             surfaceViews[key]?.removeTTYLookupFile()
             surfaceViews.removeValue(forKey: key)
+            agentSessions[key]?.stop()
+            agentSessions.removeValue(forKey: key)
             ScrollbackArchive.delete(
                 id: ScrollbackArchive.fileID(forPaneKey: "\(wsID.uuidString):\(pane.value)"))
             paneAgentState.removeValue(forKey: key)
@@ -2238,6 +2243,10 @@ final class WorkspaceStore: ObservableObject {
             view.removeTTYLookupFile()
         }
         surfaceViews = surfaceViews.filter { $0.key.workspace != id }
+        for (key, session) in agentSessions where key.workspace == id {
+            session.stop()
+        }
+        agentSessions = agentSessions.filter { $0.key.workspace != id }
         clearDockBadges(for: workspaces[idx].panes.keys.map { WorkspacePaneKey(workspace: id, pane: $0) })
         // And their scrollback snapshots.
         for paneID in workspaces[idx].panes.keys {
@@ -2290,6 +2299,10 @@ final class WorkspaceStore: ObservableObject {
             view.removeTTYLookupFile()
         }
         surfaceViews = surfaceViews.filter { $0.key.workspace != id }
+        for (key, session) in agentSessions where key.workspace == id {
+            session.stop()
+        }
+        agentSessions = agentSessions.filter { $0.key.workspace != id }
         clearDockBadges(for: workspaces[idx].panes.keys.map { WorkspacePaneKey(workspace: id, pane: $0) })
         paneAgentState = paneAgentState.filter { $0.key.workspace != id }
         paneProcesses = paneProcesses.filter { $0.key.workspace != id }
@@ -2357,11 +2370,17 @@ final class WorkspaceStore: ObservableObject {
         selectedWorkspaceID = ws.id
     }
 
-    /// Create an uncommitted agent workspace backed by `provider` with the
-    /// given project folder. The workspace is selected immediately but hidden
+    /// Create an uncommitted agent workspace backed by `provider`. The
+    /// workspace is selected immediately but hidden
     /// from the sidebar until `commitAgentWorkspace()` is called (on first
     /// message send). Any prior uncommitted workspace is silently discarded.
-    func addAgentWorkspace(provider: AgentProvider, projectPath: String) {
+    func addAgentWorkspace(provider: AgentProvider, projectPath: String? = nil) {
+        let suggestedProjectPath: String? = {
+            if let projectPath {
+                return Self.standardizedAgentProjectPath(projectPath)
+            }
+            return focusedPaneLiveCwd().flatMap(Self.standardizedAgentProjectPath)
+        }()
         // Clean up any existing uncommitted workspace first (e.g. user opened
         // the folder picker twice without sending a message).
         workspaces.removeAll { !$0.committed }
@@ -2371,7 +2390,9 @@ final class WorkspaceStore: ObservableObject {
             ("FF9F0A", "•"), ("64D2FF", "•"), ("BF5AF2", "•"),
         ]
         let pick = palette[workspaces.count % palette.count]
-        let folderName = URL(fileURLWithPath: projectPath).lastPathComponent
+        let fallbackName = String(localized: "Devin Agent")
+        let folderName = suggestedProjectPath
+            .flatMap { Self.agentProjectDisplayName(for: $0) } ?? fallbackName
         let pane = PaneID(value: 0)
         let tab = WorkspaceTab(id: TabID(value: 0), name: nil,
                                root: .leaf(pane), focusedPane: pane)
@@ -2389,10 +2410,105 @@ final class WorkspaceStore: ObservableObject {
             kind: .agent,
             agentProvider: provider,
             committed: false,
-            agentProjectPath: projectPath
+            agentProjectPath: suggestedProjectPath
         )
         workspaces.append(ws)
         selectedWorkspaceID = ws.id
+    }
+
+    static func standardizedAgentProjectPath(_ path: String) -> String? {
+        let expanded: String
+        if path == "~" || path.hasPrefix("~/") {
+            expanded = NSString(string: path).expandingTildeInPath
+        } else {
+            expanded = path
+        }
+        let url = URL(fileURLWithPath: expanded).standardizedFileURL
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir),
+              isDir.boolValue else { return nil }
+        return url.path
+    }
+
+    static func agentProjectDisplayName(for path: String) -> String? {
+        let name = URL(fileURLWithPath: path).lastPathComponent
+        return name.isEmpty ? nil : name
+    }
+
+    func isValidAgentProjectPath(_ path: String?) -> Bool {
+        guard let path, !path.isEmpty else { return false }
+        return Self.standardizedAgentProjectPath(path) != nil
+    }
+
+    func recentAgentProjectPaths(excluding workspaceID: UUID? = nil) -> [String] {
+        var seen = Set<String>()
+        var paths: [String] = []
+        for workspace in workspaces.reversed()
+            where workspace.kind == .agent && workspace.committed && workspace.id != workspaceID {
+            guard let path = workspace.agentProjectPath,
+                  let standardized = Self.standardizedAgentProjectPath(path),
+                  !seen.contains(standardized) else { continue }
+            seen.insert(standardized)
+            paths.append(standardized)
+        }
+        return paths
+    }
+
+    @discardableResult
+    func setAgentProjectPath(workspaceID: UUID, path: String) -> Bool {
+        guard let idx = workspaces.firstIndex(where: { $0.id == workspaceID }),
+              workspaces[idx].kind == .agent,
+              let standardized = Self.standardizedAgentProjectPath(path) else { return false }
+        workspaces[idx].agentProjectPath = standardized
+        if let displayName = Self.agentProjectDisplayName(for: standardized) {
+            if !workspaces[idx].userNamed {
+                workspaces[idx].name = displayName
+            }
+            for paneID in workspaces[idx].panes.keys {
+                workspaces[idx].panes[paneID]?.title = displayName
+            }
+        }
+        return true
+    }
+
+    func agentSession(workspaceID: UUID, paneID: PaneID) -> DevinSessionManager {
+        let key = WorkspacePaneKey(workspace: workspaceID, pane: paneID)
+        if let session = agentSessions[key] { return session }
+        let session = DevinSessionManager(
+            workspaceID: workspaceID,
+            paneID: paneID,
+            onStatusChange: { [weak self] status in
+                guard let self else { return }
+                switch status {
+                case .idle:
+                    self.paneAgentState[key] = PaneAgentState(
+                        kind: .devin,
+                        status: .idle,
+                        updatedAt: Date()
+                    )
+                case .starting, .thinking:
+                    self.paneAgentState[key] = PaneAgentState(
+                        kind: .devin,
+                        status: .thinking,
+                        updatedAt: Date()
+                    )
+                case .failed(let message):
+                    self.paneAgentState[key] = PaneAgentState(
+                        kind: .devin,
+                        status: .failed,
+                        detail: message,
+                        updatedAt: Date()
+                    )
+                }
+            },
+            onSessionID: { [weak self] sessionID in
+                guard let self,
+                      let idx = self.workspaces.firstIndex(where: { $0.id == workspaceID }) else { return }
+                self.workspaces[idx].agentSessionID = sessionID
+            }
+        )
+        agentSessions[key] = session
+        return session
     }
 
     /// Mark an agent workspace as committed so it appears in the sidebar

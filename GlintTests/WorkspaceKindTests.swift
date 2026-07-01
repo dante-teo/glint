@@ -24,40 +24,100 @@ final class WorkspaceKindTests: XCTestCase {
         return (store, ws.id)
     }
 
+    private func makeTempProject(named name: String = UUID().uuidString) throws -> String {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("glint-tests", isDirectory: true)
+            .appendingPathComponent(name, isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: url)
+        }
+        return url.path
+    }
+
     // MARK: - addAgentWorkspace
 
-    func testAddAgentWorkspaceSetsCorrectFields() {
+    func testAddAgentWorkspaceSetsCorrectFields() throws {
         let (store, _) = makeStore()
-        store.addAgentWorkspace(provider: .devin, projectPath: "/Users/test/Projects/my-app")
+        let projectPath = try makeTempProject(named: "my-app")
+        store.addAgentWorkspace(provider: .devin, projectPath: projectPath)
 
         let agent = store.workspaces.first { $0.kind == .agent }
         XCTAssertNotNil(agent)
         XCTAssertEqual(agent?.kind, .agent)
         XCTAssertEqual(agent?.agentProvider, .devin)
         XCTAssertFalse(agent?.committed ?? true)
-        XCTAssertEqual(agent?.agentProjectPath, "/Users/test/Projects/my-app")
+        XCTAssertEqual(agent?.agentProjectPath, projectPath)
         XCTAssertNil(agent?.agentSessionID)
         XCTAssertEqual(agent?.name, "my-app")
         // Should be selected.
         XCTAssertEqual(store.selectedWorkspaceID, agent?.id)
     }
 
+    func testAddAgentWorkspaceCanCreatePathlessDraft() {
+        let (store, _) = makeStore()
+        store.addAgentWorkspace(provider: .devin)
+
+        let agent = store.workspaces.first { $0.kind == .agent }
+        XCTAssertEqual(agent?.name, "Devin Agent")
+        XCTAssertEqual(agent?.panes[PaneID(value: 0)]?.title, "Devin Agent")
+        XCTAssertNil(agent?.agentProjectPath)
+        XCTAssertFalse(agent?.committed ?? true)
+    }
+
     func testAddAgentWorkspaceCleansUpPriorUncommitted() {
         let (store, _) = makeStore()
-        store.addAgentWorkspace(provider: .devin, projectPath: "/tmp/first")
+        store.addAgentWorkspace(provider: .devin)
         let firstID = store.workspaces.first { $0.kind == .agent }!.id
 
-        store.addAgentWorkspace(provider: .devin, projectPath: "/tmp/second")
+        store.addAgentWorkspace(provider: .devin)
 
         // The first uncommitted workspace should be gone.
         XCTAssertNil(store.workspaces.first(where: { $0.id == firstID }))
         XCTAssertEqual(store.workspaces.filter { $0.kind == .agent }.count, 1)
-        XCTAssertEqual(store.workspaces.first { $0.kind == .agent }?.name, "second")
+        XCTAssertEqual(store.workspaces.first { $0.kind == .agent }?.name, "Devin Agent")
+    }
+
+    func testSetAgentProjectPathUpdatesAutoNameAndPaneTitle() throws {
+        let (store, _) = makeStore()
+        let projectPath = try makeTempProject(named: "selected-project")
+        store.addAgentWorkspace(provider: .devin)
+        let agentID = store.workspaces.first { $0.kind == .agent }!.id
+
+        XCTAssertTrue(store.setAgentProjectPath(workspaceID: agentID, path: projectPath))
+
+        let agent = store.workspaces.first { $0.id == agentID }
+        XCTAssertEqual(agent?.agentProjectPath, projectPath)
+        XCTAssertEqual(agent?.name, "selected-project")
+        XCTAssertEqual(agent?.panes[PaneID(value: 0)]?.title, "selected-project")
+    }
+
+    func testSetAgentProjectPathDoesNotOverwriteUserRenamedWorkspace() throws {
+        let (store, _) = makeStore()
+        let projectPath = try makeTempProject(named: "selected-project")
+        store.addAgentWorkspace(provider: .devin)
+        let agentID = store.workspaces.first { $0.kind == .agent }!.id
+        store.renameWorkspace(agentID, to: "My Custom Agent")
+
+        XCTAssertTrue(store.setAgentProjectPath(workspaceID: agentID, path: projectPath))
+
+        let agent = store.workspaces.first { $0.id == agentID }
+        XCTAssertEqual(agent?.name, "My Custom Agent")
+        XCTAssertEqual(agent?.panes[PaneID(value: 0)]?.title, "selected-project")
+    }
+
+    func testSetAgentProjectPathRejectsMissingFolder() {
+        let (store, _) = makeStore()
+        store.addAgentWorkspace(provider: .devin)
+        let agentID = store.workspaces.first { $0.kind == .agent }!.id
+
+        XCTAssertFalse(store.setAgentProjectPath(workspaceID: agentID, path: "/tmp/glint-missing-\(UUID().uuidString)"))
+        XCTAssertNil(store.workspaces.first { $0.id == agentID }?.agentProjectPath)
     }
 
     func testAddWorkspaceCleansUpSelectedUncommittedAgentWorkspace() {
         let (store, terminalID) = makeStore()
-        store.addAgentWorkspace(provider: .devin, projectPath: "/tmp/proj")
+        store.addAgentWorkspace(provider: .devin)
         let agentID = store.workspaces.first { $0.kind == .agent }!.id
         XCTAssertEqual(store.selectedWorkspaceID, agentID)
 
@@ -73,7 +133,7 @@ final class WorkspaceKindTests: XCTestCase {
 
     func testActiveWorkspacesExcludesUncommitted() {
         let (store, terminalID) = makeStore()
-        store.addAgentWorkspace(provider: .devin, projectPath: "/tmp/proj")
+        store.addAgentWorkspace(provider: .devin)
 
         let active = store.activeWorkspaces
         XCTAssertEqual(active.count, 1)
@@ -84,7 +144,7 @@ final class WorkspaceKindTests: XCTestCase {
 
     func testCommitAgentWorkspaceMakesVisible() {
         let (store, _) = makeStore()
-        store.addAgentWorkspace(provider: .devin, projectPath: "/tmp/proj")
+        store.addAgentWorkspace(provider: .devin)
         let agentID = store.workspaces.first { $0.kind == .agent }!.id
 
         XCTAssertFalse(store.activeWorkspaces.contains(where: { $0.id == agentID }))
@@ -99,7 +159,7 @@ final class WorkspaceKindTests: XCTestCase {
 
     func testAutoCleanupOnWorkspaceSwitch() {
         let (store, terminalID) = makeStore()
-        store.addAgentWorkspace(provider: .devin, projectPath: "/tmp/proj")
+        store.addAgentWorkspace(provider: .devin)
         let agentID = store.workspaces.first { $0.kind == .agent }!.id
         XCTAssertEqual(store.selectedWorkspaceID, agentID)
 
@@ -114,7 +174,7 @@ final class WorkspaceKindTests: XCTestCase {
 
     func testAutoCleanupSkipsCommittedWorkspace() {
         let (store, terminalID) = makeStore()
-        store.addAgentWorkspace(provider: .devin, projectPath: "/tmp/proj")
+        store.addAgentWorkspace(provider: .devin)
         let agentID = store.workspaces.first { $0.kind == .agent }!.id
         store.commitAgentWorkspace(agentID)
 
@@ -130,7 +190,7 @@ final class WorkspaceKindTests: XCTestCase {
 
     func testSplitFocusedNoOpForAgentWorkspace() {
         let (store, _) = makeStore()
-        store.addAgentWorkspace(provider: .devin, projectPath: "/tmp/proj")
+        store.addAgentWorkspace(provider: .devin)
         let agentID = store.workspaces.first { $0.kind == .agent }!.id
 
         let paneBefore = store.workspaces.first { $0.id == agentID }!
@@ -149,7 +209,7 @@ final class WorkspaceKindTests: XCTestCase {
 
     func testNewTabNoOpForAgentWorkspace() {
         let (store, _) = makeStore()
-        store.addAgentWorkspace(provider: .devin, projectPath: "/tmp/proj")
+        store.addAgentWorkspace(provider: .devin)
         let agentID = store.workspaces.first { $0.kind == .agent }!.id
 
         let tabsBefore = store.workspaces.first { $0.id == agentID }!.tabs.count
@@ -166,7 +226,7 @@ final class WorkspaceKindTests: XCTestCase {
 
     func testIconKindReturnsDevinForAgentWorkspace() {
         let (store, _) = makeStore()
-        store.addAgentWorkspace(provider: .devin, projectPath: "/tmp/proj")
+        store.addAgentWorkspace(provider: .devin)
         let agent = store.workspaces.first { $0.kind == .agent }!
 
         let icon = store.iconKind(for: agent)
@@ -177,7 +237,7 @@ final class WorkspaceKindTests: XCTestCase {
 
     func testPersistStripsUncommittedWorkspaces() throws {
         let (store, _) = makeStore()
-        store.addAgentWorkspace(provider: .devin, projectPath: "/tmp/proj")
+        store.addAgentWorkspace(provider: .devin)
 
         // Verify there are 2 workspaces in memory (1 terminal + 1 uncommitted agent).
         XCTAssertEqual(store.workspaces.count, 2)

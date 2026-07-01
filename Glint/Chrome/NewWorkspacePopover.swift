@@ -4,7 +4,6 @@ struct NewWorkspacePopover: View {
     @EnvironmentObject var store: WorkspaceStore
     let dismiss: () -> Void
     @State private var hoveredKind: WorkspaceKind?
-    @State private var pickingFolder = false
 
     private var devinInstalled: Bool {
         DevinHookInstaller.isAgentPresent()
@@ -32,7 +31,8 @@ struct NewWorkspacePopover: View {
                     icon: .asset("DevinMark"),
                     badge: devinInstalled ? nil : "Not installed"
                 ) {
-                    pickDevinProject()
+                    store.addAgentWorkspace(provider: .devin)
+                    dismiss()
                 }
             }
             .padding(6)
@@ -107,7 +107,6 @@ struct NewWorkspacePopover: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(pickingFolder && kind == .agent)
         .onHover { hoveredKind = $0 ? kind : nil }
         .animation(.easeOut(duration: 0.12), value: hovered)
     }
@@ -133,21 +132,6 @@ struct NewWorkspacePopover: View {
         }
     }
 
-    private func pickDevinProject() {
-        guard !pickingFolder else { return }
-        pickingFolder = true
-        store.newWorkspacePopoverOpen = false
-        Task { @MainActor in
-            let folder = await FolderPicker.pickProjectFolder()
-            pickingFolder = false
-            guard let folder else {
-                store.newWorkspacePopoverOpen = true
-                return
-            }
-            store.addAgentWorkspace(provider: .devin, projectPath: folder.path)
-            dismiss()
-        }
-    }
 }
 
 private enum PickerIcon {

@@ -200,16 +200,11 @@ struct CommandPalette: View {
         ))
         items.append(.action(
             title: "New Devin Agent",
-            subtitle: "Choose a project folder",
+            subtitle: "Choose project in composer",
             symbol: "sparkles",
             shortcut: "",
             tint: actionTint,
-            action: {
-                Task { @MainActor in
-                    guard let folder = await FolderPicker.pickProjectFolder() else { return }
-                    store.addAgentWorkspace(provider: .devin, projectPath: folder.path)
-                }
-            }
+            action: { store.addAgentWorkspace(provider: .devin) }
         ))
 
         items.append(.action(

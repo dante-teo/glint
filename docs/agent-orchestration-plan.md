@@ -5,7 +5,7 @@ Transform Glint from a terminal-only app into an agent orchestration control cen
 ## Key UX Behaviors
 
 1. **New Workspace picker:** Cmd+N shows a popover with two options: "Terminal" (existing) and "Devin Agent". Auto-expands sidebar if collapsed.
-2. **Project folder selection:** Picking "Devin Agent" opens an NSOpenPanel folder picker. The selected path feeds into ACP `session/new(cwd:)`.
+2. **Inline project selection:** Picking "Devin Agent" creates a draft agent pane immediately. The project is chosen from a Codex-style dropdown under the message box; its "Choose Folder..." item is the only path that opens NSOpenPanel.
 3. **Sidebar visibility gating:** Agent workspaces are invisible in the sidebar until the user sends their first message (`committed` flag). Prevents empty/abandoned sessions from cluttering the sidebar.
 4. **Uncommitted auto-cleanup:** If the user switches away before sending a first message, the uncommitted agent workspace is silently deleted.
 5. **Archive vs Delete:** Agent sessions support "Archive" (preserves conversation history in `~/.glint/sessions/`) and "Delete" (destroys everything). Terminals just close.
@@ -22,23 +22,27 @@ Transform Glint from a terminal-only app into an agent orchestration control cen
 User clicks "Devin Agent" in popover
          |
          v
-   NSOpenPanel (folder picker)
-         |
-         v
-   WorkspaceStore.addAgentWorkspace(provider: .devin, projectPath: ...)
+   WorkspaceStore.addAgentWorkspace(provider: .devin)
    - creates Workspace with kind=.agent, committed=false
+   - projectPath is optional; draft name falls back to "Devin Agent"
    - selects it (pane renders), but sidebar card is hidden
          |
          v
-   AgentPaneView renders (empty state: project name + composer)
+   AgentPaneView renders (empty state + composer + project dropdown)
+         |
+         v
+   User picks a project from recent valid agent projects, inherited cwd,
+   or "Choose Folder..." (NSOpenPanel)
          |
          v
    User types first message, hits send
+   - validate selected folder still exists and is a directory
+   - store.setAgentProjectPath() -> standardized absolute path + auto-name
    - store.commitAgentWorkspace() -> committed=true -> sidebar card appears
-   - DevinSessionManager.start(projectPath:)
+   - DevinSessionManager.sendFirstPrompt(text:projectPath:)
      - spawns `devin acp` subprocess
      - ACPClient: initialize -> session/new(cwd:) -> session/prompt
-   - streaming session/update notifications drive the message list
+   - minimal v1: user/system messages and status updates render in-pane
 ```
 
 ```
@@ -46,16 +50,14 @@ User clicks "Devin Agent" in popover
                      |      AgentPaneView        |
                      |  +---------------------+  |
                      |  | Header: Devin icon  |  |
-                     |  | model + mode + dot  |  |
+                     |  | project/status text |  |
                      |  +---------------------+  |
                      |  | ScrollView          |  |
-                     |  |  AgentMessageView x N  |
-                     |  |  (user, assistant,  |  |
-                     |  |   thought, tool,    |  |
-                     |  |   system)           |  |
+                     |  |  AgentMessageRow x N  |
+                     |  |  (user/system v1)   |  |
                      |  +---------------------+  |
-                     |  | AgentComposer       |  |
-                     |  | [input] [send/stop] |  |
+                     |  | Composer + controls |  |
+                     |  | [input] [project] [send/stop] |
                      |  +---------------------+  |
                      +---------------------------+
                                |
@@ -77,7 +79,8 @@ User clicks "Devin Agent" in popover
 - [x] Add `@Published var newWorkspacePopoverOpen: Bool` to `WorkspaceStore`
 - [x] Add `showNewWorkspacePopover()` method (auto-expand sidebar if collapsed, set flag)
 - [x] Modify `activeWorkspaces`: filter out `!committed` workspaces
-- [x] Add `addAgentWorkspace(provider:projectPath:)` method
+- [x] Add `addAgentWorkspace(provider:projectPath:)` method (`projectPath` is optional for draft agent panes)
+- [x] Add project path helpers: standardize/validate folder paths, set project path, derive project display name, list recent valid committed projects
 - [x] Add `commitAgentWorkspace(_ id: UUID)` method
 - [x] Auto-cleanup uncommitted workspaces in `selectWorkspace()`
 - [x] Strip uncommitted workspaces in `Persistence.save()`
@@ -89,6 +92,8 @@ User clicks "Devin Agent" in popover
 - [x] Create `GlintTests/WorkspaceKindTests.swift` + `WorkspaceAgentCodableTests.swift`
   - [x] Old state.json decodes with `kind = .terminal, committed = true`
   - [x] `addAgentWorkspace` sets correct fields
+  - [x] `addAgentWorkspace` can create a pathless draft
+  - [x] `setAgentProjectPath` updates auto names and rejects missing folders
   - [x] `activeWorkspaces` excludes uncommitted
   - [x] `commitAgentWorkspace` makes workspace visible
   - [x] Auto-cleanup on workspace switch
@@ -101,11 +106,13 @@ User clicks "Devin Agent" in popover
 - [x] Create `Glint/Chrome/NewWorkspacePopover.swift`
   - [x] Terminal row: shell icon + "Terminal" + "Shell workspace" subtitle
   - [x] Devin Agent row: Devin icon + "Devin Agent" + "AI coding agent" subtitle
+  - [x] Devin Agent row creates a pathless draft pane; it does not open NSOpenPanel
   - [x] Check `DevinHookInstaller.isAgentPresent()` for "Not installed" badge
   - [x] Hover states, Theme colors, AppFonts, rounded rects
 - [x] Create `Glint/Chrome/FolderPicker.swift`
   - [x] `static func pickProjectFolder() async -> URL?`
   - [x] NSOpenPanel: `canChooseDirectories = true, canChooseFiles = false`
+  - [x] Used only from the in-pane project dropdown's "Choose Folder..." command
 - [x] Modify `Glint/Chrome/SidebarView.swift`
   - [x] Attach `.popover(isPresented: $store.newWorkspacePopoverOpen)` to `newWorkspaceCard`
   - [x] `filteredActiveWorkspaces`: also filter `committed`
@@ -116,13 +123,32 @@ User clicks "Devin Agent" in popover
   - [x] `newWorkspaceRow`: set `store.newWorkspacePopoverOpen = true` instead of direct `addWorkspace()`
 - [x] Modify `Glint/Chrome/CommandPalette.swift`
   - [x] Replace single "New Workspace" with "New Terminal" + "New Devin Agent"
+  - [x] "New Devin Agent" creates a pathless draft pane; it does not open NSOpenPanel
   - [x] Hide "Split Right" / "Split Down" when selected workspace is `.agent`
 - [x] Modify `Glint/App/GlintApp.swift`
   - [x] Cmd+N: call `workspaceStore.showNewWorkspacePopover()` instead of `addWorkspace()`
 
 ### Phase 3: ACP Client (Devin Integration Layer)
 
-- [ ] Create `Glint/Agent/ACP/ACPTypes.swift`
+- [x] Create `Glint/Agent/ACP/ACPClient.swift` minimal first-send client
+  - [x] Resolve `devin` binary from common GUI-safe paths and PATH
+  - [x] Spawn `devin acp` with stdin/stdout/stderr pipes
+  - [x] Request helper writes newline-delimited JSON-RPC and reads matching response lines
+  - [x] Minimal methods: `initialize`, `session/new(cwd:)`, `session/prompt`
+  - [x] Capture stderr for diagnostics
+  - [x] Fail when `session/new` does not return a non-empty session id
+  - [x] Close/terminate process on stop/teardown
+- [x] Create `Glint/Agent/DevinSessionManager.swift` minimal first-send manager
+  - [x] Published: `messages`, `status`, `sessionID`
+  - [x] Message model: `.user`, `.assistant`, `.system` (assistant reserved for streaming later)
+  - [x] First-send lifecycle: start process -> initialize -> new session -> prompt
+  - [x] Stop/cancel uses a run-id fence so stale process failures do not overwrite stopped state
+  - [x] PaneAgentState bridge: map session status -> sidebar/tab Devin status
+- [x] Create `GlintTests/ACPTypesTests.swift`
+  - [x] Empty result response decoding
+  - [x] New session response decoding (`sessionId` and `sessionID`)
+  - [x] Error response decoding
+- [ ] Expand ACP type coverage in `Glint/Agent/ACP/ACPTypes.swift`
   - [ ] JSON-RPC envelope: `ACPRequest`, `ACPResponse`, `ACPNotification`, `ACPError`
   - [ ] `InitializeRequest/Response`
   - [ ] `NewSessionRequest` (cwd, mcpServers) / `NewSessionResponse` (sessionId, models, modes, configOptions)
@@ -137,39 +163,40 @@ User clicks "Devin Agent" in popover
   - [ ] `CreateTerminalRequest/Response`, `TerminalOutputRequest/Response`, `KillTerminalRequest/Response`
   - [ ] `AuthenticateRequest/Response`
   - [ ] Tolerant decoding: unknown keys ignored, missing optionals defaulted
-- [ ] Create `Glint/Agent/ACP/ACPClient.swift`
-  - [ ] Resolve `devin` binary via `AgentPresence.commandExists` search paths
-  - [ ] Spawn `Process` with stdin/stdout/stderr pipes
+- [ ] Expand `Glint/Agent/ACP/ACPClient.swift`
   - [ ] Background reader on stdout: line-split, JSON decode, route messages
   - [ ] Routing: response (has id) -> pending CheckedContinuation; notification (no id) -> PassthroughSubject; server request (method + id) -> handler closures
-  - [ ] `func request<R: Decodable>(method:params:) async throws -> R`
   - [ ] `func notify(method:params:) throws`
   - [ ] Crash detection: `Process.terminationHandler` -> fail pending continuations + publish event
-  - [ ] `func close()`: close stdin, wait 2s, terminate if alive
-  - [ ] Stderr capture for diagnostics
-- [ ] Create `Glint/Agent/DevinSessionManager.swift`
-  - [ ] Published: `messages`, `sessionStatus`, `pendingPermission`, `pendingElicitation`, `sessionTitle`, `usageInfo`, `models`, `currentModel`, `modes`, `currentMode`
-  - [ ] `AgentMessage` model: `.user`, `.assistant`, `.thought`, `.toolCall`, `.system`
+- [ ] Expand `Glint/Agent/DevinSessionManager.swift`
+  - [ ] Published: `pendingPermission`, `pendingElicitation`, `sessionTitle`, `usageInfo`, `models`, `currentModel`, `modes`, `currentMode`
+  - [ ] Extend message model: `.thought`, `.toolCall`
   - [ ] Streaming chunk assembly: buffer `agentMessageChunk` by `messageId`
   - [ ] `toolCallUpdate`: find existing `.toolCall` by `toolCallId`, update in-place
-  - [ ] Lifecycle: `start(projectPath:)`, `prompt(text:)`, `cancel()`, `close()`
   - [ ] Permission handling: set `pendingPermission`, UI shows overlay, user responds
   - [ ] Elicitation handling: same pattern
-  - [ ] PaneAgentState bridge: map session status -> PaneAgentStatus, write into `WorkspaceStore.paneAgentState`
   - [ ] Conversation persistence: serialize to `~/.glint/sessions/<workspaceID>.json`
   - [ ] File handlers: read/write within project root only (path validation security)
   - [ ] Terminal handlers: return "not implemented" (v1)
-- [ ] Create `GlintTests/ACPTypesTests.swift`
-  - [ ] JSON-RPC envelope round-trip
+- [ ] Expand `GlintTests/ACPTypesTests.swift`
   - [ ] SessionUpdate discriminated union (each variant)
-  - [ ] Error decoding
   - [ ] Tolerant unknown-field handling
 
 ### Phase 4: Agent Pane UI
 
-- [ ] Create `Glint/Pane/AgentPaneView.swift`
-  - [ ] Header bar: project folder name + Devin icon + model dropdown + mode pill + status dot
-  - [ ] Message list: ScrollView + LazyVStack + ScrollViewReader
+- [x] Create `Glint/Pane/AgentPaneView.swift` minimal first-send pane
+  - [x] Header: Devin icon, workspace/project label, status text
+  - [x] Empty state and message list
+  - [x] TextEditor composer with placeholder
+  - [x] Project dropdown under the message box
+  - [x] Recent valid committed agent projects
+  - [x] "Choose Folder..." opens `FolderPicker.pickProjectFolder()`
+  - [x] Send disabled until message and valid project folder are present
+  - [x] Inline project-folder errors for missing/deleted folders
+  - [x] Stop button calls `manager.stop()`
+- [ ] Expand `Glint/Pane/AgentPaneView.swift`
+  - [ ] Header bar: model dropdown + mode pill + status dot
+  - [ ] Message list: ScrollViewReader
   - [ ] Smart auto-scroll: only scroll to bottom if user was already near bottom
   - [ ] Permission overlay: blur backdrop + card + Approve/Deny buttons
   - [ ] Elicitation overlay: form + submit
@@ -177,42 +204,44 @@ User clicks "Devin Agent" in popover
   - [ ] Auth needed state: instruction card
   - [ ] Not installed state: install instructions card
   - [ ] Loading state: centered ProgressView
-  - [ ] Empty/pre-first-message state: project name + inviting composer
-- [ ] Create `Glint/Pane/AgentComposer.swift`
-  - [ ] TextEditor with "Message Devin..." placeholder
+  - [ ] Split `AgentComposer` and `AgentMessageView` into dedicated files if the pane grows
+- [x] Implement first-send composer behavior
   - [ ] Send: Cmd+Return or button. Disabled when thinking/permission/empty
-  - [ ] On first send: `commitAgentWorkspace()` THEN `manager.prompt(text:)`
-  - [ ] Stop button: visible when thinking, calls `manager.cancel()`
+  - [x] On first send: validate project -> set project path -> `commitAgentWorkspace()` -> `sendFirstPrompt`
+  - [x] Stop button: visible when thinking/starting, calls `manager.stop()`
+- [ ] Expand composer behavior
   - [ ] Mode toggle: pill dropdown for mode switching
   - [ ] Auto-grow height up to ~120pt
-- [ ] Create `Glint/Pane/AgentMessageView.swift`
+- [ ] Expand message rendering
   - [ ] User message: right-aligned bubble, accent tint background
   - [ ] Assistant message: left-aligned, Devin icon gutter, `AttributedString(markdown:)`, blinking cursor while streaming
   - [ ] Thought block: collapsible, dimmed, italic, preview when collapsed
   - [ ] Tool call: compact row with kind icon + title + status badge (Capsule). Expandable detail.
   - [ ] System message: centered, dimmed, small font
-- [ ] Modify `Glint/Pane/PaneView.swift`
-  - [ ] Check `workspace.kind` to route `.terminal` -> GhosttyKit, `.agent` -> AgentPaneView
-  - [ ] Agent panes use `Theme.bgPane` as backing (no terminal transparency)
+- [x] Modify `Glint/Pane/PaneView.swift`
+  - [x] Check `workspace.kind` to route `.terminal` -> GhosttyKit, `.agent` -> AgentPaneView
+  - [x] Agent panes use `Theme.bgPane` as backing
 
 ### Phase 5: Wiring
 
-- [ ] Add `agentSessions: [WorkspacePaneKey: DevinSessionManager]` to `WorkspaceStore`
-- [ ] Add `agentSession(workspaceID:paneID:) -> DevinSessionManager` (lazy creation)
-- [ ] On workspace archive: close agent session, preserve conversation file
-- [ ] On workspace delete: close session, remove conversation file
+- [x] Add `agentSessions: [WorkspacePaneKey: DevinSessionManager]` to `WorkspaceStore`
+- [x] Add `agentSession(workspaceID:paneID:) -> DevinSessionManager` (lazy creation)
+- [x] On workspace archive/delete/tab/pane close: stop and drop live agent session
+- [ ] On workspace archive: preserve conversation file
+- [ ] On workspace delete: remove conversation file
 - [ ] On app quit: gracefully close all live sessions (2s timeout)
 - [ ] `paneNeedsCloseConfirmation()`: return true for agent panes where session is `.thinking`
-- [ ] Run `xcodegen generate`
+- [x] Run `xcodegen generate`
 
 ### Phase 6: Verification
 
-- [ ] All existing tests pass
-- [ ] New tests pass
+- [x] All existing tests pass
+- [x] New tests pass
 - [ ] Manual: Cmd+N -> popover appears (sidebar auto-expands if collapsed)
 - [ ] Manual: "Terminal" -> terminal workspace (same as before)
-- [ ] Manual: "Devin Agent" -> folder picker -> cancel -> nothing happens
-- [ ] Manual: "Devin Agent" -> folder picker -> select -> agent pane, NO sidebar card
+- [ ] Manual: "Devin Agent" -> draft agent pane appears immediately, NO folder dialog
+- [ ] Manual: In-pane "Choose Folder..." -> cancel -> draft pane remains open and unchanged
+- [ ] Manual: In-pane "Choose Folder..." -> select -> project dropdown updates, NO sidebar card before first send
 - [ ] Manual: Type message + send -> sidebar card appears, agent responds with streaming text
 - [ ] Manual: Tool calls render with status badges
 - [ ] Manual: Permission request -> overlay with Approve/Deny
@@ -228,12 +257,17 @@ User clicks "Devin Agent" in popover
 | Edge Case | Handling |
 |---|---|
 | Old `state.json` missing `kind`/`committed` | `decodeIfPresent` -> `.terminal` / `true` |
-| Folder picker cancelled | No workspace created, popover stays |
+| "New Devin Agent" chosen | Draft pane is created immediately; no folder dialog |
+| Folder picker cancelled from in-pane dropdown | Draft pane stays open; project selection is unchanged |
+| Selected folder deleted before send | Send disabled / inline error until a valid folder is chosen |
+| `session/new` returns no session id | First send fails before `session/prompt` with an invalid-response error |
+| User presses Stop while first send is in flight | Run-id fence ignores stale completion/failure from the stopped process |
 | User switches workspace before first message | Uncommitted workspace auto-deleted |
 | App quits with uncommitted workspace | Stripped from state in `save()` |
 | Cmd+N with sidebar collapsed | Auto-expand sidebar, then show popover |
 | `devin` binary not found (GUI PATH) | `AgentPresence.commandExists` searches common paths; show install instructions |
-| `devin acp` crashes mid-session | `terminationHandler` -> `.error`, pending continuations failed, "Restart" button |
+| `devin acp` crashes during first send | Pane shows a system error message and failed status |
+| `devin acp` crashes mid-session | Future: `terminationHandler` -> `.error`, pending continuations failed, "Restart" button |
 | ACP needs authentication | `initialize` response -> `.needsAuth`, show "Run `devin auth login`" card |
 | Multiple `agentMessageChunk` same `messageId` | Buffer + append to single `.assistant` message |
 | `toolCallUpdate` for existing tool call | Find by `toolCallId`, update in-place |
@@ -249,7 +283,7 @@ User clicks "Devin Agent" in popover
 | Cmd+1-9 skip uncommitted | `activeWorkspaces` filters `committed` |
 | Agent sidebar card idle row | Project folder name, not "N tabs . M panes" |
 | Agent context menu | "Archive Session" / "Resume Session" |
-| CommandPalette new workspace | Two items: "New Terminal" + "New Devin Agent" |
+| CommandPalette new workspace | Two items: "New Terminal" + "New Devin Agent"; Devin creates a draft pane with no dialog |
 | File request outside project root | Reject with error (security) |
 | Terminal request from agent | Return "not implemented" (v1) |
 | Auto-scroll while reading history | Track scroll position; only auto-scroll if near bottom |
@@ -258,19 +292,21 @@ User clicks "Devin Agent" in popover
 
 ## Files Summary
 
-**Create (11):**
+**Created or added in current agent phases:**
 - `Glint/Chrome/NewWorkspacePopover.swift`
 - `Glint/Chrome/FolderPicker.swift`
-- `Glint/Agent/ACP/ACPTypes.swift`
 - `Glint/Agent/ACP/ACPClient.swift`
 - `Glint/Agent/DevinSessionManager.swift`
 - `Glint/Pane/AgentPaneView.swift`
-- `Glint/Pane/AgentComposer.swift`
-- `Glint/Pane/AgentMessageView.swift`
 - `GlintTests/WorkspaceKindTests.swift`
 - `GlintTests/ACPTypesTests.swift`
 
-**Modify (6):**
+**Still planned as the pane/protocol grows:**
+- `Glint/Agent/ACP/ACPTypes.swift`
+- `Glint/Pane/AgentComposer.swift`
+- `Glint/Pane/AgentMessageView.swift`
+
+**Modified:**
 - `Glint/Workspace/WorkspaceStore.swift`
 - `Glint/Chrome/SidebarView.swift`
 - `Glint/Chrome/ContentView.swift`

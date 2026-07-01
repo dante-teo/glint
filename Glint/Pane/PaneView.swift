@@ -27,7 +27,7 @@ struct PaneView: View {
            let ws = store.workspaces.first(where: { $0.id == wsID }),
            let pane = ws.panes[paneID] {
             if ws.kind == .agent {
-                AgentPlaceholderPaneView(workspace: ws)
+                AgentPaneView(workspace: ws, paneID: paneID)
             } else {
                 paneBody(workspaceID: wsID,
                          focusedPane: ws.selectedTab?.focusedPane ?? paneID,
