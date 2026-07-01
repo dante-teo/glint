@@ -2228,9 +2228,6 @@ final class WorkspaceStore: ObservableObject {
     func deleteWorkspace(_ id: UUID) {
         guard let idx = workspaces.firstIndex(where: { $0.id == id }) else { return }
 
-        // TODO(Phase 5): close agent session + remove conversation file at
-        // ~/.glint/sessions/<workspaceID>.json before tearing down surfaces.
-
         let busyPanes = workspaces[idx].panes.keys
             .filter { paneNeedsCloseConfirmation(WorkspacePaneKey(workspace: id, pane: $0)) }
         if !busyPanes.isEmpty,
@@ -2251,9 +2248,16 @@ final class WorkspaceStore: ObservableObject {
         }
         surfaceViews = surfaceViews.filter { $0.key.workspace != id }
         for (key, session) in agentSessions where key.workspace == id {
-            session.closeSession()
+            session.closeSessionAndDeleteConversation()
         }
         agentSessions = agentSessions.filter { $0.key.workspace != id }
+        if workspaces[idx].kind == .agent {
+            // A session may never have been opened this run — e.g. the
+            // workspace was restored from a prior launch but its pane was
+            // never visited — so there's no live manager to delegate the
+            // file removal to. Delete it directly so this always cleans up.
+            DevinSessionManager.deleteConversation(workspaceID: id)
+        }
         clearDockBadges(for: workspaces[idx].panes.keys.map { WorkspacePaneKey(workspace: id, pane: $0) })
         // And their scrollback snapshots.
         for paneID in workspaces[idx].panes.keys {
@@ -2289,9 +2293,6 @@ final class WorkspaceStore: ObservableObject {
         guard let idx = workspaces.firstIndex(where: { $0.id == id }),
               !workspaces[idx].archived else { return }
 
-        // TODO(Phase 5): close agent session before archiving — call
-        // agentSessions[key]?.close() and remove the session entry.
-
         // The user must always have at least one active workspace to look at.
         guard activeWorkspaces.count > 1 else {
             NSSound.beep()
@@ -2307,7 +2308,7 @@ final class WorkspaceStore: ObservableObject {
         }
         surfaceViews = surfaceViews.filter { $0.key.workspace != id }
         for (key, session) in agentSessions where key.workspace == id {
-            session.closeSession()
+            session.closeSessionPreservingConversation()
         }
         agentSessions = agentSessions.filter { $0.key.workspace != id }
         clearDockBadges(for: workspaces[idx].panes.keys.map { WorkspacePaneKey(workspace: id, pane: $0) })
@@ -2537,6 +2538,38 @@ final class WorkspaceStore: ObservableObject {
         return session
     }
 
+    /// True when at least one agent pane has a live `DevinSessionManager`
+    /// that needs a chance to shut down (ACP `session/close` + process
+    /// teardown) before the app can actually quit.
+    var hasLiveAgentSessions: Bool { !agentSessions.isEmpty }
+
+    /// Closes every live agent session in parallel, waiting up to
+    /// `timeout`. `ACPClient.closeSession` already self-bounds to ~2s
+    /// internally, but this adds its own hard outer cap so a stuck close
+    /// (or process teardown) can never hold up quitting the app — the real
+    /// work runs as an unstructured task raced against a timeout task, and
+    /// whichever finishes first resumes the continuation exactly once via
+    /// `ResumeOnce` (mirroring `ACPClient.PendingRequest`'s guarded resume).
+    func closeAllLiveAgentSessionsForQuit(timeout: TimeInterval = 2.0) async {
+        guard !agentSessions.isEmpty else { return }
+        let sessions = Array(agentSessions.values)
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let resumeOnce = ResumeOnce(continuation)
+            Task {
+                await withTaskGroup(of: Void.self) { group in
+                    for session in sessions {
+                        group.addTask { await session.closeSessionForQuit() }
+                    }
+                }
+                resumeOnce.resume()
+            }
+            Task {
+                try? await Task.sleep(nanoseconds: UInt64(max(0, timeout) * 1_000_000_000))
+                resumeOnce.resume()
+            }
+        }
+    }
+
     /// Mark an agent workspace as committed so it appears in the sidebar
     /// and persists across launches. Called when the user sends their first
     /// message.
@@ -2597,6 +2630,29 @@ final class WorkspaceStore: ObservableObject {
         case .leaf(let id): return id
         case .split(_, _, let a, _): return firstLeaf(a)
         }
+    }
+}
+
+/// Resumes a `CheckedContinuation` exactly once no matter how many racing
+/// tasks call `resume()` — `CheckedContinuation` traps on a double resume,
+/// and `closeAllLiveAgentSessionsForQuit` races the real close-all work
+/// against a timeout task, either of which may finish first. Mirrors
+/// `ACPClient.PendingRequest`'s lock-guarded single-resume pattern.
+private final class ResumeOnce: @unchecked Sendable {
+    private let continuation: CheckedContinuation<Void, Never>
+    private let lock = NSLock()
+    private var didResume = false
+
+    init(_ continuation: CheckedContinuation<Void, Never>) {
+        self.continuation = continuation
+    }
+
+    func resume() {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !didResume else { return }
+        didResume = true
+        continuation.resume()
     }
 }
 

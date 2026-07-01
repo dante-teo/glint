@@ -259,4 +259,115 @@ final class DevinSessionManagerTests: XCTestCase {
         XCTAssertEqual(restored.sessionID, "session-123")
         XCTAssertTrue(restored.messages.contains { $0.role == .user && $0.text == "persist me" })
     }
+
+    // MARK: - Phase 5: archive/delete/quit teardown
+
+    private func makeTempSessionsDirectory() -> URL {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("glint-devin-session-store", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: dir)
+        }
+        return dir
+    }
+
+    func testCloseSessionAndDeleteConversationRemovesFile() async throws {
+        let dir = makeTempSessionsDirectory()
+        let workspaceID = UUID()
+        let client = FakeClient()
+        let manager = DevinSessionManager(
+            workspaceID: workspaceID,
+            paneID: PaneID(value: 0),
+            onStatusChange: { _ in },
+            onSessionID: { _ in },
+            clientFactory: { client },
+            sessionsDirectory: dir
+        )
+        manager.sendFirstPrompt(text: "delete me", projectPath: "/tmp")
+        await waitUntil { client.promptCalls.count == 1 }
+        // Let the debounced save actually land once, so there's a real
+        // file on disk to delete.
+        try? await Task.sleep(nanoseconds: 400_000_000)
+        let url = DevinSessionManager.conversationURL(workspaceID: workspaceID, sessionsDirectory: dir)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+
+        manager.closeSessionAndDeleteConversation()
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    /// Regression test for the `scheduleSave()` cancellation race: a save
+    /// that's in-flight (mid-debounce) when the conversation is deleted
+    /// must not resurrect the file once its sleep elapses.
+    func testCancelledDebouncedSaveDoesNotResurrectDeletedFile() async throws {
+        let dir = makeTempSessionsDirectory()
+        let workspaceID = UUID()
+        let client = FakeClient()
+        let manager = DevinSessionManager(
+            workspaceID: workspaceID,
+            paneID: PaneID(value: 0),
+            onStatusChange: { _ in },
+            onSessionID: { _ in },
+            clientFactory: { client },
+            sessionsDirectory: dir
+        )
+        manager.sendFirstPrompt(text: "in flight", projectPath: "/tmp")
+        await waitUntil { client.promptCalls.count == 1 }
+
+        // Delete immediately — the debounced save scheduled by sendFirstPrompt
+        // hasn't fired yet (its ~250ms sleep hasn't elapsed).
+        manager.closeSessionAndDeleteConversation()
+
+        // Wait well past the original debounce window; if cancellation
+        // didn't actually stop the write, the file would reappear here.
+        try? await Task.sleep(nanoseconds: 400_000_000)
+
+        let url = DevinSessionManager.conversationURL(workspaceID: workspaceID, sessionsDirectory: dir)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    func testCloseSessionPreservingConversationFlushesPendingSaveImmediately() async throws {
+        let dir = makeTempSessionsDirectory()
+        let workspaceID = UUID()
+        let client = FakeClient()
+        let manager = DevinSessionManager(
+            workspaceID: workspaceID,
+            paneID: PaneID(value: 0),
+            onStatusChange: { _ in },
+            onSessionID: { _ in },
+            clientFactory: { client },
+            sessionsDirectory: dir
+        )
+        manager.sendFirstPrompt(text: "flush me", projectPath: "/tmp")
+        await waitUntil { client.promptCalls.count == 1 }
+
+        // Preserve immediately — before the ~250ms debounce would have
+        // fired on its own.
+        manager.closeSessionPreservingConversation()
+
+        let restored = DevinSessionManager(
+            workspaceID: workspaceID,
+            paneID: PaneID(value: 0),
+            onStatusChange: { _ in },
+            onSessionID: { _ in },
+            clientFactory: { FakeClient() },
+            sessionsDirectory: dir
+        )
+        XCTAssertEqual(restored.sessionID, "session-123")
+        XCTAssertTrue(restored.messages.contains { $0.role == .user && $0.text == "flush me" })
+    }
+
+    func testCloseSessionForQuitClosesClientAndEndsIdle() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        manager.sendFirstPrompt(text: "quitting", projectPath: "/tmp")
+        await waitUntil { client.promptCalls.count == 1 }
+
+        await manager.closeSessionForQuit()
+
+        XCTAssertTrue(client.closed)
+        XCTAssertEqual(manager.status, .idle)
+    }
 }

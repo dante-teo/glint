@@ -280,4 +280,80 @@ final class WorkspaceKindTests: XCTestCase {
 
         XCTAssertTrue(store.newWorkspacePopoverOpen)
     }
+
+    // MARK: - Phase 5: archive/delete conversation lifecycle + quit
+
+    func testDeleteWorkspaceRemovesPersistedConversationFileWithNoLiveSession() throws {
+        let (store, _) = makeStore()
+        store.addAgentWorkspace(provider: .devin)
+        let agentID = store.workspaces.first { $0.kind == .agent }!.id
+
+        // Simulate a conversation file persisted by a prior launch, before
+        // this run ever opened the pane — so there's no live
+        // DevinSessionManager for it in `agentSessions`.
+        let url = DevinSessionManager.conversationURL(workspaceID: agentID)
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: url)
+        addTeardownBlock { try? FileManager.default.removeItem(at: url) }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+
+        store.deleteWorkspace(agentID)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    func testHasLiveAgentSessionsReflectsAgentSessionCreation() {
+        let (store, _) = makeStore()
+        store.addAgentWorkspace(provider: .devin)
+        let agent = store.workspaces.first { $0.kind == .agent }!
+        let pane = agent.panes.keys.first!
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: DevinSessionManager.conversationURL(workspaceID: agent.id))
+        }
+
+        XCTAssertFalse(store.hasLiveAgentSessions)
+
+        _ = store.agentSession(workspaceID: agent.id, paneID: pane)
+
+        XCTAssertTrue(store.hasLiveAgentSessions)
+    }
+
+    func testPaneNeedsCloseConfirmationTrueForThinkingAgentPane() {
+        let (store, _) = makeStore()
+        store.addAgentWorkspace(provider: .devin)
+        let agent = store.workspaces.first { $0.kind == .agent }!
+        let pane = agent.panes.keys.first!
+        let key = WorkspaceStore.WorkspacePaneKey(workspace: agent.id, pane: pane)
+
+        XCTAssertFalse(store.paneNeedsCloseConfirmation(key))
+
+        store.paneAgentState[key] = PaneAgentState(kind: .devin, status: .thinking, updatedAt: Date())
+
+        XCTAssertTrue(store.paneNeedsCloseConfirmation(key))
+    }
+
+    func testCloseAllLiveAgentSessionsForQuitNoOpWhenEmpty() async {
+        let (store, _) = makeStore()
+        // Should return immediately without hanging — there's nothing to close.
+        await store.closeAllLiveAgentSessionsForQuit(timeout: 5)
+    }
+
+    func testCloseAllLiveAgentSessionsForQuitClosesNeverStartedSessionPromptly() async {
+        let (store, _) = makeStore()
+        store.addAgentWorkspace(provider: .devin)
+        let agent = store.workspaces.first { $0.kind == .agent }!
+        let pane = agent.panes.keys.first!
+        _ = store.agentSession(workspaceID: agent.id, paneID: pane)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: DevinSessionManager.conversationURL(workspaceID: agent.id))
+        }
+
+        // The session was never started (no client, no ACP process), so
+        // this must complete almost immediately rather than waiting out
+        // the (deliberately generous) timeout.
+        let start = Date()
+        await store.closeAllLiveAgentSessionsForQuit(timeout: 5)
+        XCTAssertLessThan(Date().timeIntervalSince(start), 1.0)
+    }
 }

@@ -170,7 +170,11 @@ final class DevinSessionManager: ObservableObject {
         status = .idle
     }
 
-    func closeSession() {
+    /// Common teardown shared by `closeSession()` and `closeSessionForQuit()`:
+    /// deny any pending permission/elicitation, fence off the current run,
+    /// and detach the client so nothing else can use it. Returns the client
+    /// and session id the caller needs to actually close the ACP session.
+    private func prepareForClose() -> (client: DevinACPClient?, sessionID: String?) {
         let currentSessionID = sessionID
         denyPendingInteractions()
         runID = UUID()
@@ -178,13 +182,51 @@ final class DevinSessionManager: ObservableObject {
         let client = self.client
         self.client = nil
         notificationCancellable = nil
+        return (client, currentSessionID)
+    }
+
+    func closeSession() {
+        let (client, sessionID) = prepareForClose()
         Task.detached {
-            if let currentSessionID {
-                try? await client?.closeSession(sessionID: currentSessionID)
+            if let sessionID {
+                try? await client?.closeSession(sessionID: sessionID)
             }
             client?.close()
         }
         status = .idle
+    }
+
+    /// Same teardown as `closeSession()`, but awaits the ACP `session/close`
+    /// call (which already self-bounds to ~2s in `ACPClient`) instead of
+    /// firing-and-forgetting, then flushes the conversation synchronously.
+    /// Used only at app quit, where we need to know shutdown actually
+    /// finished before letting the process disappear.
+    func closeSessionForQuit() async {
+        let (client, sessionID) = prepareForClose()
+        if let sessionID {
+            try? await client?.closeSession(sessionID: sessionID)
+        }
+        client?.close()
+        status = .idle
+        flushSaveSynchronously()
+    }
+
+    /// Closes the live session and guarantees the on-disk conversation
+    /// reflects the final in-memory state — used when archiving a
+    /// workspace, where a later "Resume Session" must be able to reload it.
+    func closeSessionPreservingConversation() {
+        closeSession()
+        flushSaveSynchronously()
+    }
+
+    /// Closes the live session and permanently deletes the persisted
+    /// conversation, cancelling any pending debounced save first so it
+    /// can't resurrect the file after deletion.
+    func closeSessionAndDeleteConversation() {
+        closeSession()
+        saveTask?.cancel()
+        saveTask = nil
+        try? FileManager.default.removeItem(at: conversationURL)
     }
 
     func stop() {
@@ -582,6 +624,12 @@ final class DevinSessionManager: ObservableObject {
         let url = conversationURL
         saveTask = Task.detached(priority: .utility) {
             try? await Task.sleep(nanoseconds: 250_000_000)
+            // `Task.sleep` throws on cancellation, but `try?` above swallows
+            // that — without this check a cancelled save would still fall
+            // through and write its (now stale) snapshot, potentially
+            // racing with (and undoing) a synchronous flush or a delete
+            // that ran right after the cancel.
+            guard !Task.isCancelled else { return }
             do {
                 try FileManager.default.createDirectory(
                     at: url.deletingLastPathComponent(),
@@ -632,6 +680,31 @@ final class DevinSessionManager: ObservableObject {
             currentMode: currentMode,
             messages: messages
         )
+    }
+
+    /// Cancels any pending debounced save and writes the current snapshot
+    /// to disk immediately. `scheduleSave()`'s ~250ms debounce could
+    /// otherwise lose the last few chunks (or, worse, resurrect a
+    /// just-deleted file) if the manager is torn down right after streaming
+    /// ends — archiving, deleting, or quitting all need the on-disk state
+    /// to be trustworthy the moment they run, not ~250ms later.
+    private func flushSaveSynchronously() {
+        saveTask?.cancel()
+        saveTask = nil
+        let snapshot = makePersistedConversation()
+        do {
+            try FileManager.default.createDirectory(
+                at: conversationURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let data = try encoder.encode(snapshot)
+            try data.write(to: conversationURL, options: .atomic)
+        } catch {
+            NSLog("[glint] failed to flush Devin conversation: \(error)")
+        }
     }
 }
 
