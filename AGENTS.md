@@ -24,8 +24,6 @@ To unit-test `WorkspaceStore` operations (tabs, splits, pane state), create a `W
 
 Only apply `@MainActor` to test classes that actually require it (i.e. those calling `@MainActor`-isolated code like `WorkspaceStore` methods). Tests for non-isolated types such as `SleepAssertionManager` should remain unannotated. If a test file would need `@MainActor` for only some tests, split them into separate files — each named after the behavior it covers.
 
-`DevinHookInstallerTests.testIsInstalledReturnsFalseByDefault` fails on machines that already have Devin hooks installed. This is a known environment-dependent failure — it does not indicate a regression.
-
 ### Pane dim overlay and IOSurface compositing
 
 The unfocused-pane dim wash (`Color.black` in `PaneView.paneBody`) must be **always present** in the ZStack with its opacity toggled (0 when focused, 0.18/0.28 when unfocused). Do NOT convert it to a conditional `if !isFocused { ... }` — that causes the SwiftUI layer to be inserted *after* the `GhosttySurfaceView`'s IOSurface-backed Metal layer is already composited, and the overlay ends up behind the surface (invisible). Keeping the overlay in the initial render guarantees correct Core Animation z-ordering. This applies to any SwiftUI overlay placed above an `NSViewRepresentable` with a GPU-backed layer in a ZStack.
@@ -49,6 +47,16 @@ The unfocused-pane dim wash (`Color.black` in `PaneView.paneBody`) must be **alw
 **Guards:** `splitFocused()` and `newTab()` beep and return for `.agent` workspaces (one session per workspace, v1). `liveIconKind(for:)` short-circuits to the provider's icon (`.devin`) for agent workspaces.
 
 **Tests:** Store-dependent tests live in `WorkspaceKindTests.swift` (`@MainActor`). Pure Codable round-trip tests for the agent fields live in `WorkspaceAgentCodableTests.swift` (unannotated), following the `@MainActor` split convention documented above.
+
+### Devin permission auto-review
+
+`PermissionPolicy.defaultPolicy(for:)` (`Glint/Agent/PermissionReviewer.swift`) maps each `ToolKind` to `.autoApprove`, `.alwaysEscalate`, or `.llmReview`. When `WorkspaceStore.permissionReviewMode == .autoReview`, `DevinSessionManager.handlePermissionRequest` checks this policy before falling back to the manual permission overlay. `.llmReview` shells out to `devin -p -- "<prompt>"` (single-turn, non-interactive) with a prompt that ends in an unclosed JSON prefix (`{"decision":`) so the model can only continue with a valid JSON completion — `PermissionReviewer.parseResponse` re-prepends that prefix and decodes, with markdown-fence-stripping and regex-extraction fallbacks, escalating to the manual UI on any parse/timeout/process failure.
+
+**Never overwrite `rawInput` to carry review metadata.** `RequestPermissionRequest.reviewReason` is a Glint-local field (excluded from `CodingKeys`, never encoded to or decoded from the ACP wire) added so the escalation path can attach the LLM's reasoning without destroying `rawInput` — the human reviewer must always see both the reviewer's analysis and the actual tool arguments on the permission card.
+
+**Executable resolution:** `AgentPresence.executableURL(_:)` (`Glint/Agent/AgentHookInstaller.swift`) is the single shared resolver for locating a CLI agent binary (common GUI-safe install dirs plus `$PATH`, since a Finder-launched GUI app doesn't inherit the login shell's `PATH`). `ACPClient.devinExecutableURL()` and `PermissionReviewer`'s binary lookup both delegate to it — do not re-implement this search list again; call `AgentPresence.executableURL("devin")` (or the relevant binary name) instead.
+
+**Tests:** Policy-only tests (no actor isolation needed) live in `PermissionPolicyTests.swift` (unannotated). `PermissionReviewer.parseResponse` tests live in `PermissionReviewerTests.swift` (`@MainActor`, since `PermissionReviewer` itself is `@MainActor`), following the same split convention as `WorkspaceKindTests.swift`/`WorkspaceAgentCodableTests.swift`.
 
 ### App icon preset architecture
 

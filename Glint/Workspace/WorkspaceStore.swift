@@ -910,6 +910,13 @@ final class WorkspaceStore: ObservableObject {
         didSet { UserDefaults.standard.set(!warnBeforeUnsafePaste, forKey: "glint.skipUnsafePasteConfirmation") }
     }
 
+    @Published var permissionReviewMode: PermissionReviewMode = {
+        let raw = UserDefaults.standard.string(forKey: "glint.permissionReviewMode") ?? ""
+        return PermissionReviewMode(rawValue: raw) ?? .manual
+    }() {
+        didSet { UserDefaults.standard.set(permissionReviewMode.rawValue, forKey: "glint.permissionReviewMode") }
+    }
+
     /// Offer to install both agents' hooks on the very first launch so
     /// status tracking works out of the box — but ask first (these write
     /// into another tool's config files), and ask exactly once. "Not Now"

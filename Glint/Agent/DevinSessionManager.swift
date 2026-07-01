@@ -408,6 +408,70 @@ final class DevinSessionManager: ObservableObject {
     private func handlePermissionRequest(_ request: ACPServerRequest) async -> Result<ACPJSONValue, ACPErrorPayload> {
         let params = (try? request.decodeParams(RequestPermissionRequest.self))
             ?? RequestPermissionRequest(sessionId: sessionID ?? "", title: "Permission requested")
+
+        // 1. Check user permission review mode
+        let mode = WorkspaceStore.current?.permissionReviewMode ?? .manual
+
+        if mode == .autoReview {
+            let policy = PermissionPolicy.defaultPolicy(for: params.kind)
+            let title = params.title ?? "Permission request"
+
+            switch policy {
+            case .autoApprove:
+                messages.append(Message(role: .system, text: String(format: String(localized: "Auto-approved permission: %@"), title)))
+                scheduleSave()
+                return .success(.object(["outcome": .string("approved")]))
+
+            case .alwaysEscalate:
+                break // Fallthrough to UI card
+
+            case .llmReview:
+                // Spawn the LLM background review
+                let projectRoot = self.projectPath ?? ""
+                let decision = await PermissionReviewer.shared.review(
+                    title: title,
+                    kind: params.kind,
+                    rawInput: params.rawInput.map { String(describing: $0) } ?? "",
+                    conversationContext: self.messages,
+                    projectRoot: projectRoot
+                )
+
+                switch decision {
+                case .approve(let reason):
+                    let logText = reason.isEmpty 
+                        ? String(format: String(localized: "Auto-approved permission (LLM): %@"), title)
+                        : String(format: String(localized: "Auto-approved: %@ (%@)"), title, reason)
+                    messages.append(Message(role: .system, text: logText))
+                    scheduleSave()
+                    return .success(.object(["outcome": .string("approved")]))
+
+                case .deny(let reason):
+                    let logText = reason.isEmpty
+                        ? String(format: String(localized: "Auto-denied permission (LLM): %@"), title)
+                        : String(format: String(localized: "Auto-denied: %@ (%@)"), title, reason)
+                    messages.append(Message(role: .system, text: logText))
+                    scheduleSave()
+                    return .success(.object(["outcome": .string("denied")]))
+
+                case .escalate(let reason):
+                    // Attach the reviewer's reasoning via a dedicated field so
+                    // the permission card can show it alongside the original
+                    // rawInput (the actual tool arguments) instead of losing
+                    // them.
+                    var enrichedParams = params
+                    if !reason.isEmpty {
+                        enrichedParams.reviewReason = reason
+                    }
+                    return .success(await withCheckedContinuation { continuation in
+                        permissionContinuation = continuation
+                        pendingPermission = PendingPermission(request: enrichedParams)
+                        status = .needsPermission
+                    })
+                }
+            }
+        }
+
+        // Default manual flow
         return .success(await withCheckedContinuation { continuation in
             permissionContinuation = continuation
             pendingPermission = PendingPermission(request: params)

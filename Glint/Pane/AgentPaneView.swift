@@ -20,9 +20,11 @@ private struct AgentPaneContent: View {
     let workspace: Workspace
     let paneID: PaneID
     @ObservedObject var manager: DevinSessionManager
+
     @State private var draft = ""
     @State private var projectError: String?
-    @FocusState private var composerFocused: Bool
+    @State private var isNearBottom = true
+    @State private var elicitationInput = ""
 
     private var projectPath: String? {
         workspace.agentProjectPath
@@ -36,215 +38,554 @@ private struct AgentPaneContent: View {
         draft.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var canSend: Bool {
-        !trimmedDraft.isEmpty && projectIsValid && !manager.status.isBusy
-    }
-
-    private var projectOptions: [String] {
-        var seen = Set<String>()
-        var out: [String] = []
-        if let projectPath,
-           let standardized = WorkspaceStore.standardizedAgentProjectPath(projectPath) {
-            seen.insert(standardized)
-            out.append(standardized)
-        }
-        for path in store.recentAgentProjectPaths(excluding: workspace.id) where !seen.contains(path) {
-            seen.insert(path)
-            out.append(path)
-        }
-        return out
+    private var devinInstalled: Bool {
+        DevinHookInstaller.isAgentPresent()
     }
 
     var body: some View {
         ZStack {
             Theme.bgPane
+
             VStack(spacing: 0) {
+                // Header
                 header
-                messageList
-                composer
+                    .padding(.horizontal, 28)
+                    .padding(.top, 22)
+                    .padding(.bottom, 12)
+
+                Divider()
+                    .overlay(Theme.divider)
+
+                if !devinInstalled {
+                    notInstalledCard
+                        .padding(28)
+                        .frame(maxHeight: .infinity)
+                } else if case .starting = manager.status {
+                    loadingView
+                        .frame(maxHeight: .infinity)
+                } else if case .failed(let message) = manager.status, isAuthError(message) {
+                    authNeededCard(message: message)
+                        .padding(28)
+                        .frame(maxHeight: .infinity)
+                } else {
+                    VStack(spacing: 0) {
+                        // Error bar if failed
+                        if case .failed(let message) = manager.status {
+                            errorBanner(message: message)
+                        }
+
+                        // Message Scroll List with Smart Auto-Scroll
+                        messageListSection
+
+                        Divider()
+                            .overlay(Theme.divider)
+
+                        // Input Composer
+                        AgentComposer(
+                            workspace: workspace,
+                            paneID: paneID,
+                            manager: manager,
+                            draft: $draft,
+                            onSend: send
+                        )
+                        .padding(.horizontal, 28)
+                        .padding(.vertical, 16)
+                    }
+                }
             }
-            .padding(.horizontal, 28)
-            .padding(.vertical, 22)
+
+            // Overlays: Permissions and Elicitations
+            overlays
         }
         .onAppear {
-            if projectPath == nil {
-                projectError = String(localized: "Choose a project folder before sending.")
-            } else if !projectIsValid {
-                projectError = String(localized: "Project folder is missing or unavailable.")
-            }
+            validateProject()
         }
         .onChange(of: workspace.agentProjectPath) { _, _ in
-            projectError = projectIsValid ? nil : String(localized: "Project folder is missing or unavailable.")
+            validateProject()
         }
     }
 
+    // MARK: - Header
     private var header: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             Image("DevinMark")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 28, height: 28)
-                .shadow(color: Color(red: 0.16, green: 0.43, blue: 0.81).opacity(0.45),
-                        radius: 8)
+                .shadow(color: Color(red: 0.16, green: 0.43, blue: 0.81).opacity(0.45), radius: 8)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(workspace.displayName)
-                    .font(AppFonts.ui(15, weight: .semibold))
-                    .foregroundStyle(Theme.text1)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text(statusText)
-                    .font(AppFonts.ui(11))
-                    .foregroundStyle(statusColor)
-                    .lineLimit(1)
-            }
+                HStack(spacing: 8) {
+                    Text(workspace.displayName)
+                        .font(AppFonts.ui(14, weight: .semibold))
+                        .foregroundStyle(Theme.text1)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
 
-            Spacer()
-        }
-        .padding(.bottom, 18)
-    }
+                    // Status Dot
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 7, height: 7)
+                }
 
-    private var messageList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 12) {
-                if manager.messages.isEmpty {
-                    emptyState
-                } else {
-                    ForEach(manager.messages) { message in
-                        AgentMessageRow(message: message)
+                HStack(spacing: 6) {
+                    Text(statusText)
+                        .font(AppFonts.ui(11))
+                        .foregroundStyle(Theme.text3)
+                        .lineLimit(1)
+
+                    if let currentModel = manager.currentModel?.name {
+                        Text("•")
+                            .font(.system(size: 8))
+                            .foregroundStyle(Theme.text4)
+                        Text(currentModel)
+                            .font(AppFonts.ui(11))
+                            .foregroundStyle(Theme.text4)
                     }
                 }
             }
-            .frame(maxWidth: 780)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
+
+            Spacer()
+
+            // Quick mode toggle if any
+            if let currentMode = manager.currentMode {
+                Text(currentMode.uppercased())
+                    .font(AppFonts.ui(10, weight: .bold))
+                    .foregroundStyle(store.accent)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule().fill(store.accent.opacity(0.12))
+                    )
+            }
         }
     }
 
+    // MARK: - Message List Section
+    private var messageListSection: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 14) {
+                    if manager.messages.isEmpty {
+                        emptyState
+                    } else {
+                        ForEach(manager.messages) { message in
+                            AgentMessageView(
+                                message: message,
+                                isLast: message.id == manager.messages.last?.id,
+                                status: manager.status
+                            )
+                        }
+                    }
+
+                    // Bottom Anchor
+                    Color.clear
+                        .frame(height: 1)
+                        .id("bottom")
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear
+                                    .preference(key: ScrollOffsetPreferenceKey.self, value: geo.frame(in: .global).minY)
+                            }
+                        )
+                }
+                .padding(.horizontal, 28)
+                .padding(.vertical, 20)
+            }
+            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                // Detect if user is near bottom
+                // Value is coordinate of bottom, if it goes too high (small value), user has scrolled up
+                isNearBottom = value < 950 // Threshold for near-bottom
+            }
+            .onChange(of: manager.messages.count) { _, _ in
+                if isNearBottom {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo("bottom", anchor: .bottom)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Empty State
     private var emptyState: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
+            Image("DevinMark")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 44, height: 44)
+                .shadow(color: Color(red: 0.16, green: 0.43, blue: 0.81).opacity(0.3), radius: 10)
+
             Text("Start a Devin session")
-                .font(AppFonts.ui(20, weight: .semibold))
+                .font(AppFonts.ui(18, weight: .semibold))
                 .foregroundStyle(Theme.text1)
-            Text("Pick the project below, then send your first message.")
-                .font(AppFonts.ui(13))
+
+            Text("Pick a project folder below, then describe your task to begin.")
+                .font(AppFonts.ui(12.5))
                 .foregroundStyle(Theme.text3)
                 .multilineTextAlignment(.center)
+                .frame(maxWidth: 320)
         }
-        .frame(maxWidth: .infinity, minHeight: 260)
+        .frame(maxWidth: .infinity, minHeight: 280)
     }
 
-    private var composer: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Theme.overlay(0.08))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(Theme.overlay(composerFocused ? 0.22 : 0.12), lineWidth: 1)
-                    )
-                TextEditor(text: $draft)
-                    .font(AppFonts.ui(14))
+    // MARK: - Overlays
+    @ViewBuilder
+    private var overlays: some View {
+        if let permission = manager.pendingPermission {
+            ZStack {
+                // Dim/Blur Backdrop
+                VisualEffectBackground(material: .menu, blendingMode: .withinWindow)
+                    .opacity(0.7)
+                    .ignoresSafeArea()
+
+                permissionCard(permission)
+            }
+            .transition(.opacity.combined(with: .scale(scale: 0.95)))
+        } else if let elicitation = manager.pendingElicitation {
+            ZStack {
+                VisualEffectBackground(material: .menu, blendingMode: .withinWindow)
+                    .opacity(0.7)
+                    .ignoresSafeArea()
+
+                elicitationCard(elicitation)
+            }
+            .transition(.opacity.combined(with: .scale(scale: 0.95)))
+        }
+    }
+
+    // MARK: - Permission Card
+    private func permissionCard(_ permission: DevinSessionManager.PendingPermission) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                Image(systemName: "shield.righthalf.filled")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Theme.orange)
+                Text("Permission Required")
+                    .font(AppFonts.ui(14, weight: .bold))
                     .foregroundStyle(Theme.text1)
-                    .scrollContentBackground(.hidden)
-                    .focused($composerFocused)
-                    .padding(8)
-                    .frame(minHeight: 86, maxHeight: 130)
-                    .onSubmit { send() }
-                if draft.isEmpty {
-                    Text("Message Devin...")
-                        .font(AppFonts.ui(14))
-                        .foregroundStyle(Theme.text4)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 16)
-                        .allowsHitTesting(false)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(permission.request.title ?? "Devin is asking to run a tool")
+                    .font(AppFonts.ui(13, weight: .semibold))
+                    .foregroundStyle(Theme.text1)
+
+                if let kind = permission.request.kind {
+                    Text("Tool Kind: \(String(describing: kind).uppercased())")
+                        .font(AppFonts.ui(11, weight: .semibold))
+                        .foregroundStyle(Theme.text3)
                 }
             }
 
-            HStack(spacing: 10) {
-                projectMenu
-                if let projectError {
-                    Text(projectError)
-                        .font(AppFonts.ui(11))
-                        .foregroundStyle(Color(red: 1.0, green: 0.63, blue: 0.36))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+            // LLM reasoning feedback if auto-reviewed and escalated. Shown
+            // alongside (not instead of) the real arguments below, so the
+            // human reviewer never loses sight of what they're approving.
+            if let reason = permission.request.reviewReason {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Auto-Review Analysis:")
+                        .font(AppFonts.ui(11, weight: .bold))
+                        .foregroundStyle(Theme.text3)
+                    Text(reason)
+                        .font(AppFonts.ui(11.5))
+                        .foregroundStyle(Theme.text3)
+                        .italic()
+                        .padding(8)
+                        .background(Theme.overlay(0.04))
+                        .cornerRadius(6)
                 }
-                Spacer()
+            }
+
+            if let rawInput = permission.request.rawInput {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Arguments:")
+                        .font(AppFonts.ui(11, weight: .bold))
+                        .foregroundStyle(Theme.text3)
+                    ScrollView {
+                        Text(String(describing: rawInput))
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(Theme.text3)
+                            .padding(8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 100)
+                    .background(Theme.overlay(0.04))
+                    .cornerRadius(6)
+                }
+            }
+
+            HStack(spacing: 12) {
                 Button {
-                    manager.status.isBusy ? manager.stop() : send()
+                    manager.respondToPermission(approved: false)
                 } label: {
-                    Image(systemName: manager.status.isBusy ? "stop.fill" : "arrow.up")
-                        .font(.system(size: 13, weight: .bold))
-                        .frame(width: 30, height: 30)
+                    Text("Deny")
+                        .font(AppFonts.ui(12, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 32)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(manager.status.isBusy || canSend ? Theme.bgPane : Theme.text4)
                 .background(
-                    Circle()
-                        .fill(manager.status.isBusy || canSend ? Theme.text1 : Theme.overlay(0.14))
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(Theme.overlay(0.2), lineWidth: 1)
                 )
-                .disabled(!manager.status.isBusy && !canSend)
-                .help(manager.status.isBusy ? "Stop Devin" : "Send")
+                .keyboardShortcut(.escape, modifiers: [])
+
+                Button {
+                    manager.respondToPermission(approved: true)
+                } label: {
+                    Text("Approve")
+                        .font(AppFonts.ui(12, weight: .semibold))
+                        .foregroundStyle(Color.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 32)
+                }
+                .buttonStyle(.plain)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(store.accent)
+                )
+                .keyboardShortcut(.return, modifiers: [])
             }
         }
-        .frame(maxWidth: 780)
-        .padding(.top, 12)
+        .padding(20)
+        .frame(width: 360)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Theme.bgPane)
+                .shadow(color: Color.black.opacity(0.3), radius: 24, y: 12)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Theme.overlay(0.12), lineWidth: 1)
+        )
     }
 
-    private var projectMenu: some View {
-        Menu {
-            ForEach(projectOptions, id: \.self) { path in
-                Button {
-                    chooseProject(path)
-                } label: {
-                    Text(projectLabel(for: path))
+    // MARK: - Elicitation Card
+    private func elicitationCard(_ elicitation: DevinSessionManager.PendingElicitation) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                Image(systemName: "questionmark.bubble.fill")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(store.accent)
+                Text("Input Required")
+                    .font(AppFonts.ui(14, weight: .bold))
+                    .foregroundStyle(Theme.text1)
+            }
+
+            Text(elicitation.request.message ?? "Devin needs additional input to continue.")
+                .font(AppFonts.ui(12.5))
+                .foregroundStyle(Theme.text2)
+
+            TextField("Type your answer...", text: $elicitationInput)
+                .font(AppFonts.ui(13))
+                .textFieldStyle(.plain)
+                .padding(8)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Theme.overlay(0.05))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Theme.overlay(0.12), lineWidth: 1)
+                        )
+                )
+
+            HStack(spacing: 12) {
+                Button("Cancel") {
+                    manager.submitElicitation(values: nil)
+                    elicitationInput = ""
                 }
+                .buttonStyle(.plain)
+                .font(AppFonts.ui(12, weight: .semibold))
+                .frame(width: 80, height: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(Theme.overlay(0.2), lineWidth: 1)
+                )
+
+                Spacer()
+
+                Button("Submit") {
+                    manager.submitElicitation(values: .string(elicitationInput))
+                    elicitationInput = ""
+                }
+                .buttonStyle(.plain)
+                .font(AppFonts.ui(12, weight: .semibold))
+                .foregroundStyle(Color.white)
+                .frame(width: 100, height: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(store.accent)
+                )
+                .disabled(elicitationInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            if !projectOptions.isEmpty {
-                Divider()
+        }
+        .padding(20)
+        .frame(width: 360)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Theme.bgPane)
+                .shadow(color: Color.black.opacity(0.3), radius: 24, y: 12)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Theme.overlay(0.12), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Error Banner
+    private func errorBanner(message: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Theme.pink)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Session Error")
+                    .font(AppFonts.ui(12, weight: .bold))
+                    .foregroundStyle(Theme.text1)
+                Text(message)
+                    .font(AppFonts.ui(11.5))
+                    .foregroundStyle(Theme.text3)
+                    .lineLimit(2)
             }
-            Button("Choose Folder...") {
-                chooseFolder()
+
+            Spacer()
+
+            Button("Restart Session") {
+                manager.stop()
             }
-        } label: {
-            HStack(spacing: 7) {
-                Image(systemName: "folder")
-                    .font(.system(size: 12, weight: .semibold))
-                Text(projectPath.map(projectLabel(for:)) ?? String(localized: "Choose project"))
-                    .font(AppFonts.ui(12, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Theme.text4)
-            }
-            .foregroundStyle(projectIsValid ? Theme.text2 : Theme.text3)
+            .buttonStyle(.plain)
+            .font(AppFonts.ui(11, weight: .bold))
+            .foregroundStyle(Color.white)
             .padding(.horizontal, 10)
-            .frame(height: 30)
+            .padding(.vertical, 5)
             .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(Theme.overlay(0.08))
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(store.accent)
             )
         }
-        .menuStyle(.borderlessButton)
-        .frame(maxWidth: 260, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Theme.pink.opacity(0.08))
     }
 
+    // MARK: - Loading View
+    private var loadingView: some View {
+        VStack(spacing: 14) {
+            ProgressView()
+                .controlSize(.small)
+            Text("Connecting to Devin...")
+                .font(AppFonts.ui(13))
+                .foregroundStyle(Theme.text3)
+        }
+    }
+
+    // MARK: - Not Installed Card
+    private var notInstalledCard: some View {
+        VStack(spacing: 16) {
+            Image("DevinMark")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 48, height: 48)
+                .opacity(0.6)
+
+            VStack(spacing: 4) {
+                Text("Devin CLI Not Installed")
+                    .font(AppFonts.ui(16, weight: .semibold))
+                    .foregroundStyle(Theme.text1)
+                Text("Please install the devin CLI to run coding agents.")
+                    .font(AppFonts.ui(12.5))
+                    .foregroundStyle(Theme.text3)
+                    .multilineTextAlignment(.center)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Run this command in your terminal:")
+                    .font(AppFonts.ui(11, weight: .bold))
+                    .foregroundStyle(Theme.text4)
+                Text("brew install devin")
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(Theme.text2)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Theme.overlay(0.05))
+                    .cornerRadius(6)
+            }
+            .padding(.top, 4)
+        }
+    }
+
+    // MARK: - Auth Needed Card
+    private func authNeededCard(message: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "lock.shield")
+                .font(.system(size: 40, weight: .medium))
+                .foregroundStyle(Theme.orange)
+
+            VStack(spacing: 4) {
+                Text("Devin Authentication Required")
+                    .font(AppFonts.ui(16, weight: .semibold))
+                    .foregroundStyle(Theme.text1)
+                Text(message)
+                    .font(AppFonts.ui(12.5))
+                    .foregroundStyle(Theme.text3)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Run this command in your terminal, then try again:")
+                    .font(AppFonts.ui(11, weight: .bold))
+                    .foregroundStyle(Theme.text4)
+                Text("devin auth login")
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(Theme.text2)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Theme.overlay(0.05))
+                    .cornerRadius(6)
+            }
+            .padding(.top, 4)
+
+            Button("Restart Session") {
+                manager.stop()
+            }
+            .buttonStyle(.plain)
+            .font(AppFonts.ui(12, weight: .semibold))
+            .foregroundStyle(Color.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(store.accent)
+            )
+        }
+    }
+
+    /// Heuristic check for auth-related failures (no ACP metadata for this
+    /// yet; full auth-method surfacing is Phase 5). Looks for common
+    /// keywords Devin's ACP error messages use for credential problems.
+    private func isAuthError(_ message: String) -> Bool {
+        let lowered = message.lowercased()
+        return ["auth", "credential", "login", "unauthorized", "token expired"]
+            .contains { lowered.contains($0) }
+    }
+
+    // MARK: - Status Mapping Helpers
     private var statusText: String {
         switch manager.status {
         case .idle:
-            return projectPath ?? String(localized: "Choose a project to begin")
+            return projectPath ?? String(localized: "Choose folder to begin")
         case .starting:
-            return String(localized: "Starting Devin...")
+            return String(localized: "Starting...")
         case .thinking:
-            return String(localized: "Devin is working...")
+            return String(localized: "Working...")
         case .tool:
-            return String(localized: "Devin is using a tool...")
+            return String(localized: "Using tool...")
         case .needsPermission:
-            return String(localized: "Devin needs permission")
+            return String(localized: "Awaiting permission")
         case .cancelling:
-            return String(localized: "Cancelling Devin...")
+            return String(localized: "Cancelling...")
         case .failed:
             return String(localized: "Session error")
         }
@@ -253,30 +594,23 @@ private struct AgentPaneContent: View {
     private var statusColor: Color {
         switch manager.status {
         case .failed:
-            return Color(red: 1.0, green: 0.45, blue: 0.45)
-        case .starting, .thinking, .tool, .needsPermission, .cancelling:
+            return Theme.pink
+        case .starting, .thinking, .tool, .cancelling:
             return store.accent
+        case .needsPermission:
+            return Theme.orange
         case .idle:
-            return Theme.text3
+            return Theme.green
         }
     }
 
-    private func projectLabel(for path: String) -> String {
-        WorkspaceStore.agentProjectDisplayName(for: path) ?? String(localized: "Devin Agent")
-    }
-
-    private func chooseProject(_ path: String) {
-        if store.setAgentProjectPath(workspaceID: workspace.id, path: path) {
-            projectError = nil
+    private func validateProject() {
+        if projectPath == nil {
+            projectError = String(localized: "Choose a folder.")
+        } else if !projectIsValid {
+            projectError = String(localized: "Folder is unavailable.")
         } else {
-            projectError = String(localized: "Project folder is missing or unavailable.")
-        }
-    }
-
-    private func chooseFolder() {
-        Task { @MainActor in
-            guard let folder = await FolderPicker.pickProjectFolder() else { return }
-            chooseProject(folder.path)
+            projectError = nil
         }
     }
 
@@ -285,45 +619,20 @@ private struct AgentPaneContent: View {
         guard let projectPath,
               store.setAgentProjectPath(workspaceID: workspace.id, path: projectPath),
               let standardized = WorkspaceStore.standardizedAgentProjectPath(projectPath) else {
-            projectError = String(localized: "Choose a valid project folder before sending.")
+            projectError = String(localized: "Choose a folder.")
             return
         }
         projectError = nil
         store.commitAgentWorkspace(workspace.id)
-        manager.sendFirstPrompt(text: trimmedDraft, projectPath: standardized)
+        manager.sendPrompt(text: trimmedDraft, projectPath: standardized)
         draft = ""
     }
 }
 
-private struct AgentMessageRow: View {
-    let message: DevinSessionManager.Message
-
-    var body: some View {
-        HStack {
-            if message.role == .user { Spacer(minLength: 80) }
-            Text(message.text)
-                .font(AppFonts.ui(13))
-                .foregroundStyle(Theme.text1)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(background)
-                )
-            if message.role != .user { Spacer(minLength: 80) }
-        }
-    }
-
-    private var background: Color {
-        switch message.role {
-        case .user:
-            return Theme.overlay(0.18)
-        case .assistant, .thought:
-            return Theme.overlay(0.10)
-        case .toolCall:
-            return Theme.overlay(0.12)
-        case .system:
-            return Color(red: 1.0, green: 0.45, blue: 0.45).opacity(0.14)
-        }
+// MARK: - Helper Preferences
+private struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }

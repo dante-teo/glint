@@ -73,6 +73,16 @@ enum AgentPresence {
     }
 
     static func commandExists(_ name: String) -> Bool {
+        executableURL(name) != nil
+    }
+
+    /// Resolve a named executable from common GUI-safe install locations
+    /// plus `$PATH`. A GUI app launched from Finder doesn't inherit the
+    /// login shell's `PATH`, so `PATH` alone misses most installs — shared
+    /// by every caller that needs to spawn a CLI agent binary (ACPClient,
+    /// PermissionReviewer, `commandExists` above) so the search list can't
+    /// drift between copies.
+    static func executableURL(_ name: String) -> URL? {
         let fm = FileManager.default
         let home = fm.homeDirectoryForCurrentUser.path
         var dirs = [
@@ -84,10 +94,13 @@ enum AgentPresence {
         if let path = ProcessInfo.processInfo.environment["PATH"] {
             dirs.append(contentsOf: path.split(separator: ":").map(String.init))
         }
-        for dir in dirs where fm.isExecutableFile(atPath: "\(dir)/\(name)") {
-            return true
+        for dir in dirs {
+            let path = "\(dir)/\(name)"
+            if fm.isExecutableFile(atPath: path) {
+                return URL(fileURLWithPath: path)
+            }
         }
-        return false
+        return nil
     }
 }
 

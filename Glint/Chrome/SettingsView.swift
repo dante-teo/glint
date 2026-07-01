@@ -1308,6 +1308,16 @@ private struct AgentsPane: View {
                     DevinIconStyleSwatch(style: .pixelMonster)
                 }
             }
+            SettingsDivider()
+            SettingsRow("Permission mode",
+                        subtitle: "Automate approvals using AI review or escalate risky actions to you.") {
+                Picker("", selection: $store.permissionReviewMode) {
+                    Text("Manual").tag(PermissionReviewMode.manual)
+                    Text("AI Auto-Review").tag(PermissionReviewMode.autoReview)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 200)
+            }
         }
 
         SettingsCard("Notifications",

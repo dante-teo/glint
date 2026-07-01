@@ -810,6 +810,12 @@ struct RequestPermissionRequest: Codable, Equatable, Sendable {
     var title: String?
     var kind: ToolKind?
     var rawInput: ACPJSONValue?
+    /// Glint-local enrichment set when `PermissionReviewer` escalates a
+    /// request to the user. Never part of the ACP wire format (not decoded
+    /// from or encoded back to `devin acp`) — keeps the original `rawInput`
+    /// intact so the permission card can show both the reviewer's reasoning
+    /// and the actual tool arguments.
+    var reviewReason: String?
 
     private enum CodingKeys: String, CodingKey {
         case sessionId, toolCallId, title, kind, rawInput
@@ -819,12 +825,14 @@ struct RequestPermissionRequest: Codable, Equatable, Sendable {
          toolCallId: String? = nil,
          title: String? = nil,
          kind: ToolKind? = nil,
-         rawInput: ACPJSONValue? = nil) {
+         rawInput: ACPJSONValue? = nil,
+         reviewReason: String? = nil) {
         self.sessionId = sessionId
         self.toolCallId = toolCallId
         self.title = title
         self.kind = kind
         self.rawInput = rawInput
+        self.reviewReason = reviewReason
     }
 
     init(from decoder: Decoder) throws {
@@ -834,6 +842,7 @@ struct RequestPermissionRequest: Codable, Equatable, Sendable {
         title = try container.decodeIfPresent(String.self, forKey: .title)
         kind = try container.decodeIfPresent(ToolKind.self, forKey: .kind)
         rawInput = try container.decodeIfPresent(ACPJSONValue.self, forKey: .rawInput)
+        reviewReason = nil
     }
 
     func encode(to encoder: Encoder) throws {

@@ -206,30 +206,38 @@ User clicks "Devin Agent" in popover
   - [x] Send disabled until message and valid project folder are present
   - [x] Inline project-folder errors for missing/deleted folders
   - [x] Stop button calls `manager.stop()`
-- [ ] Expand `Glint/Pane/AgentPaneView.swift`
-  - [ ] Header bar: model dropdown + mode pill + status dot
-  - [ ] Message list: ScrollViewReader
-  - [ ] Smart auto-scroll: only scroll to bottom if user was already near bottom
-  - [ ] Permission overlay: blur backdrop + card + Approve/Deny buttons
-  - [ ] Elicitation overlay: form + submit
-  - [ ] Error banner: red bar + message + "Restart Session" button
-  - [ ] Auth needed state: instruction card
-  - [ ] Not installed state: install instructions card
-  - [ ] Loading state: centered ProgressView
-  - [ ] Split `AgentComposer` and `AgentMessageView` into dedicated files if the pane grows
+- [x] Expand `Glint/Pane/AgentPaneView.swift`
+  - [x] Header bar: model dropdown + mode pill + status dot
+  - [x] Message list: ScrollViewReader
+  - [x] Smart auto-scroll: only scroll to bottom if user was already near bottom
+  - [x] Permission overlay: blur backdrop + card + Approve/Deny buttons
+  - [x] Elicitation overlay: form + submit
+  - [x] Error banner: red bar + message + "Restart Session" button
+  - [x] Auth needed state: instruction card (heuristic keyword match on the failure message; full ACP auth-method surfacing remains Phase 5)
+  - [x] Not installed state: install instructions card
+  - [x] Loading state: centered ProgressView
+  - [x] Split `AgentComposer` and `AgentMessageView` into dedicated files
 - [x] Implement first-send composer behavior
-  - [ ] Send: Cmd+Return or button. Disabled when thinking/permission/empty
+  - [x] Send: Cmd+Return or button. Disabled when thinking/permission/empty
   - [x] On first send: validate project -> set project path -> `commitAgentWorkspace()` -> `sendFirstPrompt`
   - [x] Stop button: visible when thinking/starting, calls `manager.stop()`
-- [ ] Expand composer behavior
-  - [ ] Mode toggle: pill dropdown for mode switching
-  - [ ] Auto-grow height up to ~120pt
-- [ ] Expand message rendering
-  - [ ] User message: right-aligned bubble, accent tint background
-  - [ ] Assistant message: left-aligned, Devin icon gutter, `AttributedString(markdown:)`, blinking cursor while streaming
-  - [ ] Thought block: collapsible, dimmed, italic, preview when collapsed
-  - [ ] Tool call: compact row with kind icon + title + status badge (Capsule). Expandable detail.
-  - [ ] System message: centered, dimmed, small font
+- [x] Expand composer behavior
+  - [x] Mode toggle: pill dropdown for mode switching (read-only display in v1 — no ACP mode-switch method exists yet)
+  - [x] Auto-grow height up to ~120pt
+- [x] Expand message rendering
+  - [x] User message: right-aligned bubble, accent tint background
+  - [x] Assistant message: left-aligned, Devin icon gutter, `AttributedString(markdown:)`, blinking cursor while streaming
+  - [x] Thought block: collapsible, dimmed, italic, preview when collapsed
+  - [x] Tool call: compact row with kind icon + title + status badge (Capsule). Expandable detail.
+  - [x] System message: centered, dimmed, small font
+- [x] Permission auto-review (added beyond original scope)
+  - [x] `Glint/Agent/PermissionReviewer.swift`: rule-based `PermissionPolicy` per `ToolKind` + LLM review via `devin -p` with a prefix-constrained JSON prompt
+  - [x] Robust response parsing with markdown-fence stripping and regex fallback; escalates to manual UI on any parse/timeout/process failure
+  - [x] `permissionReviewMode` (`.manual` / `.autoReview`) on `WorkspaceStore`, exposed in Settings → Agents → Devin
+  - [x] `DevinSessionManager.handlePermissionRequest` checks policy/reviewer before falling back to the manual overlay; auto-approve/deny decisions are logged as system messages, escalations carry the reviewer's reasoning via `RequestPermissionRequest.reviewReason` — a Glint-local field kept separate from `rawInput` so the permission card shows both the analysis and the real tool arguments
+  - [x] `AgentPresence.executableURL(_:)` is the single shared CLI-binary resolver; `ACPClient` and `PermissionReviewer` both delegate to it instead of each re-implementing the PATH search
+  - [x] `GlintTests/PermissionPolicyTests.swift` (unannotated): policy defaults per `ToolKind`
+  - [x] `GlintTests/PermissionReviewerTests.swift` (`@MainActor`): clean/fenced/noisy JSON parsing, escalate-on-failure fallback
 - [x] Modify `Glint/Pane/PaneView.swift`
   - [x] Check `workspace.kind` to route `.terminal` -> GhosttyKit, `.agent` -> AgentPaneView
   - [x] Agent panes use `Theme.bgPane` as backing
@@ -353,19 +361,24 @@ not-implemented errors because Glint advertises `terminal = false`.
 - `Glint/Agent/ACP/ACPClient.swift`
 - `Glint/Agent/ACP/ACPTypes.swift`
 - `Glint/Agent/DevinSessionManager.swift`
+- `Glint/Agent/PermissionReviewer.swift`
 - `Glint/Pane/AgentPaneView.swift`
+- `Glint/Pane/AgentComposer.swift`
+- `Glint/Pane/AgentMessageView.swift`
 - `GlintTests/WorkspaceKindTests.swift`
 - `GlintTests/ACPTypesTests.swift`
 - `GlintTests/DevinSessionManagerTests.swift`
-
-**Still planned as the pane/protocol grows:**
-- `Glint/Pane/AgentComposer.swift`
-- `Glint/Pane/AgentMessageView.swift`
+- `GlintTests/PermissionPolicyTests.swift`
+- `GlintTests/PermissionReviewerTests.swift`
 
 **Modified:**
 - `Glint/Workspace/WorkspaceStore.swift`
 - `Glint/Chrome/SidebarView.swift`
 - `Glint/Chrome/ContentView.swift`
 - `Glint/Chrome/CommandPalette.swift`
+- `Glint/Chrome/SettingsView.swift`
 - `Glint/App/GlintApp.swift`
 - `Glint/Pane/PaneView.swift`
+- `Glint/Agent/ACP/ACPTypes.swift` (added `RequestPermissionRequest.reviewReason`)
+- `Glint/Agent/ACP/ACPClient.swift` (delegates binary resolution to `AgentPresence.executableURL(_:)`)
+- `Glint/Agent/AgentHookInstaller.swift` (added the shared `AgentPresence.executableURL(_:)` resolver)

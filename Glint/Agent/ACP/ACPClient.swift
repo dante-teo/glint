@@ -388,24 +388,7 @@ final class ACPClient: @unchecked Sendable {
     }
 
     private static func devinExecutableURL() -> URL? {
-        let fm = FileManager.default
-        let home = fm.homeDirectoryForCurrentUser.path
-        var dirs = [
-            "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin",
-            "\(home)/.local/bin", "\(home)/bin",
-            "\(home)/.bun/bin", "\(home)/.deno/bin",
-            "\(home)/.npm-global/bin",
-        ]
-        if let path = ProcessInfo.processInfo.environment["PATH"] {
-            dirs.append(contentsOf: path.split(separator: ":").map(String.init))
-        }
-        for dir in dirs {
-            let path = "\(dir)/devin"
-            if fm.isExecutableFile(atPath: path) {
-                return URL(fileURLWithPath: path)
-            }
-        }
-        return nil
+        AgentPresence.executableURL("devin")
     }
 
     #if DEBUG
