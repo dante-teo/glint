@@ -8,12 +8,12 @@ Transform Glint from a terminal-only app into an agent orchestration control cen
 2. **Inline project selection:** Picking "Devin Agent" creates a draft agent pane immediately. The project is chosen from a Codex-style dropdown under the message box; its "Choose Folder..." item is the only path that opens NSOpenPanel.
 3. **Sidebar visibility gating:** Agent workspaces are invisible in the sidebar until the user sends their first message (`committed` flag). Prevents empty/abandoned sessions from cluttering the sidebar.
 4. **Uncommitted auto-cleanup:** If the user switches away before sending a first message, the uncommitted agent workspace is silently deleted.
-5. **Archive vs Delete:** Agent sessions support "Archive" (preserves conversation history in `~/.glint/sessions/`) and "Delete" (destroys everything). Terminals just close.
+5. **Archive vs Delete:** Agent sessions support "Archive" (preserves conversation history in `~/.glint/sessions/`) and "Delete" (destroys everything). Terminals just close. Phase 3 provides the persistence/delete helper APIs; full archive/delete UI semantics remain Phase 5 work.
 
 ## Reference Material
 
-- **Synara** (https://github.com/Emanuele-web04/synara): Multi-provider agent orchestration web app. Its `packages/effect-acp` implements ACP v0.11.3 in TypeScript/Effect. Use as the definitive reference for ACP wire format and session lifecycle.
-- **ACP spec:** https://agentclientprotocol.com/protocol/schema
+- **Synara** (https://github.com/Emanuele-web04/synara): Multi-provider agent orchestration web app. Its `packages/effect-acp` is useful prior art for ACP clients and session lifecycle, but Glint now treats ACP v1 as the source of truth.
+- **ACP v1 spec:** https://agentclientprotocol.com/protocol/v1/schema
 - **Devin CLI `acp` subcommand:** `devin acp` runs as an ACP server over stdio (JSON-RPC, newline-delimited). Meant for editor/IDE integration. Reads credentials from `devin auth login` or `WINDSURF_API_KEY`.
 
 ## Architecture
@@ -42,7 +42,8 @@ User clicks "Devin Agent" in popover
    - DevinSessionManager.sendFirstPrompt(text:projectPath:)
      - spawns `devin acp` subprocess
      - ACPClient: initialize -> session/new(cwd:) -> session/prompt
-   - minimal v1: user/system messages and status updates render in-pane
+   - v1-compatible ACP requests, tolerant Devin decoding, streamed messages,
+     tool updates, permission/elicitation state, and persistence render in-pane
 ```
 
 ```
@@ -54,7 +55,7 @@ User clicks "Devin Agent" in popover
                      |  +---------------------+  |
                      |  | ScrollView          |  |
                      |  |  AgentMessageRow x N  |
-                     |  |  (user/system v1)   |  |
+                     |  |  user/assistant/thought/tool/system |
                      |  +---------------------+  |
                      |  | Composer + controls |  |
                      |  | [input] [project] [send/stop] |
@@ -130,57 +131,68 @@ User clicks "Devin Agent" in popover
 
 ### Phase 3: ACP Client (Devin Integration Layer)
 
-- [x] Create `Glint/Agent/ACP/ACPClient.swift` minimal first-send client
+- [x] Create `Glint/Agent/ACP/ACPClient.swift` ACP client
   - [x] Resolve `devin` binary from common GUI-safe paths and PATH
   - [x] Spawn `devin acp` with stdin/stdout/stderr pipes
-  - [x] Request helper writes newline-delimited JSON-RPC and reads matching response lines
-  - [x] Minimal methods: `initialize`, `session/new(cwd:)`, `session/prompt`
+  - [x] Request helper writes newline-delimited JSON-RPC
+  - [x] Background stdout reader routes responses, notifications, and server requests
+  - [x] Methods: `initialize`, `session/new(cwd:)`, `session/load`, `session/prompt`, `session/close`, `session/cancel`
+  - [x] Request timeout and cancellation cleanup
   - [x] Capture stderr for diagnostics
   - [x] Fail when `session/new` does not return a non-empty session id
   - [x] Close/terminate process on stop/teardown
-- [x] Create `Glint/Agent/DevinSessionManager.swift` minimal first-send manager
-  - [x] Published: `messages`, `status`, `sessionID`
-  - [x] Message model: `.user`, `.assistant`, `.system` (assistant reserved for streaming later)
+- [x] Create `Glint/Agent/DevinSessionManager.swift` session manager
+  - [x] Published: `messages`, `status`, `sessionID`, pending permission/elicitation, title, usage, modes/models
+  - [x] Message model: `.user`, `.assistant`, `.thought`, `.toolCall`, `.system`
   - [x] First-send lifecycle: start process -> initialize -> new session -> prompt
+  - [x] Subsequent prompts reuse the current ACP session
   - [x] Stop/cancel uses a run-id fence so stale process failures do not overwrite stopped state
   - [x] PaneAgentState bridge: map session status -> sidebar/tab Devin status
 - [x] Create `GlintTests/ACPTypesTests.swift`
   - [x] Empty result response decoding
   - [x] New session response decoding (`sessionId` and `sessionID`)
   - [x] Error response decoding
-- [ ] Expand ACP type coverage in `Glint/Agent/ACP/ACPTypes.swift`
-  - [ ] JSON-RPC envelope: `ACPRequest`, `ACPResponse`, `ACPNotification`, `ACPError`
-  - [ ] `InitializeRequest/Response`
-  - [ ] `NewSessionRequest` (cwd, mcpServers) / `NewSessionResponse` (sessionId, models, modes, configOptions)
-  - [ ] `PromptRequest/Response`
-  - [ ] `LoadSessionRequest/Response`, `CloseSessionRequest/Response`
-  - [ ] `SessionNotification` (sessionId, update: `SessionUpdate`)
-  - [ ] `SessionUpdate` discriminated union (11 variants): `userMessageChunk`, `agentMessageChunk`, `agentThoughtChunk`, `toolCall`, `toolCallUpdate`, `plan`, `usageUpdate`, `sessionInfoUpdate`, `currentModeUpdate`, `availableCommandsUpdate`, `configOptionUpdate`
-  - [ ] Content types: `TextContent`, `ImageContent`, `ResourceLinkContent`
-  - [ ] `ToolKind`, `ToolCallStatus`
-  - [ ] `RequestPermissionRequest/Response`, `ElicitationRequest/Response`
-  - [ ] `ReadTextFileRequest/Response`, `WriteTextFileRequest/Response`
-  - [ ] `CreateTerminalRequest/Response`, `TerminalOutputRequest/Response`, `KillTerminalRequest/Response`
-  - [ ] `AuthenticateRequest/Response`
-  - [ ] Tolerant decoding: unknown keys ignored, missing optionals defaulted
-- [ ] Expand `Glint/Agent/ACP/ACPClient.swift`
-  - [ ] Background reader on stdout: line-split, JSON decode, route messages
-  - [ ] Routing: response (has id) -> pending CheckedContinuation; notification (no id) -> PassthroughSubject; server request (method + id) -> handler closures
-  - [ ] `func notify(method:params:) throws`
-  - [ ] Crash detection: `Process.terminationHandler` -> fail pending continuations + publish event
-- [ ] Expand `Glint/Agent/DevinSessionManager.swift`
-  - [ ] Published: `pendingPermission`, `pendingElicitation`, `sessionTitle`, `usageInfo`, `models`, `currentModel`, `modes`, `currentMode`
-  - [ ] Extend message model: `.thought`, `.toolCall`
-  - [ ] Streaming chunk assembly: buffer `agentMessageChunk` by `messageId`
-  - [ ] `toolCallUpdate`: find existing `.toolCall` by `toolCallId`, update in-place
-  - [ ] Permission handling: set `pendingPermission`, UI shows overlay, user responds
-  - [ ] Elicitation handling: same pattern
-  - [ ] Conversation persistence: serialize to `~/.glint/sessions/<workspaceID>.json`
-  - [ ] File handlers: read/write within project root only (path validation security)
-  - [ ] Terminal handlers: return "not implemented" (v1)
-- [ ] Expand `GlintTests/ACPTypesTests.swift`
-  - [ ] SessionUpdate discriminated union (each variant)
-  - [ ] Tolerant unknown-field handling
+- [x] Expand ACP type coverage in `Glint/Agent/ACP/ACPTypes.swift`
+  - [x] JSON-RPC envelope: `ACPRequest`, `ACPResponse`, `ACPNotification`, `ACPError`
+  - [x] `InitializeRequest/Response`
+  - [x] `NewSessionRequest` (cwd, mcpServers) / `NewSessionResponse` (sessionId, models, modes, configOptions)
+  - [x] `PromptRequest/Response`
+  - [x] `LoadSessionRequest/Response`, `CloseSessionRequest/Response`
+  - [x] `SessionNotification` (sessionId, update: `SessionUpdate`)
+  - [x] `SessionUpdate` discriminated union (11 variants): `userMessageChunk`, `agentMessageChunk`, `agentThoughtChunk`, `toolCall`, `toolCallUpdate`, `plan`, `usageUpdate`, `sessionInfoUpdate`, `currentModeUpdate`, `availableCommandsUpdate`, `configOptionUpdate`
+  - [x] Content types: `TextContent`, `ImageContent`, `ResourceLinkContent`
+  - [x] `ToolKind`, `ToolCallStatus`
+  - [x] `RequestPermissionRequest/Response`, `ElicitationRequest/Response`
+  - [x] `ReadTextFileRequest/Response`, `WriteTextFileRequest/Response`
+  - [x] `CreateTerminalRequest/Response`, `TerminalOutputRequest/Response`, `KillTerminalRequest/Response`
+  - [x] `AuthenticateRequest/Response`
+  - [x] Tolerant decoding: unknown keys ignored, missing optionals defaulted
+  - [x] Devin compatibility: decode `sessionID` alias for new-session responses, notifications, and inbound session-scoped server requests
+- [x] Expand `Glint/Agent/ACP/ACPClient.swift`
+  - [x] Background reader on stdout: line-split, JSON decode, route messages
+  - [x] Routing: response (has id) -> pending CheckedContinuation; notification (no id) -> PassthroughSubject; server request (method + id) -> handler closures
+  - [x] `func notify(method:params:) throws`
+  - [x] Crash detection: `Process.terminationHandler` -> fail pending continuations + publish event
+- [x] Expand `Glint/Agent/DevinSessionManager.swift`
+  - [x] Published: `pendingPermission`, `pendingElicitation`, `sessionTitle`, `usageInfo`, `models`, `currentModel`, `modes`, `currentMode`
+  - [x] Extend message model: `.thought`, `.toolCall`
+  - [x] Streaming chunk assembly: buffer `agentMessageChunk` by `messageId`
+  - [x] `toolCallUpdate`: find existing `.toolCall` by `toolCallId`, update in-place
+  - [x] Permission handling: set `pendingPermission`, UI shows overlay, user responds
+  - [x] Elicitation handling: same pattern
+  - [x] Conversation persistence: serialize to `~/.glint/sessions/<workspaceID>.json`
+  - [x] File handlers: read/write within project root only, including symlink-resolved path validation
+  - [x] Terminal handlers: return "not implemented" (v1)
+- [x] Expand `GlintTests/ACPTypesTests.swift`
+  - [x] SessionUpdate discriminated union (each variant)
+  - [x] Tolerant unknown-field handling
+  - [x] Legacy `sessionID` alias decoding for inbound session-scoped types
+- [x] Create `GlintTests/DevinSessionManagerTests.swift`
+  - [x] First send and subsequent prompt behavior
+  - [x] Chunk assembly and tool-call replacement
+  - [x] Permission response flow
+  - [x] Conversation persistence round-trip
+  - [x] Project-root file security, including symlinked write targets
 
 ### Phase 4: Agent Pane UI
 
@@ -233,6 +245,45 @@ User clicks "Devin Agent" in popover
 - [ ] `paneNeedsCloseConfirmation()`: return true for agent panes where session is `.thinking`
 - [x] Run `xcodegen generate`
 
+### Phase 3 Integration Notes
+
+Glint integrates Devin through ACP v1 over the `devin acp` stdio subprocess.
+Outbound requests use the ACP v1 shape: `protocolVersion = 1`, file read/write
+capabilities enabled, terminal capability disabled, `session/new` and
+`session/load` include `cwd` plus `mcpServers: []`, and `session/prompt.prompt`
+is an array of content blocks. If Devin rejects ACP v1 initialization, Glint
+surfaces a clear unsupported-protocol error instead of guessing an older wire
+format.
+
+The client routes newline-delimited JSON-RPC in one background stdout reader:
+responses resolve pending continuations by `id`, notifications publish through
+`notifications`, and server requests dispatch to registered async handlers that
+write JSON-RPC results or errors. Malformed JSON lines are logged and ignored.
+Process termination, EOF, timeout, or cancellation fail affected pending
+continuations.
+
+Devin compatibility is tolerant inbound decoding, not a second protocol mode.
+Glint encodes outbound `sessionId`, but accepts Devin's legacy `sessionID` alias
+for new-session responses, session notifications, permission/elicitation
+requests, file requests, and terminal requests. Unknown enum values and unknown
+`sessionUpdate` variants decode into `.unknown` cases so newer Devin messages do
+not break sessions.
+
+`DevinSessionManager` persists conversation snapshots to
+`~/.glint/sessions/<workspaceID>.json` with enough session metadata, message
+summaries, and tool summaries to render after restart. Saves are debounced while
+streaming. Assistant and thought chunks assemble by `messageId`; if the id is
+missing, chunks fall back to the latest same-role message without an id. Tool
+calls insert or replace by `toolCallId`.
+
+File handlers enforce the selected project root. Paths are standardized,
+symlinks are resolved before root checks, reads must resolve to an existing
+non-directory file under the project root, writes to existing files validate the
+full resolved target, and writes to new files validate the symlink-resolved
+parent directory. Escapes through `..`, absolute paths, symlinked directories,
+or symlinked existing write targets are rejected. Terminal server requests return
+not-implemented errors because Glint advertises `terminal = false`.
+
 ### Phase 6: Verification
 
 - [x] All existing tests pass
@@ -267,24 +318,28 @@ User clicks "Devin Agent" in popover
 | Cmd+N with sidebar collapsed | Auto-expand sidebar, then show popover |
 | `devin` binary not found (GUI PATH) | `AgentPresence.commandExists` searches common paths; show install instructions |
 | `devin acp` crashes during first send | Pane shows a system error message and failed status |
-| `devin acp` crashes mid-session | Future: `terminationHandler` -> `.error`, pending continuations failed, "Restart" button |
-| ACP needs authentication | `initialize` response -> `.needsAuth`, show "Run `devin auth login`" card |
+| `devin acp` crashes mid-session | `terminationHandler` fails pending continuations; pane moves to failed status. Rich restart UI is Phase 4/5. |
+| ACP v1 initialize rejected | Surface clear "Devin ACP rejected ACP v1 initialization" unsupported-protocol error; do not silently downgrade |
+| ACP needs authentication | Auth metadata is decoded and preserved for future UI; full auth card is Phase 4/5 |
+| Devin sends legacy `sessionID` | Decode as alias for inbound session notifications and server requests; encode outbound ACP v1 `sessionId` |
 | Multiple `agentMessageChunk` same `messageId` | Buffer + append to single `.assistant` message |
+| Missing `messageId` in stream | Fallback grouping appends to the latest same-role message without an id |
 | `toolCallUpdate` for existing tool call | Find by `toolCallId`, update in-place |
-| Unknown `sessionUpdate` variant | Ignored (tolerant decoding), logged |
-| User closes workspace while agent thinking | Confirmation dialog -> `cancel()` -> `close()` -> terminate |
+| Unknown `sessionUpdate` variant | Decode as `.unknown` and ignore in manager |
+| User closes workspace while agent thinking | Phase 3 closes the ACP session and process; close-confirmation UI remains Phase 5 |
 | Permission pending on workspace close | Send "deny" response before teardown |
 | Split pane in agent workspace | Guard -> beep, no-op |
 | New tab in agent workspace | Beep (v1) |
-| Archive agent workspace | Close session, preserve conversation JSON, drop surfaces |
-| Unarchive agent workspace | Read-only conversation + "Resume Session" button |
-| Delete agent workspace | Close session, remove conversation file |
+| Archive agent workspace | Helper exists to preserve conversation JSON; full archive semantics remain Phase 5 |
+| Unarchive agent workspace | Read-only conversation + "Resume Session" button remains Phase 5 |
+| Delete agent workspace | Helper exists to remove conversation file; full delete semantics remain Phase 5 |
 | WorkspaceSwitcherPopover | Filter out `!committed` workspaces |
 | Cmd+1-9 skip uncommitted | `activeWorkspaces` filters `committed` |
 | Agent sidebar card idle row | Project folder name, not "N tabs . M panes" |
 | Agent context menu | "Archive Session" / "Resume Session" |
 | CommandPalette new workspace | Two items: "New Terminal" + "New Devin Agent"; Devin creates a draft pane with no dialog |
 | File request outside project root | Reject with error (security) |
+| File request path escapes through symlink | Resolve symlinks before root check; write targets validate full path when the file exists |
 | Terminal request from agent | Return "not implemented" (v1) |
 | Auto-scroll while reading history | Track scroll position; only auto-scroll if near bottom |
 | Large conversation persistence | Separate file per workspace, not in `state.json` |
@@ -296,13 +351,14 @@ User clicks "Devin Agent" in popover
 - `Glint/Chrome/NewWorkspacePopover.swift`
 - `Glint/Chrome/FolderPicker.swift`
 - `Glint/Agent/ACP/ACPClient.swift`
+- `Glint/Agent/ACP/ACPTypes.swift`
 - `Glint/Agent/DevinSessionManager.swift`
 - `Glint/Pane/AgentPaneView.swift`
 - `GlintTests/WorkspaceKindTests.swift`
 - `GlintTests/ACPTypesTests.swift`
+- `GlintTests/DevinSessionManagerTests.swift`
 
 **Still planned as the pane/protocol grows:**
-- `Glint/Agent/ACP/ACPTypes.swift`
 - `Glint/Pane/AgentComposer.swift`
 - `Glint/Pane/AgentMessageView.swift`
 

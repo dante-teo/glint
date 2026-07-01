@@ -239,6 +239,12 @@ private struct AgentPaneContent: View {
             return String(localized: "Starting Devin...")
         case .thinking:
             return String(localized: "Devin is working...")
+        case .tool:
+            return String(localized: "Devin is using a tool...")
+        case .needsPermission:
+            return String(localized: "Devin needs permission")
+        case .cancelling:
+            return String(localized: "Cancelling Devin...")
         case .failed:
             return String(localized: "Session error")
         }
@@ -248,7 +254,7 @@ private struct AgentPaneContent: View {
         switch manager.status {
         case .failed:
             return Color(red: 1.0, green: 0.45, blue: 0.45)
-        case .starting, .thinking:
+        case .starting, .thinking, .tool, .needsPermission, .cancelling:
             return store.accent
         case .idle:
             return Theme.text3
@@ -312,8 +318,10 @@ private struct AgentMessageRow: View {
         switch message.role {
         case .user:
             return Theme.overlay(0.18)
-        case .assistant:
+        case .assistant, .thought:
             return Theme.overlay(0.10)
+        case .toolCall:
+            return Theme.overlay(0.12)
         case .system:
             return Color(red: 1.0, green: 0.45, blue: 0.45).opacity(0.14)
         }

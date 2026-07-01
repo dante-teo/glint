@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		03298F74C2B7C43FF6E7CE15 /* DevinSessionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9363739CF4F4BF53C1CD19BC /* DevinSessionManagerTests.swift */; };
 		03A10F3C2A6E3D55B543D7E6 /* THIRD_PARTY_FONT_LICENSES.md in Resources */ = {isa = PBXBuildFile; fileRef = D8CAD184E9D0547B876C8AFE /* THIRD_PARTY_FONT_LICENSES.md */; };
 		04E75EAD5165E8D96C1C5517 /* MascotAssetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 349714D49AE52D84995314FD /* MascotAssetTests.swift */; };
 		1115F230E14FBE3C1FC754A2 /* GhosttySurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E298AD81B1615CBBFD69F48A /* GhosttySurfaceView.swift */; };
@@ -47,6 +48,7 @@
 		C1102E6BF39B44928974869A /* FontDefaultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE559C44534F14D1C4C817A8 /* FontDefaultsTests.swift */; };
 		C48BD1224EA2C6D3C87B9120 /* AgentPaneSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 829D894CF747D6BC08667239 /* AgentPaneSummary.swift */; };
 		C54833EBB70975128F00E558 /* DevinSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0B664239014346014C8D049 /* DevinSessionManager.swift */; };
+		C7422ED14E8C4E63C6911645 /* ACPTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 994BA89D275D22B553A5ECE4 /* ACPTypes.swift */; };
 		C748DE21F23B49B2FFD73DC7 /* WorkspaceIconKindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83E4DF4C5180D50C381B4976 /* WorkspaceIconKindTests.swift */; };
 		CACBF58D56347AD978A88101 /* AgentPlaceholderPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA93584E91A4AB0574900628 /* AgentPlaceholderPaneView.swift */; };
 		CD30F5E1B78B3C46C9990FD6 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8C269A6E9AE87961C3356DC /* SidebarView.swift */; };
@@ -124,6 +126,8 @@
 		8C8B584A039DB106E33D41EF /* CwdInheritanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CwdInheritanceTests.swift; sourceTree = "<group>"; };
 		8DD4866639B7A52FBED29DB9 /* ACPTypesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ACPTypesTests.swift; sourceTree = "<group>"; };
 		8EDE0D7C434B8E9C76C4A297 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
+		9363739CF4F4BF53C1CD19BC /* DevinSessionManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevinSessionManagerTests.swift; sourceTree = "<group>"; };
+		994BA89D275D22B553A5ECE4 /* ACPTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ACPTypes.swift; sourceTree = "<group>"; };
 		9E67CF5D8552AE1F51386161 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A04F39D8F313EF380039FB6F /* AppIconPresetGroupingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconPresetGroupingTests.swift; sourceTree = "<group>"; };
 		A8C269A6E9AE87961C3356DC /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
@@ -199,6 +203,7 @@
 				A04F39D8F313EF380039FB6F /* AppIconPresetGroupingTests.swift */,
 				8C8B584A039DB106E33D41EF /* CwdInheritanceTests.swift */,
 				0F58E2127BAE2C9F5155CF07 /* DevinHookInstallerTests.swift */,
+				9363739CF4F4BF53C1CD19BC /* DevinSessionManagerTests.swift */,
 				DE559C44534F14D1C4C817A8 /* FontDefaultsTests.swift */,
 				2C3EBDD619911358E7495969 /* LiquidGlassSplitWindowTests.swift */,
 				349714D49AE52D84995314FD /* MascotAssetTests.swift */,
@@ -233,6 +238,7 @@
 			isa = PBXGroup;
 			children = (
 				F01831399AB1737ECE0B13E8 /* ACPClient.swift */,
+				994BA89D275D22B553A5ECE4 /* ACPTypes.swift */,
 			);
 			path = ACP;
 			sourceTree = "<group>";
@@ -448,6 +454,7 @@
 				F0C9D4521F90D3DE4F02E29A /* AppearanceThemeTests.swift in Sources */,
 				3A7EFF6FAB2F2AF7006A6B49 /* CwdInheritanceTests.swift in Sources */,
 				34997DD4A4F9B64A754FE77F /* DevinHookInstallerTests.swift in Sources */,
+				03298F74C2B7C43FF6E7CE15 /* DevinSessionManagerTests.swift in Sources */,
 				C1102E6BF39B44928974869A /* FontDefaultsTests.swift in Sources */,
 				D12A23FB9E6AB95C264AA888 /* LiquidGlassSplitWindowTests.swift in Sources */,
 				04E75EAD5165E8D96C1C5517 /* MascotAssetTests.swift in Sources */,
@@ -466,6 +473,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				DEEF28E69E16438246624BFB /* ACPClient.swift in Sources */,
+				C7422ED14E8C4E63C6911645 /* ACPTypes.swift in Sources */,
 				E464D0233508CD31C1235054 /* AgentBridge.swift in Sources */,
 				3932A4CFEFF6FB81AE283645 /* AgentHookInstaller.swift in Sources */,
 				C48BD1224EA2C6D3C87B9120 /* AgentPaneSummary.swift in Sources */,

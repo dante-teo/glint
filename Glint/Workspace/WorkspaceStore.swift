@@ -1932,7 +1932,7 @@ final class WorkspaceStore: ObservableObject {
         // Clean up the TTY lookup file before dropping the view reference.
         surfaceViews[key]?.removeTTYLookupFile()
         surfaceViews.removeValue(forKey: key)
-        agentSessions[key]?.stop()
+        agentSessions[key]?.closeSession()
         agentSessions.removeValue(forKey: key)
         // The pane is gone for good — drop its scrollback snapshot too.
         ScrollbackArchive.delete(
@@ -2135,7 +2135,7 @@ final class WorkspaceStore: ObservableObject {
             workspaces[i].panes.removeValue(forKey: pane)
             surfaceViews[key]?.removeTTYLookupFile()
             surfaceViews.removeValue(forKey: key)
-            agentSessions[key]?.stop()
+            agentSessions[key]?.closeSession()
             agentSessions.removeValue(forKey: key)
             ScrollbackArchive.delete(
                 id: ScrollbackArchive.fileID(forPaneKey: "\(wsID.uuidString):\(pane.value)"))
@@ -2244,7 +2244,7 @@ final class WorkspaceStore: ObservableObject {
         }
         surfaceViews = surfaceViews.filter { $0.key.workspace != id }
         for (key, session) in agentSessions where key.workspace == id {
-            session.stop()
+            session.closeSession()
         }
         agentSessions = agentSessions.filter { $0.key.workspace != id }
         clearDockBadges(for: workspaces[idx].panes.keys.map { WorkspacePaneKey(workspace: id, pane: $0) })
@@ -2300,7 +2300,7 @@ final class WorkspaceStore: ObservableObject {
         }
         surfaceViews = surfaceViews.filter { $0.key.workspace != id }
         for (key, session) in agentSessions where key.workspace == id {
-            session.stop()
+            session.closeSession()
         }
         agentSessions = agentSessions.filter { $0.key.workspace != id }
         clearDockBadges(for: workspaces[idx].panes.keys.map { WorkspacePaneKey(workspace: id, pane: $0) })
@@ -2490,6 +2490,25 @@ final class WorkspaceStore: ObservableObject {
                     self.paneAgentState[key] = PaneAgentState(
                         kind: .devin,
                         status: .thinking,
+                        updatedAt: Date()
+                    )
+                case .tool:
+                    self.paneAgentState[key] = PaneAgentState(
+                        kind: .devin,
+                        status: .tool,
+                        updatedAt: Date()
+                    )
+                case .needsPermission:
+                    self.paneAgentState[key] = PaneAgentState(
+                        kind: .devin,
+                        status: .needsPermission,
+                        updatedAt: Date()
+                    )
+                case .cancelling:
+                    self.paneAgentState[key] = PaneAgentState(
+                        kind: .devin,
+                        status: .thinking,
+                        detail: String(localized: "Cancelling"),
                         updatedAt: Date()
                     )
                 case .failed(let message):
