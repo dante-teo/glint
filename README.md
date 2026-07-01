@@ -41,6 +41,8 @@ The app bundle icon is a conventional macOS `AppIcon.appiconset` under `Glint/Re
 
 Agent status icons are bundled in `Glint/Resources/Assets.xcassets`. Animated status assets are 128x128 transparent APNGs stored as `.png` files inside `.dataset` folders; compact marks are 24x24 and 48x48 rasters inside `.imageset` folders.
 
+Managed ACP agent architecture notes live in [docs/agent-architecture.md](docs/agent-architecture.md). Read that before changing provider adapters, session state projection, permission handling, project file access, or conversation persistence.
+
 Devin has two selectable icon families:
 
 - `Devin*` / `DevinMark`: the default portrait family.

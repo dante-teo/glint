@@ -1,7 +1,7 @@
 import Combine
 import Foundation
 
-protocol DevinACPClient: AnyObject {
+protocol AgentRuntimeAdapter: AnyObject {
     var notifications: AnyPublisher<ACPNotification, Never> { get }
     var diagnostics: AnyPublisher<ACPDiagnosticEvent, Never> { get }
     func start() throws
@@ -16,35 +16,20 @@ protocol DevinACPClient: AnyObject {
     func close()
 }
 
-extension DevinACPClient {
+typealias DevinACPClient = AgentRuntimeAdapter
+
+extension AgentRuntimeAdapter {
     @discardableResult
     func prompt(sessionID: String, text: String) async throws -> PromptResponse {
         try await prompt(sessionID: sessionID, content: [.text(text)])
     }
 }
 
-extension ACPClient: DevinACPClient {}
+extension ACPClient: AgentRuntimeAdapter {}
 
 @MainActor
-final class DevinSessionManager: ObservableObject {
-    enum Status: Equatable, Codable {
-        case idle
-        case starting
-        case thinking
-        case tool
-        case needsPermission
-        case cancelling
-        case failed(String)
-
-        var isBusy: Bool {
-            switch self {
-            case .starting, .thinking, .tool, .needsPermission, .cancelling:
-                return true
-            case .idle, .failed:
-                return false
-            }
-        }
-    }
+final class AgentSessionController: ObservableObject {
+    typealias Status = AgentSessionStatus
 
     struct Message: Identifiable, Equatable, Codable {
         enum Role: String, Codable {
@@ -78,22 +63,10 @@ final class DevinSessionManager: ObservableObject {
         }
     }
 
-    struct PendingPermission: Identifiable, Equatable {
-        var id = UUID()
-        var request: RequestPermissionRequest
-    }
+    typealias PendingPermission = AgentPendingPermission
+    typealias PendingElicitation = AgentPendingElicitation
 
-    struct PendingElicitation: Identifiable, Equatable {
-        var id = UUID()
-        var request: ElicitationRequest
-    }
-
-    struct UsageInfo: Equatable, Codable {
-        var used: UInt64
-        var size: UInt64
-        var costAmount: Double?
-        var costCurrency: String?
-    }
+    typealias UsageInfo = AgentUsage
 
     /// A single image attached to an outgoing prompt (composer attachments).
     struct ImageAttachment: Equatable {
@@ -136,9 +109,10 @@ final class DevinSessionManager: ObservableObject {
     private let paneID: PaneID
     private let onStatusChange: (Status) -> Void
     private let onSessionID: (String?) -> Void
-    private let clientFactory: () -> DevinACPClient
+    private let clientFactory: () -> AgentRuntimeAdapter
     private let sessionsDirectory: URL
-    private var client: DevinACPClient?
+    private var client: AgentRuntimeAdapter?
+    private let projectFileService = AgentProjectFileService()
     private var notificationCancellable: AnyCancellable?
     private var diagnosticCancellable: AnyCancellable?
     private var runID = UUID()
@@ -159,7 +133,7 @@ final class DevinSessionManager: ObservableObject {
          paneID: PaneID,
          onStatusChange: @escaping (Status) -> Void,
          onSessionID: @escaping (String?) -> Void,
-         clientFactory: @escaping () -> DevinACPClient = { ACPClient() },
+         clientFactory: @escaping () -> AgentRuntimeAdapter = { DevinACPAdapter() },
          sessionsDirectory: URL? = nil) {
         self.workspaceID = workspaceID
         self.paneID = paneID
@@ -226,7 +200,7 @@ final class DevinSessionManager: ObservableObject {
     /// deny any pending permission/elicitation, fence off the current run,
     /// and detach the client so nothing else can use it. Returns the client
     /// and session id the caller needs to actually close the ACP session.
-    private func prepareForClose() -> (client: DevinACPClient?, sessionID: String?) {
+    private func prepareForClose() -> (client: AgentRuntimeAdapter?, sessionID: String?) {
         let currentSessionID = sessionID
         denyPendingInteractions()
         runID = UUID()
@@ -317,24 +291,11 @@ final class DevinSessionManager: ObservableObject {
     /// direction, since that would silently turn a user's Deny into an
     /// Allow (or vice versa).
     nonisolated private static func selectOption(from options: [PermissionOption], approved: Bool) -> PermissionOption? {
-        let preferredKinds: [PermissionOptionKind] = approved
-            ? [.allowOnce, .allowAlways]
-            : [.rejectOnce, .rejectAlways]
-        for kind in preferredKinds {
-            if let match = options.first(where: { $0.kind == kind }) {
-                return match
-            }
-        }
-        return nil
+        AgentPermissionDecider.selectOption(from: options, approved: approved)
     }
 
     nonisolated private static func outcomeJSON(for option: PermissionOption?) -> ACPJSONValue {
-        guard let option else {
-            return (try? RequestPermissionResponse(outcome: .cancelled).jsonValue())
-                ?? .object(["outcome": .object(["outcome": .string("cancelled")])])
-        }
-        return (try? RequestPermissionResponse(outcome: .selected(optionId: option.optionId)).jsonValue())
-            ?? .object(["outcome": .object(["outcome": .string("selected"), "optionId": .string(option.optionId)])])
+        AgentPermissionDecider.outcomeJSON(for: option)
     }
 
     func submitElicitation(values: ACPJSONValue?) {
@@ -426,7 +387,7 @@ final class DevinSessionManager: ObservableObject {
         scheduleSave()
     }
 
-    private func installHandlers(on client: DevinACPClient, projectRoot: String) {
+    private func installHandlers(on client: AgentRuntimeAdapter, projectRoot: String) {
         client.setRequestHandler(method: "fs/read_text_file") { [weak self] request in
             await self?.handleReadTextFile(request, projectRoot: projectRoot)
                 ?? .failure(ACPErrorPayload(message: "Session is no longer available."))
@@ -464,7 +425,7 @@ final class DevinSessionManager: ObservableObject {
     /// preserve relative ordering against it. Losing that race lets a late
     /// `toolCallUpdate`/thinking notification apply *after* `markIdle()`,
     /// leaving `status` stuck busy forever (composer permanently disabled).
-    private func observeNotifications(from client: DevinACPClient) {
+    private func observeNotifications(from client: AgentRuntimeAdapter) {
         notificationCancellable = client.notifications
             .receive(on: DispatchQueue.main)
             .sink { [weak self] notification in
@@ -474,7 +435,7 @@ final class DevinSessionManager: ObservableObject {
             }
     }
 
-    private func observeDiagnostics(from client: DevinACPClient) {
+    private func observeDiagnostics(from client: AgentRuntimeAdapter) {
         diagnosticCancellable = client.diagnostics
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
@@ -619,10 +580,7 @@ final class DevinSessionManager: ObservableObject {
     private func handleReadTextFile(_ request: ACPServerRequest, projectRoot: String) async -> Result<ACPJSONValue, ACPErrorPayload> {
         do {
             let params = try request.decodeParams(ReadTextFileRequest.self)
-            let url = try validatedProjectFileURL(path: params.path, projectRoot: projectRoot)
-            let content = try String(contentsOf: url, encoding: .utf8)
-            let sliced = slice(content: content, line: params.line, limit: params.limit)
-            return .success(try ReadTextFileResponse(content: sliced).jsonValue())
+            return .success(try projectFileService.readTextFile(params, projectRoot: projectRoot).jsonValue())
         } catch {
             return .failure(ACPErrorPayload(message: error.localizedDescription))
         }
@@ -631,9 +589,7 @@ final class DevinSessionManager: ObservableObject {
     private func handleWriteTextFile(_ request: ACPServerRequest, projectRoot: String) async -> Result<ACPJSONValue, ACPErrorPayload> {
         do {
             let params = try request.decodeParams(WriteTextFileRequest.self)
-            let url = try validatedProjectFileURL(path: params.path, projectRoot: projectRoot, allowMissingLeaf: true)
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try params.content.write(to: url, atomically: true, encoding: .utf8)
+            try projectFileService.writeTextFile(params, projectRoot: projectRoot)
             return .success(.null)
         } catch {
             return .failure(ACPErrorPayload(message: error.localizedDescription))
@@ -784,32 +740,6 @@ final class DevinSessionManager: ObservableObject {
             rawOutput: nil
         )
         scheduleSave()
-    }
-
-    private func validatedProjectFileURL(path: String, projectRoot: String, allowMissingLeaf: Bool = false) throws -> URL {
-        let fm = FileManager.default
-        let root = URL(fileURLWithPath: projectRoot).standardizedFileURL.resolvingSymlinksInPath()
-        let candidate = URL(fileURLWithPath: path).standardizedFileURL
-        var isDirectory: ObjCBool = false
-        let candidateExists = fm.fileExists(atPath: candidate.path, isDirectory: &isDirectory)
-        let resolved = (allowMissingLeaf && !candidateExists ? candidate.deletingLastPathComponent() : candidate).resolvingSymlinksInPath()
-        let resolvedPath = resolved.path
-        guard resolvedPath == root.path || resolvedPath.hasPrefix(root.path + "/") else {
-            throw ACPClientError.invalidResponse(String(localized: "File access outside the project folder is not allowed."))
-        }
-        guard allowMissingLeaf || (candidateExists && !isDirectory.boolValue) else {
-            throw ACPClientError.invalidResponse(String(localized: "Requested file does not exist or is not a text file."))
-        }
-        return candidate
-    }
-
-    private func slice(content: String, line: Int?, limit: Int?) -> String {
-        guard line != nil || limit != nil else { return content }
-        let lines = content.components(separatedBy: .newlines)
-        let start = max((line ?? 1) - 1, 0)
-        guard start < lines.count else { return "" }
-        let end = min(start + (limit ?? (lines.count - start)), lines.count)
-        return lines[start..<end].joined(separator: "\n")
     }
 
     private func isCurrentRun(_ id: UUID) -> Bool {
@@ -981,3 +911,5 @@ private extension Encodable {
         try JSONDecoder.acp.decode(ACPJSONValue.self, from: JSONEncoder.acp.encode(self))
     }
 }
+
+typealias DevinSessionManager = AgentSessionController
