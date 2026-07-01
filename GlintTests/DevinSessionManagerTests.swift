@@ -433,6 +433,23 @@ final class DevinSessionManagerTests: XCTestCase {
         XCTAssertTrue(manager.messages.contains { $0.role == .system && $0.text.contains("Couldn't switch mode") })
     }
 
+    func testConfigOptionUpdateStoresOptions() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.promptCalls.count == 1 }
+
+        client.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
+            sessionId: "session-123",
+            update: .configOptionUpdate(ConfigOptionUpdate(configOptions: [
+                SessionConfigOption(id: "reasoning_effort", name: "Reasoning", type: "enum", value: .string("high"))
+            ]))
+        ))))
+
+        await waitUntil { manager.configOptions.contains { $0.id == "reasoning_effort" } }
+        XCTAssertEqual(manager.configOptions.first?.value, .string("high"))
+    }
+
     func testPermissionRequestPublishesAndResolves() async throws {
         let client = FakeClient()
         let manager = makeManager(client: client)
@@ -460,6 +477,83 @@ final class DevinSessionManagerTests: XCTestCase {
 
         if case .success(let value) = result {
             XCTAssertEqual(value, .object(["outcome": .object(["outcome": .string("selected"), "optionId": .string("allow-once")])]))
+        } else {
+            XCTFail("Expected permission success")
+        }
+    }
+
+    func testAlwaysAllowPermissionModeApprovesAllowOptionWithoutPublishingCard() async throws {
+        let previous = UserDefaults.standard.string(forKey: "glint.permissionReviewMode")
+        let store = WorkspaceStore()
+        store.permissionReviewMode = .alwaysAllow
+        addTeardownBlock {
+            if let previous {
+                UserDefaults.standard.set(previous, forKey: "glint.permissionReviewMode")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "glint.permissionReviewMode")
+            }
+            _ = store
+        }
+
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.handlers["session/request_permission"] != nil }
+        let handler = try XCTUnwrap(client.handlers["session/request_permission"])
+
+        let result = await handler(ACPServerRequest(
+            id: 13,
+            method: "session/request_permission",
+            params: try jsonValue(RequestPermissionRequest(
+                sessionId: "session-123",
+                toolCall: PermissionToolCallInfo(toolCallId: "tool-1", title: "Run", kind: .execute),
+                options: [
+                    PermissionOption(optionId: "allow-once", name: "Allow once", kind: .allowOnce),
+                    PermissionOption(optionId: "reject-once", name: "Reject", kind: .rejectOnce)
+                ]
+            ))
+        ))
+
+        XCTAssertNil(manager.pendingPermission)
+        if case .success(let value) = result {
+            XCTAssertEqual(value, .object(["outcome": .object(["outcome": .string("selected"), "optionId": .string("allow-once")])]))
+        } else {
+            XCTFail("Expected permission success")
+        }
+    }
+
+    func testAlwaysAllowPermissionModeCancelsWhenNoAllowOptionExists() async throws {
+        let previous = UserDefaults.standard.string(forKey: "glint.permissionReviewMode")
+        let store = WorkspaceStore()
+        store.permissionReviewMode = .alwaysAllow
+        addTeardownBlock {
+            if let previous {
+                UserDefaults.standard.set(previous, forKey: "glint.permissionReviewMode")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "glint.permissionReviewMode")
+            }
+            _ = store
+        }
+
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.handlers["session/request_permission"] != nil }
+        let handler = try XCTUnwrap(client.handlers["session/request_permission"])
+
+        let result = await handler(ACPServerRequest(
+            id: 14,
+            method: "session/request_permission",
+            params: try jsonValue(RequestPermissionRequest(
+                sessionId: "session-123",
+                toolCall: PermissionToolCallInfo(toolCallId: "tool-1", title: "Run", kind: .execute),
+                options: [PermissionOption(optionId: "reject-once", name: "Reject", kind: .rejectOnce)]
+            ))
+        ))
+
+        XCTAssertNil(manager.pendingPermission)
+        if case .success(let value) = result {
+            XCTAssertEqual(value, .object(["outcome": .object(["outcome": .string("cancelled")])]))
         } else {
             XCTFail("Expected permission success")
         }

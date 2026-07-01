@@ -1,6 +1,47 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+struct AgentContextUsageFormatter {
+    static func percent(for usage: DevinSessionManager.UsageInfo?) -> Double {
+        guard let usage, usage.size > 0 else { return 0 }
+        return min(1, max(0, Double(usage.used) / Double(usage.size)))
+    }
+
+    static func label(for usage: DevinSessionManager.UsageInfo?) -> String {
+        guard let usage, usage.size > 0 else {
+            return String(localized: "Context unavailable")
+        }
+        return String(format: "%.0f%% context", percent(for: usage) * 100)
+    }
+
+    static func tooltip(for usage: DevinSessionManager.UsageInfo?) -> String {
+        guard let usage, usage.size > 0 else {
+            return String(localized: "Context usage has not been reported yet.")
+        }
+        let used = min(usage.used, usage.size)
+        let remaining = usage.size - used
+        var lines = [
+            String(format: String(localized: "%@ of %@ used"), formattedCount(used), formattedCount(usage.size)),
+            String(format: String(localized: "%@ remaining"), formattedCount(remaining)),
+            String(format: "%.0f%%", percent(for: usage) * 100)
+        ]
+        if let amount = usage.costAmount, let currency = usage.costCurrency {
+            lines.append(String(format: String(localized: "Cost: %.4f %@"), amount, currency))
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private static func formattedCount(_ value: UInt64) -> String {
+        if value >= 1_000_000 {
+            return String(format: "%.1fM", Double(value) / 1_000_000)
+        }
+        if value >= 1_000 {
+            return String(format: "%.1fk", Double(value) / 1_000)
+        }
+        return "\(value)"
+    }
+}
+
 /// A single image the user has attached in the composer, pending send.
 /// Distinct from `DevinSessionManager.ImageAttachment`: this one keeps an
 /// `NSImage` thumbnail for the UI alongside the base64 payload that
@@ -17,6 +58,23 @@ struct ComposerAttachment: Identifiable, Equatable {
     }
 }
 
+private extension SessionConfigOption {
+    var stableID: String {
+        id ?? name ?? type ?? value?.prettyPrinted ?? "unknown-config-option"
+    }
+}
+
+private extension SessionModel {
+    var stableID: String {
+        id ?? name ?? raw?.prettyPrinted ?? "unknown-model"
+    }
+}
+
+enum AgentComposerMode: Equatable {
+    case agent
+    case plan
+}
+
 struct AgentComposer: View {
     @EnvironmentObject private var store: WorkspaceStore
     let workspace: Workspace
@@ -24,11 +82,15 @@ struct AgentComposer: View {
     @ObservedObject var manager: DevinSessionManager
     @Binding var draft: String
     @Binding var attachments: [ComposerAttachment]
+    @Binding var mode: AgentComposerMode
+    @Binding var pendingModeDirective: String?
     let onSend: () -> Void
 
     @FocusState private var isFocused: Bool
     @State private var projectError: String?
     @State private var isPickingImages = false
+    @State private var showContextUsage = false
+    @State private var isModeLabelHovered = false
 
     private var projectPath: String? {
         workspace.agentProjectPath
@@ -107,32 +169,23 @@ struct AgentComposer: View {
                 }
             }
 
-            // Toolbar Row
-            HStack(spacing: 12) {
-                Button {
-                    pickImages()
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.text3)
-                        .frame(width: 28, height: 28)
-                        .background(
-                            Circle().fill(Theme.overlay(0.05))
-                        )
-                }
-                .buttonStyle(.plain)
-                .help("Attach images")
-
-                modelBadge
-
-                modeMenu
-
-                Spacer()
-
+            if projectError != nil || !isSessionActive {
                 projectSection
+            }
 
+            // Toolbar Row
+            HStack(spacing: 8) {
+                plusMenu
+                approvalMenu
+                if mode == .plan {
+                    planModeLabel
+                }
+                contextUsageButton
+                Spacer(minLength: 8)
+                modelMenu
                 sendButton
             }
+            .frame(minHeight: 30)
         }
         .padding(12)
         .background(
@@ -216,71 +269,267 @@ struct AgentComposer: View {
         )
     }
 
-    // MARK: - Model (informational only)
-    // There's no confirmed ACP v1 method for the client to request a model
-    // change (only inbound notifications telling us the agent's current
-    // model), so this is a plain, non-interactive badge rather than a
-    // dropdown that would silently do nothing when tapped.
-    private var modelBadge: some View {
-        Group {
-            if let modelName = manager.currentModel?.name ?? manager.currentModel?.id {
-                Text(modelName)
-                    .font(AppFonts.ui(12, weight: .medium))
-                    .foregroundStyle(Theme.text3)
-                    .padding(.horizontal, 10)
-                    .frame(height: 28)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Theme.overlay(0.05))
-                    )
+    // MARK: - Bottom controls
+    private var plusMenu: some View {
+        Menu {
+            Button {
+                pickImages()
+            } label: {
+                Label("Attach Image", systemImage: "photo")
             }
+            Divider()
+            Button {
+                insertDraftToken("/")
+            } label: {
+                Label("Insert Slash Command", systemImage: "command")
+            }
+            Button {
+                enablePlanMode()
+            } label: {
+                Label("Plan Mode", systemImage: "checklist")
+            }
+            Button {
+                insertDraftToken("$")
+            } label: {
+                Label("Mention Skill", systemImage: "sparkle.magnifyingglass")
+            }
+        } label: {
+            controlIcon("plus")
+        }
+        .menuStyle(.borderlessButton)
+        .help("Add content or commands")
+    }
+
+    private var approvalMenu: some View {
+        Menu {
+            ForEach(PermissionReviewMode.allCases, id: \.self) { mode in
+                Button {
+                    store.permissionReviewMode = mode
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(mode.title)
+                            Text(mode.subtitle)
+                                .font(.caption)
+                        }
+                        if store.permissionReviewMode == mode {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            controlPill(icon: approvalIcon, title: store.permissionReviewMode.title, maxWidth: 116)
+        }
+        .menuStyle(.borderlessButton)
+        .help(store.permissionReviewMode.subtitle)
+    }
+
+    private var planModeLabel: some View {
+        HStack(spacing: 6) {
+            Divider()
+                .frame(height: 22)
+                .overlay(Theme.overlay(0.12))
+                .padding(.trailing, 2)
+
+            Image(systemName: "checklist")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.text4)
+            Text("Plan")
+                .font(AppFonts.ui(12, weight: .medium))
+                .foregroundStyle(Theme.text3)
+
+            Button {
+                exitPlanMode()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 8, weight: .bold))
+                    .frame(width: 14, height: 14)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Theme.text4)
+            .opacity(isModeLabelHovered ? 1 : 0)
+            .help("Exit plan mode")
+        }
+        .padding(.horizontal, 6)
+        .frame(height: 28)
+        .onHover { isModeLabelHovered = $0 }
+        .help("Plan mode will be sent with your next message.")
+    }
+
+    private var approvalIcon: String {
+        switch store.permissionReviewMode {
+        case .manual:
+            return "hand.raised"
+        case .autoReview:
+            return "checkmark.shield"
+        case .alwaysAllow:
+            return "checkmark.seal"
         }
     }
 
-    private var modeMenu: some View {
-        Group {
-            if isSessionActive && !manager.modes.isEmpty {
-                Menu {
-                    ForEach(manager.modes, id: \.id) { mode in
-                        Button {
-                            manager.selectMode(mode.id)
-                        } label: {
+    private var contextUsageButton: some View {
+        Button {} label: {
+            ZStack {
+                Circle()
+                    .stroke(Theme.overlay(0.14), lineWidth: 2)
+                Circle()
+                    .trim(from: 0, to: AgentContextUsageFormatter.percent(for: manager.usageInfo))
+                    .stroke(Theme.accentBright, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                Image(systemName: "circle.dashed")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.text3)
+            }
+            .frame(width: 28, height: 28)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            showContextUsage = hovering
+        }
+        .popover(isPresented: $showContextUsage, arrowEdge: .bottom) {
+            contextUsagePopover
+        }
+        .help(AgentContextUsageFormatter.tooltip(for: manager.usageInfo))
+        .accessibilityLabel(AgentContextUsageFormatter.label(for: manager.usageInfo))
+    }
+
+    private var contextUsagePopover: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Context Window")
+                .font(AppFonts.ui(12, weight: .semibold))
+                .foregroundStyle(Theme.text1)
+            Text(AgentContextUsageFormatter.tooltip(for: manager.usageInfo))
+                .font(AppFonts.ui(11.5))
+                .foregroundStyle(Theme.text3)
+                .lineSpacing(3)
+        }
+        .padding(12)
+        .frame(width: 220, alignment: .leading)
+    }
+
+    private var modelMenu: some View {
+        Menu {
+            if manager.models.isEmpty {
+                Text("No models reported")
+            } else {
+                Section("Model") {
+                    ForEach(modelMenuModels, id: \.stableID) { model in
+                        Button {} label: {
                             HStack {
-                                Text(mode.name ?? mode.id)
-                                if manager.currentMode == mode.id {
+                                Text(model.name ?? model.id ?? "Model")
+                                if isCurrentModel(model) {
                                     Image(systemName: "checkmark")
                                 }
                             }
                         }
+                        .disabled(true)
                     }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(currentModeLabel)
-                            .font(AppFonts.ui(12, weight: .medium))
-                            .foregroundStyle(Theme.text3)
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 8, weight: .semibold))
-                            .foregroundStyle(Theme.text4)
-                    }
-                    .padding(.horizontal, 10)
-                    .frame(height: 28)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Theme.overlay(0.05))
-                    )
                 }
-                .menuStyle(.borderlessButton)
-                .frame(width: 110, alignment: .leading)
             }
+
+            if !reasoningOptions.isEmpty {
+                Section("Reasoning Effort") {
+                    ForEach(reasoningOptions, id: \.stableID) { option in
+                        Button(reasoningLabel(for: option)) {}
+                            .disabled(true)
+                    }
+                }
+            }
+
+            Divider()
+            Text("Devin did not expose model switching for this session.")
+        } label: {
+            controlPill(icon: "cpu", title: modelMenuLabel, maxWidth: 150)
+        }
+        .menuStyle(.borderlessButton)
+        .help("Model and reasoning are read-only until Devin exposes a supported switcher.")
+    }
+
+    private var modelMenuLabel: String {
+        if let modelName = manager.currentModel?.name ?? manager.currentModel?.id {
+            return modelName
+        }
+        return manager.models.first?.name ?? manager.models.first?.id ?? String(localized: "Model")
+    }
+
+    private var modelMenuModels: [SessionModel] {
+        if let current = manager.currentModel,
+           !manager.models.contains(where: { ($0.id ?? $0.name) == (current.id ?? current.name) }) {
+            return [current] + manager.models
+        }
+        return manager.models
+    }
+
+    private var reasoningOptions: [SessionConfigOption] {
+        manager.configOptions.filter { option in
+            let key = [option.id, option.name, option.type]
+                .compactMap { $0?.lowercased() }
+                .joined(separator: " ")
+            return (key.contains("reasoning") || key.contains("effort")) && !key.contains("speed")
         }
     }
 
-    private var currentModeLabel: String {
-        if let currentMode = manager.currentMode,
-           let mode = manager.modes.first(where: { $0.id == currentMode }) {
-            return mode.name ?? mode.id
+    private func reasoningLabel(for option: SessionConfigOption) -> String {
+        let name = option.name ?? option.id ?? String(localized: "Reasoning")
+        guard let value = option.value else { return name }
+        return "\(name): \(value.stringValue ?? value.prettyPrinted)"
+    }
+
+    private func isCurrentModel(_ model: SessionModel) -> Bool {
+        guard let current = manager.currentModel else { return false }
+        return (model.id ?? model.name) == (current.id ?? current.name)
+    }
+
+    private func insertDraftToken(_ token: String) {
+        if draft.isEmpty || draft.last?.isWhitespace == true {
+            draft += token
+        } else {
+            draft += " \(token)"
         }
-        return manager.modes.first?.name ?? String(localized: "Mode")
+        isFocused = true
+    }
+
+    private func enablePlanMode() {
+        mode = .plan
+        pendingModeDirective = "/plan"
+        isFocused = true
+    }
+
+    private func exitPlanMode() {
+        mode = .agent
+        pendingModeDirective = pendingModeDirective == "/plan" ? nil : "/agent"
+        isModeLabelHovered = false
+        isFocused = true
+    }
+
+    private func controlIcon(_ systemName: String) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(Theme.text3)
+            .frame(width: 28, height: 28)
+            .background(Circle().fill(Theme.overlay(0.05)))
+    }
+
+    private func controlPill(icon: String, title: String, maxWidth: CGFloat) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 11.5, weight: .semibold))
+            Text(title)
+                .font(AppFonts.ui(11.5, weight: .medium))
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Image(systemName: "chevron.down")
+                .font(.system(size: 7.5, weight: .bold))
+                .foregroundStyle(Theme.text4)
+        }
+        .foregroundStyle(Theme.text3)
+        .padding(.horizontal, 9)
+        .frame(maxWidth: maxWidth, minHeight: 28, maxHeight: 28, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Theme.overlay(0.05))
+        )
     }
 
     private var projectSection: some View {

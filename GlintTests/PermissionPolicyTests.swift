@@ -7,6 +7,18 @@ import XCTest
 /// AGENTS.md convention (see `WorkspaceAgentCodableTests.swift` for the
 /// canonical precedent).
 final class PermissionPolicyTests: XCTestCase {
+    func testPermissionReviewModeRawValuesRemainCompatible() {
+        XCTAssertEqual(PermissionReviewMode(rawValue: "manual"), .manual)
+        XCTAssertEqual(PermissionReviewMode(rawValue: "autoReview"), .autoReview)
+        XCTAssertEqual(PermissionReviewMode(rawValue: "alwaysAllow"), .alwaysAllow)
+    }
+
+    func testPermissionReviewModeTitlesMatchComposerLabels() {
+        XCTAssertEqual(PermissionReviewMode.manual.title, "Always Ask")
+        XCTAssertEqual(PermissionReviewMode.autoReview.title, "Auto Review")
+        XCTAssertEqual(PermissionReviewMode.alwaysAllow.title, "Always Allow")
+    }
+
     func testDefaultPolicyAutoApprovesReadThinkFetchSearch() {
         XCTAssertEqual(PermissionPolicy.defaultPolicy(for: .read), .autoApprove)
         XCTAssertEqual(PermissionPolicy.defaultPolicy(for: .think), .autoApprove)

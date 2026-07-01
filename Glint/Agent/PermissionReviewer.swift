@@ -3,6 +3,29 @@ import Foundation
 enum PermissionReviewMode: String, Codable, CaseIterable {
     case manual
     case autoReview
+    case alwaysAllow
+
+    var title: String {
+        switch self {
+        case .manual:
+            return String(localized: "Always Ask")
+        case .autoReview:
+            return String(localized: "Auto Review")
+        case .alwaysAllow:
+            return String(localized: "Always Allow")
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .manual:
+            return String(localized: "Show every permission card.")
+        case .autoReview:
+            return String(localized: "Use Devin to review risky actions.")
+        case .alwaysAllow:
+            return String(localized: "Approve offered allow options.")
+        }
+    }
 }
 
 enum PermissionPolicy: String, Codable {

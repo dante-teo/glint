@@ -1312,11 +1312,12 @@ private struct AgentsPane: View {
             SettingsRow("Permission mode",
                         subtitle: "Automate approvals using AI review or escalate risky actions to you.") {
                 Picker("", selection: $store.permissionReviewMode) {
-                    Text("Manual").tag(PermissionReviewMode.manual)
-                    Text("AI Auto-Review").tag(PermissionReviewMode.autoReview)
+                    ForEach(PermissionReviewMode.allCases, id: \.self) { mode in
+                        Text(mode.title).tag(mode)
+                    }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 200)
+                .frame(width: 310)
             }
         }
 

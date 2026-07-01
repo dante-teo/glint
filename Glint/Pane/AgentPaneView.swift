@@ -27,6 +27,8 @@ private struct AgentPaneContent: View {
     @State private var isNearBottom = true
     @State private var elicitationInput = ""
     @State private var showDiagnostics = false
+    @State private var composerMode: AgentComposerMode = .agent
+    @State private var pendingModeDirective: String?
 
     private var projectPath: String? {
         workspace.agentProjectPath
@@ -107,6 +109,8 @@ private struct AgentPaneContent: View {
                                 manager: manager,
                                 draft: $draft,
                                 attachments: $attachments,
+                                mode: $composerMode,
+                                pendingModeDirective: $pendingModeDirective,
                                 onSend: send
                             )
                             .frame(maxWidth: 760)
@@ -735,7 +739,8 @@ private struct AgentPaneContent: View {
     }
 
     private func send() {
-        guard !trimmedDraft.isEmpty || !attachments.isEmpty else { return }
+        guard let promptText = preparedPromptText() else { return }
+        guard !promptText.isEmpty || !attachments.isEmpty else { return }
         guard let projectPath,
               store.setAgentProjectPath(workspaceID: workspace.id, path: projectPath),
               let standardized = WorkspaceStore.standardizedAgentProjectPath(projectPath) else {
@@ -745,9 +750,42 @@ private struct AgentPaneContent: View {
         projectError = nil
         store.commitAgentWorkspace(workspace.id)
         let images = attachments.map { DevinSessionManager.ImageAttachment(base64Data: $0.base64Data, mimeType: $0.mimeType) }
-        manager.sendPrompt(text: trimmedDraft, projectPath: standardized, images: images)
+        manager.sendPrompt(text: promptText, projectPath: standardized, images: images)
         draft = ""
         attachments = []
+    }
+
+    private func preparedPromptText() -> String? {
+        if trimmedDraft == "/plan" {
+            composerMode = .plan
+            pendingModeDirective = "/plan"
+            draft = ""
+            return nil
+        }
+        if trimmedDraft == "/agent" {
+            composerMode = .agent
+            pendingModeDirective = "/agent"
+            draft = ""
+            return nil
+        }
+        if trimmedDraft.hasPrefix("/plan ") || trimmedDraft.hasPrefix("/plan\n") {
+            composerMode = .plan
+            pendingModeDirective = nil
+            return trimmedDraft
+        }
+        if trimmedDraft.hasPrefix("/agent ") || trimmedDraft.hasPrefix("/agent\n") {
+            composerMode = .agent
+            pendingModeDirective = nil
+            return trimmedDraft
+        }
+        guard let directive = pendingModeDirective else {
+            return trimmedDraft
+        }
+        pendingModeDirective = nil
+        if trimmedDraft.isEmpty {
+            return directive
+        }
+        return "\(directive)\n\(trimmedDraft)"
     }
 }
 

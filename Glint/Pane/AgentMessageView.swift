@@ -178,29 +178,66 @@ struct AgentThoughtRow: View {
     }
 }
 
+struct AgentToolCallDisplay {
+    static func title(for message: DevinSessionManager.Message) -> String {
+        let trimmed = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            return trimmed
+        }
+        if let id = message.toolCallId, !id.isEmpty {
+            return String(format: String(localized: "Tool call %@"), id)
+        }
+        return String(localized: "Tool call")
+    }
+
+    static func clampedUsagePercent(used: UInt64, size: UInt64) -> Double {
+        guard size > 0 else { return 0 }
+        return min(1, max(0, Double(used) / Double(size)))
+    }
+
+    static func truncated(_ text: String, limit: Int, expanded: Bool) -> (text: String, isTruncated: Bool) {
+        let normalized = text.isEmpty ? String(localized: "(empty)") : text
+        guard !expanded, normalized.count > limit else {
+            return (normalized, false)
+        }
+        return (String(normalized.prefix(limit)) + "\n...", true)
+    }
+}
+
 // MARK: - Tool Call Row
 struct AgentToolCallRow: View {
     let message: DevinSessionManager.Message
     @State private var isExpanded = false
+    @State private var showStatus = true
+    @State private var showLocations = true
+    @State private var showInput = false
+    @State private var showOutput = false
     @State private var showFullInput = false
     @State private var showFullOutput = false
+    @State private var showContent = false
+    @State private var showFullContent = false
+    @State private var showRaw = false
     @State private var showFullRaw = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            toolIcon
-                .frame(width: 22, height: 22)
-                .padding(.top, 2)
+            toolIconBadge
+                .padding(.top, 1)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 8) {
                 Button {
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
                         isExpanded.toggle()
                     }
                 } label: {
-                    HStack(spacing: 8) {
-                        Text(message.text)
-                            .font(AppFonts.ui(13, weight: .semibold))
+                    HStack(spacing: 9) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(Theme.text4)
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+
+                        Text(AgentToolCallDisplay.title(for: message))
+                            .font(AppFonts.ui(13.5, weight: .semibold))
                             .foregroundStyle(Theme.text1)
                             .lineLimit(1)
                             .truncationMode(.middle)
@@ -213,41 +250,70 @@ struct AgentToolCallRow: View {
                                 .foregroundStyle(Theme.text4)
                         }
 
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(Theme.text4)
-                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        Spacer(minLength: 0)
                     }
                 }
                 .buttonStyle(.plain)
 
                 if isExpanded {
-                    VStack(alignment: .leading, spacing: 8) {
-                        if let reason = message.toolAbandonedReason {
-                            detailSection(title: "Status", text: reason, color: Theme.orange)
+                    VStack(alignment: .leading, spacing: 9) {
+                        disclosureSection(
+                            title: "Status",
+                            icon: "info.circle",
+                            isExpanded: $showStatus
+                        ) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                metadataItem(label: "Status", value: statusBadgeSpec.label)
+                                if let kind = message.toolKind {
+                                    metadataItem(label: "Kind", value: kind.description)
+                                }
+                                if let id = message.toolCallId {
+                                    metadataItem(label: "ID", value: id)
+                                }
+                                if let reason = message.toolAbandonedReason {
+                                    detailBody(reason, color: Theme.orange, showFull: .constant(true), limit: 1200)
+                                }
+                            }
                         }
-                        if let kind = message.toolKind {
-                            metadataItem(label: "Kind", value: kind.description)
-                        }
-                        if let id = message.toolCallId {
-                            metadataItem(label: "ID", value: id)
-                        }
+
                         if let locations = message.toolLocations, !locations.isEmpty {
-                            detailSection(title: "Locations", text: locationsText(locations), color: Theme.text3)
+                            disclosureSection(
+                                title: "Locations",
+                                icon: "mappin.and.ellipse",
+                                isExpanded: $showLocations
+                            ) {
+                                detailBody(locationsText(locations), color: Theme.text3, showFull: .constant(true), limit: 1800)
+                            }
                         }
-                        rawJSONSection(title: "Input", value: message.toolRawInput, showFull: $showFullInput)
-                        rawJSONSection(title: "Output", value: message.toolRawOutput, showFull: $showFullOutput)
+
+                        rawJSONSection(title: "Input", icon: "arrow.down.doc", value: message.toolRawInput, isExpanded: $showInput, showFull: $showFullInput)
+                        rawJSONSection(title: "Output", icon: "arrow.up.doc", value: message.toolRawOutput, isExpanded: $showOutput, showFull: $showFullOutput)
+
                         if let content = message.toolContent, !content.isEmpty {
-                            detailSection(title: "Content", text: contentText(content), color: Theme.text3)
+                            disclosureSection(
+                                title: "Content",
+                                icon: "doc.richtext",
+                                isExpanded: $showContent
+                            ) {
+                                detailBody(contentText(content), color: Theme.text3, showFull: $showFullContent, limit: 4000)
+                            }
                         }
-                        detailSection(title: "Raw Tool JSON", text: rawToolJSON, color: Theme.text3, showFull: $showFullRaw)
+
+                        disclosureSection(
+                            title: "Raw Tool JSON",
+                            icon: "curlybraces",
+                            isExpanded: $showRaw
+                        ) {
+                            detailBody(rawToolJSON, color: Theme.text3, showFull: $showFullRaw, limit: 4000)
+                        }
                     }
-                    .padding(.top, 4)
+                    .padding(.top, 2)
+                    .padding(.leading, 2)
                 }
             }
             Spacer()
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, 6)
     }
 
     private var toolIconSpec: (systemName: String, color: Color) {
@@ -273,11 +339,16 @@ struct AgentToolCallRow: View {
         }
     }
 
-    private var toolIcon: some View {
+    private var toolIconBadge: some View {
         let spec = toolIconSpec
-        return Image(systemName: spec.systemName)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(spec.color)
+        return ZStack {
+            Circle()
+                .fill(spec.color.opacity(0.13))
+            Image(systemName: spec.systemName)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(spec.color)
+        }
+        .frame(width: 22, height: 22)
     }
 
     private var statusBadgeSpec: (label: String, color: Color, bgColor: Color) {
@@ -301,10 +372,10 @@ struct AgentToolCallRow: View {
     private var statusBadge: some View {
         let spec = statusBadgeSpec
         return Text(spec.label)
-            .font(AppFonts.ui(9, weight: .semibold))
+            .font(AppFonts.ui(9.5, weight: .semibold))
             .foregroundStyle(spec.color)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 1.5)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
             .background(
                 Capsule().fill(spec.bgColor)
             )
@@ -329,7 +400,7 @@ struct AgentToolCallRow: View {
     private func metadataItem(label: String, value: String) -> some View {
         HStack(spacing: 6) {
             Text("\(label):")
-                .font(AppFonts.ui(10.5, weight: .bold))
+                .font(AppFonts.ui(10.5, weight: .semibold))
                 .foregroundStyle(Theme.text4)
             Text(value)
                 .font(.system(size: 11, design: .monospaced))
@@ -339,38 +410,68 @@ struct AgentToolCallRow: View {
     }
 
     @ViewBuilder
-    private func rawJSONSection(title: String, value: ACPJSONValue?, showFull: Binding<Bool>) -> some View {
-        if let value {
-            detailSection(title: title, text: value.prettyPrinted, color: Theme.text3, showFull: showFull)
-        } else {
-            detailSection(title: title, text: "No \(title.lowercased()) provided by agent.", color: Theme.text4)
+    private func rawJSONSection(title: String, icon: String, value: ACPJSONValue?, isExpanded: Binding<Bool>, showFull: Binding<Bool>) -> some View {
+        disclosureSection(title: title, icon: icon, isExpanded: isExpanded) {
+            if let value {
+                detailBody(value.prettyPrinted, color: Theme.text3, showFull: showFull, limit: 4000)
+            } else {
+                detailBody("No \(title.lowercased()) provided by agent.", color: Theme.text4, showFull: .constant(true), limit: 4000)
+            }
         }
     }
 
-    private func detailSection(title: String,
-                               text: String,
-                               color: Color,
-                               showFull: Binding<Bool>? = nil) -> some View {
-        let fullText = text.isEmpty ? "(empty)" : text
-        let truncated = fullText.count > 4000 && showFull?.wrappedValue != true
-        let displayText = truncated ? String(fullText.prefix(4000)) + "\n..." : fullText
+    private func disclosureSection<Content: View>(
+        title: String,
+        icon: String,
+        isExpanded: Binding<Bool>,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
+                    isExpanded.wrappedValue.toggle()
+                }
+            } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 7.5, weight: .bold))
+                        .foregroundStyle(Theme.text4)
+                        .rotationEffect(.degrees(isExpanded.wrappedValue ? 90 : 0))
+                    Image(systemName: icon)
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(Theme.text4)
+                    Text(title)
+                        .font(AppFonts.ui(11.5, weight: .semibold))
+                        .foregroundStyle(Theme.text3)
+                    Spacer(minLength: 0)
+                }
+            }
+            .buttonStyle(.plain)
 
-        return VStack(alignment: .leading, spacing: 5) {
+            if isExpanded.wrappedValue {
+                content()
+                    .padding(.leading, 18)
+            }
+        }
+        .frame(maxWidth: 720, alignment: .leading)
+    }
+
+    private func detailBody(_ text: String, color: Color, showFull: Binding<Bool>, limit: Int) -> some View {
+        let result = AgentToolCallDisplay.truncated(text, limit: limit, expanded: showFull.wrappedValue)
+        return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Text(title)
-                    .font(AppFonts.ui(10.5, weight: .bold))
-                    .foregroundStyle(Theme.text4)
                 Spacer()
                 Button {
-                    copy(fullText)
+                    copy(text.isEmpty ? String(localized: "(empty)") : text)
                 } label: {
                     Image(systemName: "doc.on.doc")
                         .font(.system(size: 10, weight: .semibold))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(Theme.text4)
-                .help("Copy \(title)")
-                if let showFull, fullText.count > 4000 {
+                .help("Copy")
+
+                if result.isTruncated || showFull.wrappedValue {
                     Button(showFull.wrappedValue ? "Less" : "Full") {
                         showFull.wrappedValue.toggle()
                     }
@@ -379,19 +480,22 @@ struct AgentToolCallRow: View {
                     .foregroundStyle(Theme.text3)
                 }
             }
-            Text(displayText)
+            Text(result.text)
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(color)
                 .textSelection(.enabled)
-                .lineLimit(showFull?.wrappedValue == true ? nil : 80)
-                .padding(8)
+                .lineLimit(showFull.wrappedValue ? nil : 80)
+                .padding(9)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Theme.overlay(0.04))
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Theme.overlay(0.045))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .stroke(Theme.overlay(0.07), lineWidth: 1)
                 )
         }
-        .frame(maxWidth: 680, alignment: .leading)
     }
 
     private func locationsText(_ locations: [ToolCallLocation]) -> String {

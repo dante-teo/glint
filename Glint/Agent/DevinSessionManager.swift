@@ -114,6 +114,7 @@ final class DevinSessionManager: ObservableObject {
     @Published private(set) var currentModel: SessionModel?
     @Published private(set) var modes: [SessionMode] = []
     @Published private(set) var currentMode: String?
+    @Published private(set) var configOptions: [SessionConfigOption] = []
     @Published private(set) var diagnostics: [ACPDiagnosticEvent] = []
 
     private struct PersistedConversation: Codable {
@@ -127,6 +128,7 @@ final class DevinSessionManager: ObservableObject {
         var currentModel: SessionModel?
         var modes: [SessionMode]
         var currentMode: String?
+        var configOptions: [SessionConfigOption]?
         var messages: [Message]
     }
 
@@ -542,7 +544,9 @@ final class DevinSessionManager: ObservableObject {
             sessionTitle = info.title
         case .currentModeUpdate(let mode):
             currentMode = mode.modeId
-        case .availableCommandsUpdate, .configOptionUpdate:
+        case .configOptionUpdate(let update):
+            configOptions = update.configOptions
+        case .availableCommandsUpdate:
             break
         case .unknown:
             appendDiagnostic(.init(kind: .notification, title: "Unknown session update", detail: String(describing: update)))
@@ -650,11 +654,22 @@ final class DevinSessionManager: ObservableObject {
 
         // 1. Check user permission review mode
         let mode = WorkspaceStore.current?.permissionReviewMode ?? .manual
+        let title = params.toolCall?.title ?? String(localized: "Permission request")
+
+        if mode == .alwaysAllow {
+            let option = Self.selectOption(from: params.options, approved: true)
+            if option == nil {
+                messages.append(Message(role: .system, text: String(format: String(localized: "No allow option was offered for permission: %@"), title)))
+            } else {
+                messages.append(Message(role: .system, text: String(format: String(localized: "Always allowed permission: %@"), title)))
+            }
+            scheduleSave()
+            return .success(Self.outcomeJSON(for: option))
+        }
 
         if mode == .autoReview {
             let kind = params.toolCall?.kind
             let policy = PermissionPolicy.defaultPolicy(for: kind)
-            let title = params.toolCall?.title ?? "Permission request"
 
             switch policy {
             case .autoApprove:
@@ -817,6 +832,9 @@ final class DevinSessionManager: ObservableObject {
             self.modes = modes.availableModes ?? []
             currentMode = modes.currentModeId
         }
+        if let configOptions = response.configOptions {
+            self.configOptions = configOptions
+        }
         scheduleSave()
     }
 
@@ -907,6 +925,7 @@ final class DevinSessionManager: ObservableObject {
         currentModel = decoded.currentModel
         modes = decoded.modes
         currentMode = decoded.currentMode
+        configOptions = decoded.configOptions ?? []
         messages = decoded.messages
     }
 
@@ -926,6 +945,7 @@ final class DevinSessionManager: ObservableObject {
             currentModel: currentModel,
             modes: modes,
             currentMode: currentMode,
+            configOptions: configOptions,
             messages: messages
         )
     }
