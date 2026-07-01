@@ -27,6 +27,7 @@
 		623A28FE871F2B79A6D52835 /* SplitFocusDimTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEFA4685C0ED722B2B86A010 /* SplitFocusDimTests.swift */; };
 		657E526F46F719D1F9DEF150 /* Barlow-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = 771C4C951D83D876034A393F /* Barlow-Medium.otf */; };
 		692D1A7D490E07D796535EAA /* UpdaterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4408F9761E584DE2AB6630E2 /* UpdaterController.swift */; };
+		6C4DD263D1CEBA46FCBE7A83 /* FolderPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F3D02341D5B9D010C3A226D /* FolderPicker.swift */; };
 		6D74FE6545631EB8193C82E1 /* PaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FC2FBC9E8729A5ECBF857C /* PaneView.swift */; };
 		7D07A40DF6411A613624827A /* PaneSurfaceRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16137B405E48DBE262A15B6D /* PaneSurfaceRepresentable.swift */; };
 		7FC12666816053BEB64079CB /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 050E267AE14712D4D6633B4F /* Theme.swift */; };
@@ -38,11 +39,13 @@
 		AA8EDD24CDF66636AE550A4B /* WorkspaceAgentCodableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84BA45C8BE2820C29CB54256 /* WorkspaceAgentCodableTests.swift */; };
 		AB89FA6EF5785EC4026F4402 /* VisualEffectBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0656F7C1D48AE0429C1888B /* VisualEffectBackground.swift */; };
 		AC6C263FBCEAF29D274E0881 /* Barlow-SemiBold.otf in Resources */ = {isa = PBXBuildFile; fileRef = 8970AF928E9F330D5C81C2C3 /* Barlow-SemiBold.otf */; };
+		B6DE63D608A15234D6D65F8F /* NewWorkspacePopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBA89141695F47F8D97F5BD9 /* NewWorkspacePopover.swift */; };
 		B70CAFEBB2416E25B0FFED97 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = C48F9D3C512A0ABE8369D0F4 /* Sparkle */; };
 		C0E8D97C08BA3F0FA33F31E7 /* CommandPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 235E2D958A2244483CAA0812 /* CommandPalette.swift */; };
 		C1102E6BF39B44928974869A /* FontDefaultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE559C44534F14D1C4C817A8 /* FontDefaultsTests.swift */; };
 		C48BD1224EA2C6D3C87B9120 /* AgentPaneSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 829D894CF747D6BC08667239 /* AgentPaneSummary.swift */; };
 		C748DE21F23B49B2FFD73DC7 /* WorkspaceIconKindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83E4DF4C5180D50C381B4976 /* WorkspaceIconKindTests.swift */; };
+		CACBF58D56347AD978A88101 /* AgentPlaceholderPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA93584E91A4AB0574900628 /* AgentPlaceholderPaneView.swift */; };
 		CD30F5E1B78B3C46C9990FD6 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8C269A6E9AE87961C3356DC /* SidebarView.swift */; };
 		CD7908F096580864CB2992ED /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BE4DBC7E2579823474466E9 /* ContentView.swift */; };
 		CEA0A8FF66046FEFA80FAC0C /* GlintApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CB74659D174004C620D538A /* GlintApp.swift */; };
@@ -83,6 +86,7 @@
 		150EEF32284061D527E51866 /* GlintTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlintTheme.swift; sourceTree = "<group>"; };
 		16137B405E48DBE262A15B6D /* PaneSurfaceRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneSurfaceRepresentable.swift; sourceTree = "<group>"; };
 		1E646AABA8ADCE8A2A5C6F55 /* PaneTreeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneTreeView.swift; sourceTree = "<group>"; };
+		1F3D02341D5B9D010C3A226D /* FolderPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderPicker.swift; sourceTree = "<group>"; };
 		21868C7211897C87A6CAD7C3 /* ControlBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlBridge.swift; sourceTree = "<group>"; };
 		235E2D958A2244483CAA0812 /* CommandPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPalette.swift; sourceTree = "<group>"; };
 		25DADCEBA9C483C729B69388 /* Glint.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Glint.entitlements; sourceTree = "<group>"; };
@@ -121,6 +125,8 @@
 		BE9117F7FB3E54B8267A1843 /* DepartureMonoNerdFont-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "DepartureMonoNerdFont-Regular.otf"; sourceTree = "<group>"; };
 		C0656F7C1D48AE0429C1888B /* VisualEffectBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualEffectBackground.swift; sourceTree = "<group>"; };
 		C9E2B9ADF809766CE4278047 /* SafeJSON.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeJSON.swift; sourceTree = "<group>"; };
+		CA93584E91A4AB0574900628 /* AgentPlaceholderPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentPlaceholderPaneView.swift; sourceTree = "<group>"; };
+		CBA89141695F47F8D97F5BD9 /* NewWorkspacePopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewWorkspacePopover.swift; sourceTree = "<group>"; };
 		D8CAD184E9D0547B876C8AFE /* THIRD_PARTY_FONT_LICENSES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = THIRD_PARTY_FONT_LICENSES.md; sourceTree = "<group>"; };
 		DB20921E3CAC1006A8FBD3AE /* SettingsSafety.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSafety.swift; sourceTree = "<group>"; };
 		DE559C44534F14D1C4C817A8 /* FontDefaultsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontDefaultsTests.swift; sourceTree = "<group>"; };
@@ -164,6 +170,7 @@
 		5D84BADE56807E092D26B87B /* Pane */ = {
 			isa = PBXGroup;
 			children = (
+				CA93584E91A4AB0574900628 /* AgentPlaceholderPaneView.swift */,
 				E298AD81B1615CBBFD69F48A /* GhosttySurfaceView.swift */,
 				16137B405E48DBE262A15B6D /* PaneSurfaceRepresentable.swift */,
 				1E646AABA8ADCE8A2A5C6F55 /* PaneTreeView.swift */,
@@ -201,7 +208,9 @@
 			children = (
 				235E2D958A2244483CAA0812 /* CommandPalette.swift */,
 				4BE4DBC7E2579823474466E9 /* ContentView.swift */,
+				1F3D02341D5B9D010C3A226D /* FolderPicker.swift */,
 				150EEF32284061D527E51866 /* GlintTheme.swift */,
+				CBA89141695F47F8D97F5BD9 /* NewWorkspacePopover.swift */,
 				6D3B64992BBD5A190DFE36D2 /* SettingsView.swift */,
 				A8C269A6E9AE87961C3356DC /* SidebarView.swift */,
 				050E267AE14712D4D6633B4F /* Theme.swift */,
@@ -438,15 +447,18 @@
 				E464D0233508CD31C1235054 /* AgentBridge.swift in Sources */,
 				3932A4CFEFF6FB81AE283645 /* AgentHookInstaller.swift in Sources */,
 				C48BD1224EA2C6D3C87B9120 /* AgentPaneSummary.swift in Sources */,
+				CACBF58D56347AD978A88101 /* AgentPlaceholderPaneView.swift in Sources */,
 				5157C5439862F21202BCC44D /* AppDelegate.swift in Sources */,
 				FF23A847BC5D81C090121A22 /* AppFonts.swift in Sources */,
 				C0E8D97C08BA3F0FA33F31E7 /* CommandPalette.swift in Sources */,
 				CD7908F096580864CB2992ED /* ContentView.swift in Sources */,
 				EF937781512647E835836F83 /* ControlBridge.swift in Sources */,
+				6C4DD263D1CEBA46FCBE7A83 /* FolderPicker.swift in Sources */,
 				3CB9F41E3B1CB4A8790D9159 /* GhosttyManager.swift in Sources */,
 				1115F230E14FBE3C1FC754A2 /* GhosttySurfaceView.swift in Sources */,
 				CEA0A8FF66046FEFA80FAC0C /* GlintApp.swift in Sources */,
 				930665E39CE84564CBF9D300 /* GlintTheme.swift in Sources */,
+				B6DE63D608A15234D6D65F8F /* NewWorkspacePopover.swift in Sources */,
 				21C03B3AE912F4D30FA6F92C /* PaneAgentState.swift in Sources */,
 				7D07A40DF6411A613624827A /* PaneSurfaceRepresentable.swift in Sources */,
 				49DF8EE59313B7CFE29DA303 /* PaneTreeView.swift in Sources */,

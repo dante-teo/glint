@@ -170,14 +170,20 @@ struct CommandPalette: View {
         // accidental ⏎ on an empty query is a harmless no-op (it just
         // re-selects the workspace you're already in).
         let currentID = store.selectedWorkspaceID
-        let ordered = store.workspaces.filter { $0.id == currentID }
-            + store.workspaces.filter { $0.id != currentID }
+        let ordered = store.activeWorkspaces.filter { $0.id == currentID }
+            + store.activeWorkspaces.filter { $0.id != currentID }
         for ws in ordered {
-            let n = ws.panes.count
-            let unit = String(localized: n == 1 ? "pane" : "panes")
+            let subtitle: String
+            if ws.kind == .agent {
+                subtitle = agentProjectLabel(for: ws)
+            } else {
+                let n = ws.panes.count
+                let unit = String(localized: n == 1 ? "pane" : "panes")
+                subtitle = "\(n) \(unit)"
+            }
             items.append(.workspace(
                 title: ws.displayName,
-                subtitle: "\(n) \(unit)",
+                subtitle: subtitle,
                 accent: ws.accent,
                 isCurrent: ws.id == currentID,
                 action: { store.selectWorkspace(ws.id) }
@@ -185,12 +191,25 @@ struct CommandPalette: View {
         }
 
         items.append(.action(
-            title: "New Workspace",
-            subtitle: "Create a fresh workspace",
+            title: "New Terminal",
+            subtitle: "Create a shell workspace",
             symbol: "plus.square",
             shortcut: "",
             tint: actionTint,
             action: { store.addWorkspace() }
+        ))
+        items.append(.action(
+            title: "New Devin Agent",
+            subtitle: "Choose a project folder",
+            symbol: "sparkles",
+            shortcut: "",
+            tint: actionTint,
+            action: {
+                Task { @MainActor in
+                    guard let folder = await FolderPicker.pickProjectFolder() else { return }
+                    store.addAgentWorkspace(provider: .devin, projectPath: folder.path)
+                }
+            }
         ))
 
         items.append(.action(
@@ -205,22 +224,24 @@ struct CommandPalette: View {
         // side by side (see PaneTreeView) — which reads inverted as a
         // label. User-facing copy is direction-explicit instead; the enum
         // cases and shortcuts stay as-is (other files reference them).
-        items.append(.action(
-            title: "Split Right",
-            subtitle: "Open a new pane on the right",
-            symbol: "rectangle.split.2x1",
-            shortcut: "⌘D",
-            tint: actionTint,
-            action: { store.splitFocused(.horizontal) }
-        ))
-        items.append(.action(
-            title: "Split Down",
-            subtitle: "Stack a new pane below",
-            symbol: "rectangle.split.1x2",
-            shortcut: "⌘⇧D",
-            tint: actionTint,
-            action: { store.splitFocused(.vertical) }
-        ))
+        if store.selectedWorkspace?.kind != .agent {
+            items.append(.action(
+                title: "Split Right",
+                subtitle: "Open a new pane on the right",
+                symbol: "rectangle.split.2x1",
+                shortcut: "⌘D",
+                tint: actionTint,
+                action: { store.splitFocused(.horizontal) }
+            ))
+            items.append(.action(
+                title: "Split Down",
+                subtitle: "Stack a new pane below",
+                symbol: "rectangle.split.1x2",
+                shortcut: "⌘⇧D",
+                tint: actionTint,
+                action: { store.splitFocused(.vertical) }
+            ))
+        }
         items.append(.action(
             title: "Close Pane",
             subtitle: "Close the focused pane",
@@ -247,6 +268,14 @@ struct CommandPalette: View {
         ))
 
         return items
+    }
+
+    private func agentProjectLabel(for workspace: Workspace) -> String {
+        if let path = workspace.agentProjectPath, !path.isEmpty {
+            let name = URL(fileURLWithPath: path).lastPathComponent
+            if !name.isEmpty { return name }
+        }
+        return workspace.displayName
     }
 
     private func filteredItems() -> [PaletteItem] {

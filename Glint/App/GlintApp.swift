@@ -75,7 +75,7 @@ struct GlintApp: App {
             // events reach ghostty; workspace switching uses the tab-like
             // ⌘⇧[ / ⌘⇧] plus ⌘1…⌘9 direct jumps instead.
             CommandGroup(replacing: .newItem) {
-                Button("New Workspace") { workspaceStore.addWorkspace() }
+                Button("New Workspace") { workspaceStore.showNewWorkspacePopover() }
                     .keyboardShortcut("n", modifiers: .command)
                 Button("Next Workspace") { workspaceStore.selectNextWorkspace() }
                     .keyboardShortcut("]", modifiers: [.command, .shift])

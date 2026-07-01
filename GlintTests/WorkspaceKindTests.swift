@@ -55,6 +55,20 @@ final class WorkspaceKindTests: XCTestCase {
         XCTAssertEqual(store.workspaces.first { $0.kind == .agent }?.name, "second")
     }
 
+    func testAddWorkspaceCleansUpSelectedUncommittedAgentWorkspace() {
+        let (store, terminalID) = makeStore()
+        store.addAgentWorkspace(provider: .devin, projectPath: "/tmp/proj")
+        let agentID = store.workspaces.first { $0.kind == .agent }!.id
+        XCTAssertEqual(store.selectedWorkspaceID, agentID)
+
+        store.addWorkspace()
+
+        XCTAssertNil(store.workspaces.first(where: { $0.id == agentID }))
+        XCTAssertEqual(store.workspaces.count, 2)
+        XCTAssertTrue(store.workspaces.contains(where: { $0.id == terminalID }))
+        XCTAssertEqual(store.selectedWorkspace?.kind, .terminal)
+    }
+
     // MARK: - activeWorkspaces excludes uncommitted
 
     func testActiveWorkspacesExcludesUncommitted() {

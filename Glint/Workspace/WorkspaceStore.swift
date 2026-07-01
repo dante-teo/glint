@@ -4,7 +4,7 @@ import AppKit
 
 // MARK: - Domain types
 
-enum WorkspaceKind: String, Codable {
+enum WorkspaceKind: String, Codable, Equatable {
     case terminal
     case agent
 }
@@ -2341,6 +2341,11 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func addWorkspace() {
+        // Match selectWorkspace()/addAgentWorkspace(): an uncommitted agent
+        // workspace has no user message or session to preserve, so creating a
+        // terminal from it should not leave a hidden workspace in memory.
+        workspaces.removeAll { !$0.committed }
+
         let palette = [
             ("5E5CE6", "•"), ("FF6582", "•"), ("30D158", "•"),
             ("FF9F0A", "•"), ("64D2FF", "•"), ("BF5AF2", "•"),

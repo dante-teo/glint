@@ -1329,7 +1329,7 @@ private struct WorkspaceSwitcherPopover: View {
             header
             ScrollView {
                 LazyVStack(spacing: 1) {
-                    ForEach(store.workspaces) { ws in
+                    ForEach(store.activeWorkspaces) { ws in
                         WorkspaceSwitcherRow(
                             ws: ws,
                             isCurrent: ws.id == store.selectedWorkspaceID,
@@ -1376,7 +1376,7 @@ private struct WorkspaceSwitcherPopover: View {
                 .kerning(1.1)
                 .foregroundStyle(Theme.text4)
             Spacer()
-            Text("\(store.workspaces.count)")
+            Text("\(store.activeWorkspaces.count)")
                 .font(.system(size: 10.5, weight: .medium, design: .monospaced))
                 .foregroundStyle(Theme.text4)
         }
@@ -1387,7 +1387,7 @@ private struct WorkspaceSwitcherPopover: View {
 
     private var newWorkspaceRow: some View {
         Button {
-            store.addWorkspace()
+            store.showNewWorkspacePopover()
             dismiss()
         } label: {
             HStack(spacing: 10) {
@@ -1506,6 +1506,13 @@ private struct WorkspaceSwitcherRow: View {
             case .failed:          return String(localized: "error")
             case .idle:            break
             }
+        }
+        if ws.kind == .agent {
+            if let path = ws.agentProjectPath, !path.isEmpty {
+                let name = URL(fileURLWithPath: path).lastPathComponent
+                if !name.isEmpty { return name }
+            }
+            return ws.displayName
         }
         let n = ws.panes.count
         let unit = String(localized: n == 1 ? "pane" : "panes")
