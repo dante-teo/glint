@@ -161,11 +161,27 @@ final class ACPClient: @unchecked Sendable {
         )
     }
 
+    /// Real Devin turns can legitimately run for a long time (multiple tool
+    /// calls, builds, etc.) before returning `end_turn`. A short timeout
+    /// here would fail the turn out from under a still-working agent,
+    /// leaving the UI in a confusing state even though work continues in
+    /// the background. Cancellation (`session/cancel`) is the intended way
+    /// to end a turn early, not a timeout.
+    private static let promptTimeout: TimeInterval = 60 * 60 * 24
+
     @discardableResult
-    func prompt(sessionID: String, text: String) async throws -> PromptResponse {
+    func prompt(sessionID: String, content: [ContentBlock]) async throws -> PromptResponse {
         try await request(
             method: "session/prompt",
-            params: PromptRequest(sessionId: sessionID, prompt: [.text(text)])
+            params: PromptRequest(sessionId: sessionID, prompt: content),
+            timeout: Self.promptTimeout
+        )
+    }
+
+    func setMode(sessionID: String, modeId: String) async throws {
+        let _: EmptyACPResult = try await request(
+            method: "session/set_mode",
+            params: SetSessionModeRequest(sessionId: sessionID, modeId: modeId)
         )
     }
 

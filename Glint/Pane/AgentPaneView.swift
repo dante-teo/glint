@@ -22,6 +22,7 @@ private struct AgentPaneContent: View {
     @ObservedObject var manager: DevinSessionManager
 
     @State private var draft = ""
+    @State private var attachments: [ComposerAttachment] = []
     @State private var projectError: String?
     @State private var isNearBottom = true
     @State private var elicitationInput = ""
@@ -50,7 +51,15 @@ private struct AgentPaneContent: View {
                 // Header
                 header
                     .padding(.horizontal, 28)
-                    .padding(.top, 22)
+                    // In floating-toolbar mode (`store.glassEffect`) the
+                    // global `ToolbarHeader` overlays the pane area instead
+                    // of pushing it down (see `ContentView.floatingHeader`).
+                    // Terminal panes are kept clear of it via the padded
+                    // shell launcher, but this is plain SwiftUI content with
+                    // no equivalent trick, so it needs the toolbar's height
+                    // added explicitly or its own header renders underneath
+                    // the glass islands.
+                    .padding(.top, 22 + (store.glassEffect ? ToolbarHeader.height : 0))
                     .padding(.bottom, 12)
 
                 Divider()
@@ -76,20 +85,29 @@ private struct AgentPaneContent: View {
 
                         // Message Scroll List with Smart Auto-Scroll
                         messageListSection
-
-                        Divider()
-                            .overlay(Theme.divider)
-
-                        // Input Composer
-                        AgentComposer(
-                            workspace: workspace,
-                            paneID: paneID,
-                            manager: manager,
-                            draft: $draft,
-                            onSend: send
-                        )
+                    }
+                    // The composer floats above the message list as a
+                    // centered, max-width card (not a full-width bar docked
+                    // to the pane edge) — `safeAreaInset` keeps the scroll
+                    // content from being obscured by it without needing a
+                    // manual bottom-padding calculation.
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        HStack {
+                            Spacer(minLength: 0)
+                            AgentComposer(
+                                workspace: workspace,
+                                paneID: paneID,
+                                manager: manager,
+                                draft: $draft,
+                                attachments: $attachments,
+                                onSend: send
+                            )
+                            .frame(maxWidth: 760)
+                            Spacer(minLength: 0)
+                        }
                         .padding(.horizontal, 28)
-                        .padding(.vertical, 16)
+                        .padding(.top, 8)
+                        .padding(.bottom, 20)
                     }
                 }
             }
@@ -267,11 +285,11 @@ private struct AgentPaneContent: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(permission.request.title ?? "Devin is asking to run a tool")
+                Text(permission.request.toolCall?.title ?? "Devin is asking to run a tool")
                     .font(AppFonts.ui(13, weight: .semibold))
                     .foregroundStyle(Theme.text1)
 
-                if let kind = permission.request.kind {
+                if let kind = permission.request.toolCall?.kind {
                     Text("Tool Kind: \(String(describing: kind).uppercased())")
                         .font(AppFonts.ui(11, weight: .semibold))
                         .foregroundStyle(Theme.text3)
@@ -296,7 +314,7 @@ private struct AgentPaneContent: View {
                 }
             }
 
-            if let rawInput = permission.request.rawInput {
+            if let rawInput = permission.request.toolCall?.rawInput {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Arguments:")
                         .font(AppFonts.ui(11, weight: .bold))
@@ -615,7 +633,7 @@ private struct AgentPaneContent: View {
     }
 
     private func send() {
-        guard !trimmedDraft.isEmpty else { return }
+        guard !trimmedDraft.isEmpty || !attachments.isEmpty else { return }
         guard let projectPath,
               store.setAgentProjectPath(workspaceID: workspace.id, path: projectPath),
               let standardized = WorkspaceStore.standardizedAgentProjectPath(projectPath) else {
@@ -624,8 +642,10 @@ private struct AgentPaneContent: View {
         }
         projectError = nil
         store.commitAgentWorkspace(workspace.id)
-        manager.sendPrompt(text: trimmedDraft, projectPath: standardized)
+        let images = attachments.map { DevinSessionManager.ImageAttachment(base64Data: $0.base64Data, mimeType: $0.mimeType) }
+        manager.sendPrompt(text: trimmedDraft, projectPath: standardized, images: images)
         draft = ""
+        attachments = []
     }
 }
 

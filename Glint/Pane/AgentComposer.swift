@@ -1,4 +1,21 @@
 import SwiftUI
+import UniformTypeIdentifiers
+
+/// A single image the user has attached in the composer, pending send.
+/// Distinct from `DevinSessionManager.ImageAttachment`: this one keeps an
+/// `NSImage` thumbnail for the UI alongside the base64 payload that
+/// actually gets sent.
+struct ComposerAttachment: Identifiable, Equatable {
+    let id = UUID()
+    let thumbnail: NSImage
+    let base64Data: String
+    let mimeType: String
+    let filename: String
+
+    static func == (lhs: ComposerAttachment, rhs: ComposerAttachment) -> Bool {
+        lhs.id == rhs.id
+    }
+}
 
 struct AgentComposer: View {
     @EnvironmentObject private var store: WorkspaceStore
@@ -6,10 +23,12 @@ struct AgentComposer: View {
     let paneID: PaneID
     @ObservedObject var manager: DevinSessionManager
     @Binding var draft: String
+    @Binding var attachments: [ComposerAttachment]
     let onSend: () -> Void
 
     @FocusState private var isFocused: Bool
     @State private var projectError: String?
+    @State private var isPickingImages = false
 
     private var projectPath: String? {
         workspace.agentProjectPath
@@ -28,7 +47,7 @@ struct AgentComposer: View {
     }
 
     private var canSend: Bool {
-        !trimmedDraft.isEmpty && projectIsValid && !manager.status.isBusy &&
+        (!trimmedDraft.isEmpty || !attachments.isEmpty) && projectIsValid && !manager.status.isBusy &&
         manager.pendingPermission == nil && manager.pendingElicitation == nil
     }
 
@@ -48,16 +67,13 @@ struct AgentComposer: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Text Editor Container
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Theme.overlay(0.06))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Theme.overlay(isFocused ? 0.22 : 0.10), lineWidth: 1)
-                    )
+        VStack(alignment: .leading, spacing: 10) {
+            if !attachments.isEmpty {
+                attachmentsRow
+            }
 
+            // Text Editor
+            ZStack(alignment: .topLeading) {
                 TextEditor(text: $draft)
                     .font(AppFonts.ui(14))
                     .foregroundStyle(Theme.text1)
@@ -65,9 +81,9 @@ struct AgentComposer: View {
                     .focused($isFocused)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
-                    .frame(minHeight: 44, maxHeight: 120)
+                    .frame(minHeight: 40, maxHeight: 140)
                     .onKeyPress(phases: .down) { press in
-                        guard press.key == .return, press.modifiers.contains(.command) else {
+                        guard press.key == .return, !press.modifiers.contains(.shift) else {
                             return .ignored
                         }
                         if canSend {
@@ -78,20 +94,23 @@ struct AgentComposer: View {
                     }
 
                 if draft.isEmpty {
-                    Text("Ask Codex Anything...")
+                    Text("Ask Devin Anything...")
                         .font(AppFonts.ui(14))
                         .foregroundStyle(Theme.text4)
+                        // Matches the TextEditor's own padding, plus the ~5pt
+                        // leading inset NSTextView's line fragment padding
+                        // adds internally (a well-known SwiftUI TextEditor
+                        // quirk) so the placeholder lines up with real text.
                         .padding(.horizontal, 15)
-                        .padding(.vertical, 14)
+                        .padding(.vertical, 8)
                         .allowsHitTesting(false)
                 }
             }
 
             // Toolbar Row
             HStack(spacing: 12) {
-                // Attach button icon placeholder
                 Button {
-                    // Placeholder for future attachment logic
+                    pickImages()
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 13, weight: .semibold))
@@ -102,24 +121,29 @@ struct AgentComposer: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .help("Attach images")
 
-                // Model dropdown selector
-                modelMenu
+                modelBadge
 
-                // Mode pill selector
                 modeMenu
 
                 Spacer()
 
-                // Project display / selection dropdown
                 projectSection
 
-                // Send or Stop Button
                 sendButton
             }
-            .padding(.top, 2)
         }
-        .padding(.horizontal, 2)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Theme.overlay(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Theme.overlay(isFocused ? 0.22 : 0.10), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.25), radius: 20, y: 8)
         .onAppear {
             isFocused = true
             validateProject()
@@ -135,56 +159,80 @@ struct AgentComposer: View {
         }
     }
 
-    private var modelMenu: some View {
-        Group {
-            if isSessionActive && !manager.models.isEmpty {
-                Menu {
-                    ForEach(manager.models, id: \.id) { model in
+    // MARK: - Attachments
+    private var attachmentsRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(attachments) { attachment in
+                    ZStack(alignment: .topTrailing) {
+                        Image(nsImage: attachment.thumbnail)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 52, height: 52)
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .stroke(Theme.overlay(0.15), lineWidth: 1)
+                            )
+
                         Button {
-                            // Selected model (future ACP endpoint for model select can go here)
+                            attachments.removeAll { $0.id == attachment.id }
                         } label: {
-                            HStack {
-                                Text(model.name ?? model.id ?? "Unknown model")
-                                if manager.currentModel?.id == model.id {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.white, Color.black.opacity(0.6))
                         }
+                        .buttonStyle(.plain)
+                        .offset(x: 5, y: -5)
                     }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(manager.currentModel?.name ?? manager.currentModel?.id ?? "GPT-5.3-Codex")
-                            .font(AppFonts.ui(12, weight: .medium))
-                            .foregroundStyle(Theme.text3)
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 8, weight: .semibold))
-                            .foregroundStyle(Theme.text4)
-                    }
+                }
+            }
+            .padding(.horizontal, 2)
+        }
+    }
+
+    private func pickImages() {
+        guard !isPickingImages else { return }
+        isPickingImages = true
+        Task { @MainActor in
+            defer { isPickingImages = false }
+            let urls = await ImagePicker.pickImages()
+            for url in urls {
+                if let attachment = Self.loadAttachment(from: url) {
+                    attachments.append(attachment)
+                }
+            }
+        }
+    }
+
+    private static func loadAttachment(from url: URL) -> ComposerAttachment? {
+        guard let data = try? Data(contentsOf: url), let image = NSImage(data: data) else { return nil }
+        let mimeType = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "image/png"
+        return ComposerAttachment(
+            thumbnail: image,
+            base64Data: data.base64EncodedString(),
+            mimeType: mimeType,
+            filename: url.lastPathComponent
+        )
+    }
+
+    // MARK: - Model (informational only)
+    // There's no confirmed ACP v1 method for the client to request a model
+    // change (only inbound notifications telling us the agent's current
+    // model), so this is a plain, non-interactive badge rather than a
+    // dropdown that would silently do nothing when tapped.
+    private var modelBadge: some View {
+        Group {
+            if let modelName = manager.currentModel?.name ?? manager.currentModel?.id {
+                Text(modelName)
+                    .font(AppFonts.ui(12, weight: .medium))
+                    .foregroundStyle(Theme.text3)
                     .padding(.horizontal, 10)
                     .frame(height: 28)
                     .background(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(Theme.overlay(0.05))
                     )
-                }
-                .menuStyle(.borderlessButton)
-                .frame(width: 130, alignment: .leading)
-            } else {
-                HStack(spacing: 4) {
-                    Text("GPT-5.3-Codex")
-                        .font(AppFonts.ui(12, weight: .medium))
-                        .foregroundStyle(Theme.text3)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 8, weight: .semibold))
-                        .foregroundStyle(Theme.text4)
-                }
-                .padding(.horizontal, 10)
-                .frame(height: 28)
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Theme.overlay(0.05))
-                )
-                .opacity(0.6)
             }
         }
     }
@@ -195,7 +243,7 @@ struct AgentComposer: View {
                 Menu {
                     ForEach(manager.modes, id: \.id) { mode in
                         Button {
-                            // Mode switch placeholder
+                            manager.selectMode(mode.id)
                         } label: {
                             HStack {
                                 Text(mode.name ?? mode.id)
@@ -223,22 +271,6 @@ struct AgentComposer: View {
                 }
                 .menuStyle(.borderlessButton)
                 .frame(width: 110, alignment: .leading)
-            } else {
-                HStack(spacing: 4) {
-                    Text("Extra high")
-                        .font(AppFonts.ui(12, weight: .medium))
-                        .foregroundStyle(Theme.text3)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 8, weight: .semibold))
-                        .foregroundStyle(Theme.text4)
-                }
-                .padding(.horizontal, 10)
-                .frame(height: 28)
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Theme.overlay(0.05))
-                )
-                .opacity(0.6)
             }
         }
     }
@@ -248,7 +280,7 @@ struct AgentComposer: View {
            let mode = manager.modes.first(where: { $0.id == currentMode }) {
             return mode.name ?? mode.id
         }
-        return "Extra high"
+        return manager.modes.first?.name ?? String(localized: "Mode")
     }
 
     private var projectSection: some View {

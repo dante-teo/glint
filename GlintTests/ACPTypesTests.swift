@@ -132,8 +132,14 @@ final class ACPTypesTests: XCTestCase {
                 if case .sessionInfoUpdate(let info) = $0 { return info.title == "New title" }
                 return false
             }),
-            (#"{"sessionUpdate":"current_mode_update","currentModeId":"plan"}"#, {
-                if case .currentModeUpdate(let mode) = $0 { return mode.currentModeId == "plan" }
+            (#"{"sessionUpdate":"current_mode_update","modeId":"plan"}"#, {
+                if case .currentModeUpdate(let mode) = $0 { return mode.modeId == "plan" }
+                return false
+            }),
+            // Tolerate the nested-style `currentModeId` key too, in case an
+            // agent sends it here instead of the spec's flat `modeId`.
+            (#"{"sessionUpdate":"current_mode_update","currentModeId":"architect"}"#, {
+                if case .currentModeUpdate(let mode) = $0 { return mode.modeId == "architect" }
                 return false
             }),
             (#"{"sessionUpdate":"available_commands_update","availableCommands":[{"name":"/reset"}]}"#, {
@@ -196,7 +202,7 @@ final class ACPTypesTests: XCTestCase {
     func testPermissionElicitationFileAndTerminalTypesDecode() throws {
         let permission = try JSONDecoder().decode(
             RequestPermissionRequest.self,
-            from: #"{"sessionId":"s","toolCallId":"t","title":"Run command","kind":"execute"}"#.data(using: .utf8)!
+            from: #"{"sessionId":"s","toolCall":{"toolCallId":"t","title":"Run command","kind":"execute"},"options":[{"optionId":"allow-once","name":"Allow once","kind":"allow_once"},{"optionId":"reject-once","name":"Reject","kind":"reject_once"}]}"#.data(using: .utf8)!
         )
         let elicitation = try JSONDecoder().decode(
             ElicitationRequest.self,
@@ -211,7 +217,8 @@ final class ACPTypesTests: XCTestCase {
             from: #"{"sessionId":"s","command":"pnpm","args":["test"],"cwd":"/tmp/project"}"#.data(using: .utf8)!
         )
 
-        XCTAssertEqual(permission.kind, .execute)
+        XCTAssertEqual(permission.toolCall?.kind, .execute)
+        XCTAssertEqual(permission.options.map(\.optionId), ["allow-once", "reject-once"])
         XCTAssertEqual(elicitation.schema, .object(["type": .string("object")]))
         XCTAssertEqual(read.line, 2)
         XCTAssertEqual(terminal.args, ["test"])
@@ -224,7 +231,7 @@ final class ACPTypesTests: XCTestCase {
         )
         let permission = try JSONDecoder().decode(
             RequestPermissionRequest.self,
-            from: #"{"sessionID":"legacy","title":"Run command"}"#.data(using: .utf8)!
+            from: #"{"sessionID":"legacy"}"#.data(using: .utf8)!
         )
         let elicitation = try JSONDecoder().decode(
             ElicitationRequest.self,

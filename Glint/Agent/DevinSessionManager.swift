@@ -8,10 +8,18 @@ protocol DevinACPClient: AnyObject {
     func initialize() async throws -> InitializeResponse
     func createSession(cwd: String) async throws -> NewSessionResponse
     func loadSession(sessionID: String, cwd: String) async throws -> LoadSessionResponse
-    func prompt(sessionID: String, text: String) async throws -> PromptResponse
+    func prompt(sessionID: String, content: [ContentBlock]) async throws -> PromptResponse
+    func setMode(sessionID: String, modeId: String) async throws
     func closeSession(sessionID: String) async throws
     func cancelSession(sessionID: String)
     func close()
+}
+
+extension DevinACPClient {
+    @discardableResult
+    func prompt(sessionID: String, text: String) async throws -> PromptResponse {
+        try await prompt(sessionID: sessionID, content: [.text(text)])
+    }
 }
 
 extension ACPClient: DevinACPClient {}
@@ -72,6 +80,12 @@ final class DevinSessionManager: ObservableObject {
         var costCurrency: String?
     }
 
+    /// A single image attached to an outgoing prompt (composer attachments).
+    struct ImageAttachment: Equatable {
+        var base64Data: String
+        var mimeType: String
+    }
+
     @Published private(set) var status: Status = .idle {
         didSet { onStatusChange(status) }
     }
@@ -109,6 +123,13 @@ final class DevinSessionManager: ObservableObject {
     private var client: DevinACPClient?
     private var notificationCancellable: AnyCancellable?
     private var runID = UUID()
+    /// Whether a turn is currently in flight. Session/update notifications
+    /// for a turn the agent process keeps emitting after the user cancels
+    /// (or after we've already marked the turn idle/failed) must not be
+    /// allowed to flip `status` back to busy — nothing would ever reset it
+    /// again, leaving the composer permanently disabled. Message/tool
+    /// content from those notifications is still recorded either way.
+    private var isTurnActive = false
     private var projectPath: String?
     private var saveTask: Task<Void, Never>?
     private var permissionContinuation: CheckedContinuation<ACPJSONValue, Never>?
@@ -131,13 +152,13 @@ final class DevinSessionManager: ObservableObject {
         loadPersistedConversation()
     }
 
-    func sendFirstPrompt(text: String, projectPath: String) {
-        sendPrompt(text: text, projectPath: projectPath)
+    func sendFirstPrompt(text: String, projectPath: String, images: [ImageAttachment] = []) {
+        sendPrompt(text: text, projectPath: projectPath, images: images)
     }
 
-    func sendPrompt(text: String, projectPath: String? = nil) {
+    func sendPrompt(text: String, projectPath: String? = nil, images: [ImageAttachment] = []) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !status.isBusy else { return }
+        guard !trimmed.isEmpty || !images.isEmpty, !status.isBusy else { return }
         if let projectPath {
             self.projectPath = projectPath
         }
@@ -146,16 +167,26 @@ final class DevinSessionManager: ObservableObject {
             return
         }
 
-        messages.append(Message(role: .user, text: trimmed))
+        var content: [ContentBlock] = []
+        if !trimmed.isEmpty {
+            content.append(.text(trimmed))
+        }
+        content.append(contentsOf: images.map { .image(ImageContent(data: $0.base64Data, mimeType: $0.mimeType)) })
+
+        let displayText = trimmed.isEmpty
+            ? (images.count == 1 ? String(localized: "Sent an image") : String(format: String(localized: "Sent %d images"), images.count))
+            : trimmed
+        messages.append(Message(role: .user, text: displayText))
         scheduleSave()
 
         let runID = UUID()
         self.runID = runID
+        isTurnActive = true
 
         if sessionID == nil || client == nil {
-            startSessionAndPrompt(text: trimmed, projectPath: projectRoot, runID: runID)
+            startSessionAndPrompt(content: content, projectPath: projectRoot, runID: runID)
         } else {
-            promptExistingSession(text: trimmed, runID: runID)
+            promptExistingSession(content: content, runID: runID)
         }
     }
 
@@ -167,6 +198,7 @@ final class DevinSessionManager: ObservableObject {
         status = .cancelling
         client?.cancelSession(sessionID: sessionID)
         runID = UUID()
+        isTurnActive = false
         status = .idle
     }
 
@@ -178,6 +210,7 @@ final class DevinSessionManager: ObservableObject {
         let currentSessionID = sessionID
         denyPendingInteractions()
         runID = UUID()
+        isTurnActive = false
         status = .cancelling
         let client = self.client
         self.client = nil
@@ -232,15 +265,52 @@ final class DevinSessionManager: ObservableObject {
     func stop() {
         denyPendingInteractions()
         runID = UUID()
+        isTurnActive = false
         client?.close()
         client = nil
         notificationCancellable = nil
         status = .idle
     }
 
+    /// The ACP v1 response to a permission request must select one of the
+    /// `optionId`s the agent offered (`{"outcome":{"outcome":"selected","optionId":...}}`),
+    /// not a bare "approved"/"denied" string — Devin's ACP server has no
+    /// way to act on the latter, which looks to the user like the tool
+    /// call permanently "stuck" since the agent is left waiting for a
+    /// response it can actually parse.
     func respondToPermission(approved: Bool) {
-        let response = RequestPermissionResponse(outcome: approved ? .approved : .denied)
-        completePermission(with: (try? response.jsonValue()) ?? .object(["outcome": .string(approved ? "approved" : "denied")]))
+        let options = pendingPermission?.request.options ?? []
+        completePermission(with: Self.outcomeJSON(for: Self.selectOption(from: options, approved: approved)))
+    }
+
+    /// Picks the offered option matching the desired allow/reject
+    /// direction, preferring the "once" variant over "always" — checked in
+    /// that priority order regardless of where the agent placed them in
+    /// `options`, not by set membership (which would let whichever kind
+    /// happens to come first in the array win). Returns nil (→
+    /// `cancelled`) if no option of the requested direction exists at
+    /// all; it must never fall back to an option of the *opposite*
+    /// direction, since that would silently turn a user's Deny into an
+    /// Allow (or vice versa).
+    nonisolated private static func selectOption(from options: [PermissionOption], approved: Bool) -> PermissionOption? {
+        let preferredKinds: [PermissionOptionKind] = approved
+            ? [.allowOnce, .allowAlways]
+            : [.rejectOnce, .rejectAlways]
+        for kind in preferredKinds {
+            if let match = options.first(where: { $0.kind == kind }) {
+                return match
+            }
+        }
+        return nil
+    }
+
+    nonisolated private static func outcomeJSON(for option: PermissionOption?) -> ACPJSONValue {
+        guard let option else {
+            return (try? RequestPermissionResponse(outcome: .cancelled).jsonValue())
+                ?? .object(["outcome": .object(["outcome": .string("cancelled")])])
+        }
+        return (try? RequestPermissionResponse(outcome: .selected(optionId: option.optionId)).jsonValue())
+            ?? .object(["outcome": .object(["outcome": .string("selected"), "optionId": .string(option.optionId)])])
     }
 
     func submitElicitation(values: ACPJSONValue?) {
@@ -259,7 +329,7 @@ final class DevinSessionManager: ObservableObject {
         try? FileManager.default.removeItem(at: conversationURL(workspaceID: workspaceID, sessionsDirectory: sessionsDirectory))
     }
 
-    private func startSessionAndPrompt(text: String, projectPath: String, runID: UUID) {
+    private func startSessionAndPrompt(content: [ContentBlock], projectPath: String, runID: UUID) {
         status = .starting
         let client = clientFactory()
         installHandlers(on: client, projectRoot: projectPath)
@@ -278,7 +348,7 @@ final class DevinSessionManager: ObservableObject {
                 await self?.applyInitialize(initialize)
                 await self?.applySession(sessionID: sessionID, response: session)
                 await self?.markThinking()
-                _ = try await client.prompt(sessionID: sessionID, text: text)
+                _ = try await client.prompt(sessionID: sessionID, content: content)
                 guard await self?.isCurrentRun(runID) == true else { return }
                 await self?.markIdle()
             } catch {
@@ -290,12 +360,12 @@ final class DevinSessionManager: ObservableObject {
         }
     }
 
-    private func promptExistingSession(text: String, runID: UUID) {
+    private func promptExistingSession(content: [ContentBlock], runID: UUID) {
         guard let client, let sessionID else { return }
         status = .thinking
         Task.detached { [weak self, client, sessionID, runID] in
             do {
-                _ = try await client.prompt(sessionID: sessionID, text: text)
+                _ = try await client.prompt(sessionID: sessionID, content: content)
                 guard await self?.isCurrentRun(runID) == true else { return }
                 await self?.markIdle()
             } catch {
@@ -305,6 +375,30 @@ final class DevinSessionManager: ObservableObject {
                 await self?.markFailed(message)
             }
         }
+    }
+
+    /// Switches the session's operating mode via `session/set_mode`
+    /// (confirmed ACP v1 method: `{sessionId, modeId}`). The mode can be
+    /// changed at any point, whether idle or generating a response.
+    func selectMode(_ modeId: String) {
+        guard let client, let sessionID, modeId != currentMode else { return }
+        let previousMode = currentMode
+        currentMode = modeId
+        Task.detached { [weak self, client, sessionID, modeId] in
+            do {
+                try await client.setMode(sessionID: sessionID, modeId: modeId)
+            } catch {
+                await self?.revertMode(to: previousMode, failedModeId: modeId, error: error)
+            }
+        }
+    }
+
+    private func revertMode(to previousMode: String?, failedModeId: String, error: Error) {
+        guard currentMode == failedModeId else { return }
+        currentMode = previousMode
+        let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        messages.append(Message(role: .system, text: String(format: String(localized: "Couldn't switch mode: %@"), message)))
+        scheduleSave()
     }
 
     private func installHandlers(on client: DevinACPClient, projectRoot: String) {
@@ -323,7 +417,7 @@ final class DevinSessionManager: ObservableObject {
         }
         client.setRequestHandler(method: "session/request_permission") { [weak self] request in
             await self?.handlePermissionRequest(request)
-                ?? .success(.object(["outcome": .string("denied")]))
+                ?? .success(Self.outcomeJSON(for: nil))
         }
         client.setRequestHandler(method: "session/elicitation") { [weak self] request in
             await self?.handleElicitationRequest(request)
@@ -335,11 +429,21 @@ final class DevinSessionManager: ObservableObject {
         }
     }
 
+    /// Notifications are delivered via `.receive(on: DispatchQueue.main)`, so
+    /// by the time this sink runs we're already on the main thread/queue.
+    /// Handling it synchronously here (instead of spawning a further
+    /// `Task { @MainActor in ... }`) is required for correctness, not just
+    /// style: the `session/prompt` response for the same turn resolves its
+    /// own MainActor hop via a separate async chain, and an extra
+    /// unstructured-Task hop on the notification side isn't guaranteed to
+    /// preserve relative ordering against it. Losing that race lets a late
+    /// `toolCallUpdate`/thinking notification apply *after* `markIdle()`,
+    /// leaving `status` stuck busy forever (composer permanently disabled).
     private func observeNotifications(from client: DevinACPClient) {
         notificationCancellable = client.notifications
             .receive(on: DispatchQueue.main)
             .sink { [weak self] notification in
-                Task { @MainActor in
+                MainActor.assumeIsolated {
                     self?.handleNotification(notification)
                 }
             }
@@ -360,16 +464,16 @@ final class DevinSessionManager: ObservableObject {
             appendChunk(role: .user, messageId: chunk.messageId, content: chunk.content)
         case .agentMessageChunk(let chunk):
             appendChunk(role: .assistant, messageId: chunk.messageId, content: chunk.content)
-            status = .thinking
+            if isTurnActive { status = .thinking }
         case .agentThoughtChunk(let chunk):
             appendChunk(role: .thought, messageId: chunk.messageId, content: chunk.content)
-            status = .thinking
+            if isTurnActive { status = .thinking }
         case .toolCall(let tool):
             upsertToolCall(id: tool.toolCallId, title: tool.title, status: tool.status, kind: tool.kind)
-            status = .tool
+            if isTurnActive { status = .tool }
         case .toolCallUpdate(let tool):
             upsertToolCall(id: tool.toolCallId, title: tool.title, status: tool.status, kind: tool.kind)
-            status = .tool
+            if isTurnActive { status = .tool }
         case .plan(let plan):
             let text = plan.entries.map(\.content).joined(separator: "\n")
             if !text.isEmpty {
@@ -385,7 +489,7 @@ final class DevinSessionManager: ObservableObject {
         case .sessionInfoUpdate(let info):
             sessionTitle = info.title
         case .currentModeUpdate(let mode):
-            currentMode = mode.currentModeId
+            currentMode = mode.modeId
         case .availableCommandsUpdate, .configOptionUpdate:
             break
         case .unknown:
@@ -448,21 +552,29 @@ final class DevinSessionManager: ObservableObject {
     }
 
     private func handlePermissionRequest(_ request: ACPServerRequest) async -> Result<ACPJSONValue, ACPErrorPayload> {
+        // Falls back to a couple of generic allow/reject options (rather
+        // than an empty list) so a malformed/unexpected request can still
+        // be answered with a real optionId instead of forcing `cancelled`.
+        let fallbackOptions = [
+            PermissionOption(optionId: "allow", name: "Allow", kind: .allowOnce),
+            PermissionOption(optionId: "reject", name: "Reject", kind: .rejectOnce)
+        ]
         let params = (try? request.decodeParams(RequestPermissionRequest.self))
-            ?? RequestPermissionRequest(sessionId: sessionID ?? "", title: "Permission requested")
+            ?? RequestPermissionRequest(sessionId: sessionID ?? "", options: fallbackOptions)
 
         // 1. Check user permission review mode
         let mode = WorkspaceStore.current?.permissionReviewMode ?? .manual
 
         if mode == .autoReview {
-            let policy = PermissionPolicy.defaultPolicy(for: params.kind)
-            let title = params.title ?? "Permission request"
+            let kind = params.toolCall?.kind
+            let policy = PermissionPolicy.defaultPolicy(for: kind)
+            let title = params.toolCall?.title ?? "Permission request"
 
             switch policy {
             case .autoApprove:
                 messages.append(Message(role: .system, text: String(format: String(localized: "Auto-approved permission: %@"), title)))
                 scheduleSave()
-                return .success(.object(["outcome": .string("approved")]))
+                return .success(Self.outcomeJSON(for: Self.selectOption(from: params.options, approved: true)))
 
             case .alwaysEscalate:
                 break // Fallthrough to UI card
@@ -472,8 +584,8 @@ final class DevinSessionManager: ObservableObject {
                 let projectRoot = self.projectPath ?? ""
                 let decision = await PermissionReviewer.shared.review(
                     title: title,
-                    kind: params.kind,
-                    rawInput: params.rawInput.map { String(describing: $0) } ?? "",
+                    kind: kind,
+                    rawInput: params.toolCall?.rawInput.map { String(describing: $0) } ?? "",
                     conversationContext: self.messages,
                     projectRoot: projectRoot
                 )
@@ -485,7 +597,7 @@ final class DevinSessionManager: ObservableObject {
                         : String(format: String(localized: "Auto-approved: %@ (%@)"), title, reason)
                     messages.append(Message(role: .system, text: logText))
                     scheduleSave()
-                    return .success(.object(["outcome": .string("approved")]))
+                    return .success(Self.outcomeJSON(for: Self.selectOption(from: params.options, approved: true)))
 
                 case .deny(let reason):
                     let logText = reason.isEmpty
@@ -493,7 +605,7 @@ final class DevinSessionManager: ObservableObject {
                         : String(format: String(localized: "Auto-denied: %@ (%@)"), title, reason)
                     messages.append(Message(role: .system, text: logText))
                     scheduleSave()
-                    return .success(.object(["outcome": .string("denied")]))
+                    return .success(Self.outcomeJSON(for: Self.selectOption(from: params.options, approved: false)))
 
                 case .escalate(let reason):
                     // Attach the reviewer's reasoning via a dedicated field so
@@ -546,8 +658,12 @@ final class DevinSessionManager: ObservableObject {
     }
 
     private func denyPendingInteractions() {
+        // Per the ACP v1 spec: "If the current prompt turn gets cancelled,
+        // the Client MUST respond with the cancelled outcome" — not a
+        // rejected/denied option selection, since the client is abandoning
+        // the turn rather than actually deciding allow/reject.
         if pendingPermission != nil {
-            completePermission(with: .object(["outcome": .string("denied")]))
+            completePermission(with: Self.outcomeJSON(for: nil))
         }
         if pendingElicitation != nil {
             completeElicitation(with: .object(["cancelled": .bool(true)]))
@@ -608,11 +724,13 @@ final class DevinSessionManager: ObservableObject {
     }
 
     private func markIdle() {
+        isTurnActive = false
         status = .idle
         scheduleSave()
     }
 
     private func markFailed(_ message: String) {
+        isTurnActive = false
         messages.append(Message(role: .system, text: message))
         status = .failed(message)
         scheduleSave()

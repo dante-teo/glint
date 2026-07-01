@@ -331,6 +331,11 @@ struct CloseSessionRequest: Codable, Equatable, Sendable {
     var sessionId: String
 }
 
+struct SetSessionModeRequest: Codable, Equatable, Sendable {
+    var sessionId: String
+    var modeId: String
+}
+
 struct CloseSessionResponse: Codable, Equatable, Sendable {
     init() {}
 
@@ -762,7 +767,36 @@ struct SessionInfoUpdate: Codable, Equatable, Sendable {
 
 struct CurrentModeUpdate: Codable, Equatable, Sendable {
     var sessionUpdate = "current_mode_update"
-    var currentModeId: String
+    var modeId: String
+
+    // The ACP spec's `current_mode_update` notification uses a flat
+    // `modeId` key (distinct from `SessionModeState.currentModeId`, which
+    // is nested under `modes` in session setup responses). Tolerate a
+    // `currentModeId` key too in case an agent sends the nested-style name
+    // here as well.
+    private enum CodingKeys: String, CodingKey {
+        case sessionUpdate, modeId, currentModeId
+    }
+
+    init(modeId: String) {
+        self.modeId = modeId
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        sessionUpdate = try container.decodeIfPresent(String.self, forKey: .sessionUpdate) ?? "current_mode_update"
+        if let modeId = try container.decodeIfPresent(String.self, forKey: .modeId) {
+            self.modeId = modeId
+        } else {
+            modeId = try container.decode(String.self, forKey: .currentModeId)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(sessionUpdate, forKey: .sessionUpdate)
+        try container.encode(modeId, forKey: .modeId)
+    }
 }
 
 struct AvailableCommandsUpdate: Codable, Equatable, Sendable {
@@ -804,12 +838,66 @@ struct SessionConfigOption: Codable, Equatable, Sendable {
     var value: ACPJSONValue?
 }
 
-struct RequestPermissionRequest: Codable, Equatable, Sendable {
-    var sessionId: String
-    var toolCallId: String?
+/// The `toolCall` field nested inside a `session/request_permission`
+/// request. The ACP v1 spec's own example includes only `toolCallId` (all
+/// other fields omitted), so unlike `ToolCallUpdate` (used for the
+/// tool_call *creation* notification, where `title` is required), every
+/// field here besides the id must tolerate being absent.
+struct PermissionToolCallInfo: Codable, Equatable, Sendable {
+    var toolCallId: String
     var title: String?
     var kind: ToolKind?
+    var status: ToolCallStatus?
     var rawInput: ACPJSONValue?
+}
+
+struct PermissionOption: Codable, Equatable, Sendable {
+    var optionId: String
+    var name: String?
+    var kind: PermissionOptionKind?
+}
+
+enum PermissionOptionKind: Codable, Equatable, Sendable {
+    case allowOnce
+    case allowAlways
+    case rejectOnce
+    case rejectAlways
+    case unknown(String)
+
+    init(from decoder: Decoder) throws {
+        let value = try decoder.singleValueContainer().decode(String.self)
+        switch value {
+        case "allow_once": self = .allowOnce
+        case "allow_always": self = .allowAlways
+        case "reject_once": self = .rejectOnce
+        case "reject_always": self = .rejectAlways
+        default: self = .unknown(value)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .allowOnce: try container.encode("allow_once")
+        case .allowAlways: try container.encode("allow_always")
+        case .rejectOnce: try container.encode("reject_once")
+        case .rejectAlways: try container.encode("reject_always")
+        case .unknown(let value): try container.encode(value)
+        }
+    }
+}
+
+struct RequestPermissionRequest: Codable, Equatable, Sendable {
+    var sessionId: String
+    /// Per the ACP v1 spec, the tool call details are nested under
+    /// `toolCall`, not flat on the request — do not add flattened
+    /// `toolCallId`/`title`/`kind`/`rawInput` fields back here; read them
+    /// via `toolCall`.
+    var toolCall: PermissionToolCallInfo?
+    /// The choices the agent is offering (e.g. allow-once/reject-once).
+    /// The client's response must echo back one of these `optionId`s, not
+    /// an arbitrary approved/denied string.
+    var options: [PermissionOption]
     /// Glint-local enrichment set when `PermissionReviewer` escalates a
     /// request to the user. Never part of the ACP wire format (not decoded
     /// from or encoded back to `devin acp`) — keeps the original `rawInput`
@@ -818,67 +906,71 @@ struct RequestPermissionRequest: Codable, Equatable, Sendable {
     var reviewReason: String?
 
     private enum CodingKeys: String, CodingKey {
-        case sessionId, toolCallId, title, kind, rawInput
+        case sessionId, toolCall, options
     }
 
     init(sessionId: String,
-         toolCallId: String? = nil,
-         title: String? = nil,
-         kind: ToolKind? = nil,
-         rawInput: ACPJSONValue? = nil,
+         toolCall: PermissionToolCallInfo? = nil,
+         options: [PermissionOption] = [],
          reviewReason: String? = nil) {
         self.sessionId = sessionId
-        self.toolCallId = toolCallId
-        self.title = title
-        self.kind = kind
-        self.rawInput = rawInput
+        self.toolCall = toolCall
+        self.options = options
         self.reviewReason = reviewReason
     }
 
     init(from decoder: Decoder) throws {
         sessionId = try decoder.decodeSessionIdAlias()
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        toolCallId = try container.decodeIfPresent(String.self, forKey: .toolCallId)
-        title = try container.decodeIfPresent(String.self, forKey: .title)
-        kind = try container.decodeIfPresent(ToolKind.self, forKey: .kind)
-        rawInput = try container.decodeIfPresent(ACPJSONValue.self, forKey: .rawInput)
+        toolCall = try container.decodeIfPresent(PermissionToolCallInfo.self, forKey: .toolCall)
+        options = try container.decodeIfPresent([PermissionOption].self, forKey: .options) ?? []
         reviewReason = nil
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(sessionId, forKey: .sessionId)
-        try container.encodeIfPresent(toolCallId, forKey: .toolCallId)
-        try container.encodeIfPresent(title, forKey: .title)
-        try container.encodeIfPresent(kind, forKey: .kind)
-        try container.encodeIfPresent(rawInput, forKey: .rawInput)
+        try container.encodeIfPresent(toolCall, forKey: .toolCall)
+        try container.encode(options, forKey: .options)
     }
 }
 
 struct RequestPermissionResponse: Codable, Equatable, Sendable {
-    var outcome: PermissionOutcome
+    var outcome: RequestPermissionOutcome
 }
 
-enum PermissionOutcome: Codable, Equatable, Sendable {
-    case approved
-    case denied
-    case unknown(String)
+/// Per the ACP v1 spec, the response is `{"outcome": {"outcome": ...}}` —
+/// a nested object naming the *selected option* by id, not a bare
+/// "approved"/"denied" string. `selected` must reference one of the
+/// `optionId`s the agent offered in the request's `options` array;
+/// `cancelled` is mandatory when the client abandons the turn (e.g. the
+/// user hits stop) rather than actually deciding allow/reject.
+enum RequestPermissionOutcome: Codable, Equatable, Sendable {
+    case selected(optionId: String)
+    case cancelled
+
+    private enum CodingKeys: String, CodingKey {
+        case outcome, optionId
+    }
 
     init(from decoder: Decoder) throws {
-        let value = try decoder.singleValueContainer().decode(String.self)
-        switch value {
-        case "approved": self = .approved
-        case "denied": self = .denied
-        default: self = .unknown(value)
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let outcome = try container.decode(String.self, forKey: .outcome)
+        if outcome == "cancelled" {
+            self = .cancelled
+        } else {
+            self = .selected(optionId: try container.decode(String.self, forKey: .optionId))
         }
     }
 
     func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
+        var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case .approved: try container.encode("approved")
-        case .denied: try container.encode("denied")
-        case .unknown(let value): try container.encode(value)
+        case .selected(let optionId):
+            try container.encode("selected", forKey: .outcome)
+            try container.encode(optionId, forKey: .optionId)
+        case .cancelled:
+            try container.encode("cancelled", forKey: .outcome)
         }
     }
 }

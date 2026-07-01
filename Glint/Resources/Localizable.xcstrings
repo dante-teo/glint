@@ -88,7 +88,7 @@
     "Arguments:" : {
 
     },
-    "Ask Codex Anything..." : {
+    "Ask Devin Anything..." : {
 
     },
     "Ask first when the clipboard contains newlines or control characters — a multi-line paste into a shell prompt runs each line immediately." : {
@@ -158,9 +158,6 @@
     "External control" : {
       "extractionState" : "manual"
     },
-    "Extra high" : {
-
-    },
     "git" : {
 
     },
@@ -169,9 +166,6 @@
     },
     "Glint can register a small hook with Claude Code (~/.claude/settings.json) and Codex (~/.codex/hooks.json) that reports when an agent is thinking, finished, or waiting for approval. It only sends events to Glint on this Mac. You can uninstall it anytime in Settings → Agents." : {
       "extractionState" : "manual"
-    },
-    "GPT-5.3-Codex" : {
-
     },
     "How Claude panes are drawn in the sidebar and tabs." : {
       "extractionState" : "manual"

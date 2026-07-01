@@ -11,7 +11,14 @@ final class DevinSessionManagerTests: XCTestCase {
         var started = false
         var closed = false
         var cancelledSessionID: String?
-        var promptCalls: [(sessionID: String, text: String)] = []
+        var promptCalls: [(sessionID: String, content: [ContentBlock])] = []
+        var setModeCalls: [(sessionID: String, modeId: String)] = []
+        var setModeError: Error?
+        /// When set, the next `prompt(sessionID:content:)` call suspends
+        /// until this continuation is resumed, letting tests interleave a
+        /// notification between "prompt sent" and "prompt resolved" to
+        /// exercise the ordering-race fix.
+        var promptGate: CheckedContinuation<Void, Never>?
 
         func start() throws {
             started = true
@@ -33,9 +40,31 @@ final class DevinSessionManagerTests: XCTestCase {
             LoadSessionResponse(modes: nil, configOptions: nil)
         }
 
-        func prompt(sessionID: String, text: String) async throws -> PromptResponse {
-            promptCalls.append((sessionID, text))
+        private var shouldGateNextPrompt = false
+
+        func armPromptGate() {
+            shouldGateNextPrompt = true
+        }
+
+        func releasePromptGate() {
+            promptGate?.resume()
+            promptGate = nil
+        }
+
+        func prompt(sessionID: String, content: [ContentBlock]) async throws -> PromptResponse {
+            promptCalls.append((sessionID, content))
+            if shouldGateNextPrompt {
+                shouldGateNextPrompt = false
+                await withCheckedContinuation { continuation in
+                    promptGate = continuation
+                }
+            }
             return PromptResponse(stopReason: .endTurn)
+        }
+
+        func setMode(sessionID: String, modeId: String) async throws {
+            setModeCalls.append((sessionID, modeId))
+            if let setModeError { throw setModeError }
         }
 
         func closeSession(sessionID: String) async throws {}
@@ -85,7 +114,7 @@ final class DevinSessionManagerTests: XCTestCase {
         XCTAssertTrue(client.started)
         XCTAssertEqual(manager.sessionID, "session-123")
         XCTAssertEqual(client.promptCalls.first?.sessionID, "session-123")
-        XCTAssertEqual(client.promptCalls.first?.text, "hello Devin")
+        XCTAssertEqual(client.promptCalls.first?.content.compactMap(\.plainText).joined(), "hello Devin")
         XCTAssertEqual(manager.status, .idle)
     }
 
@@ -98,7 +127,71 @@ final class DevinSessionManagerTests: XCTestCase {
         manager.sendPrompt(text: "second")
         await waitUntil { client.promptCalls.count == 2 }
 
-        XCTAssertEqual(client.promptCalls.map(\.text), ["first", "second"])
+        XCTAssertEqual(client.promptCalls.map { $0.content.compactMap(\.plainText).joined() }, ["first", "second"])
+    }
+
+    /// Regression test for `sendPrompt`'s content-array construction: a
+    /// non-empty text draft plus attached images must produce a text
+    /// block followed by one image block per attachment, in that order.
+    func testSendPromptWithTextAndImagesBuildsTextThenImageBlocks() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+
+        manager.sendFirstPrompt(
+            text: "check this screenshot",
+            projectPath: "/tmp",
+            images: [DevinSessionManager.ImageAttachment(base64Data: "AAAA", mimeType: "image/png")]
+        )
+
+        await waitUntil { client.promptCalls.count == 1 }
+        let content = client.promptCalls.first?.content ?? []
+        XCTAssertEqual(content.count, 2)
+        XCTAssertEqual(content.first?.plainText, "check this screenshot")
+        if case .image(let image) = content.last {
+            XCTAssertEqual(image.data, "AAAA")
+            XCTAssertEqual(image.mimeType, "image/png")
+        } else {
+            XCTFail("Expected an image content block")
+        }
+    }
+
+    /// Regression test for the "images-only send" guard: sending with an
+    /// empty draft but at least one attachment must still go through
+    /// (only text AND images both empty should be rejected), and the
+    /// displayed user message should fall back to a descriptive string
+    /// since there's no literal text to show.
+    func testSendPromptWithOnlyImagesSendsImageOnlyContentAndDisplayText() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+
+        manager.sendFirstPrompt(
+            text: "   ",
+            projectPath: "/tmp",
+            images: [DevinSessionManager.ImageAttachment(base64Data: "AAAA", mimeType: "image/png")]
+        )
+
+        await waitUntil { client.promptCalls.count == 1 }
+        let content = client.promptCalls.first?.content ?? []
+        XCTAssertEqual(content.count, 1)
+        if case .image = content.first {
+            // expected
+        } else {
+            XCTFail("Expected the only content block to be an image")
+        }
+        XCTAssertTrue(manager.messages.contains { $0.role == .user && $0.text == "Sent an image" })
+    }
+
+    /// A draft that's empty (after trimming) with no images at all must
+    /// not send anything.
+    func testSendPromptWithEmptyTextAndNoImagesDoesNothing() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+
+        manager.sendFirstPrompt(text: "   ", projectPath: "/tmp")
+
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(client.promptCalls.count, 0)
+        XCTAssertTrue(manager.messages.isEmpty)
     }
 
     func testAgentChunksWithSameMessageIDAppendToOneMessage() async throws {
@@ -139,6 +232,82 @@ final class DevinSessionManagerTests: XCTestCase {
         XCTAssertEqual(manager.messages.filter { $0.toolCallId == "tool-1" }.count, 1)
     }
 
+    /// Regression test for the "stuck tool call" bug: cancelling a turn
+    /// must suppress `status` changes from notifications the agent process
+    /// keeps emitting for that now-abandoned turn. Without the turn-active
+    /// guard, this late `toolCallUpdate` would flip `status` back to
+    /// `.tool` with nothing left to ever reset it.
+    func testCancelSuppressesStaleNotificationStatus() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        client.armPromptGate()
+        addTeardownBlock { client.releasePromptGate() }
+
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.promptCalls.count == 1 }
+
+        manager.cancelTurn()
+        XCTAssertEqual(manager.status, .idle)
+
+        client.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
+            sessionId: "session-123",
+            update: .toolCallUpdate(ToolCallDelta(toolCallId: "tool-1", title: "Still running", status: .completed))
+        ))))
+
+        await waitUntil { manager.messages.contains { $0.toolCallId == "tool-1" } }
+        XCTAssertEqual(manager.status, .idle)
+    }
+
+    /// Regression test guarding the removal of the extra `Task { @MainActor
+    /// in ... }` hop in `observeNotifications`: a notification delivered
+    /// while a prompt is in flight must still land as `.tool`/`.thinking`
+    /// (i.e. notification handling itself keeps working) and the turn must
+    /// still resolve to `.idle` once the response arrives.
+    func testNotificationDuringInFlightPromptThenResolvesIdle() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        client.armPromptGate()
+        addTeardownBlock { client.releasePromptGate() }
+
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.promptCalls.count == 1 }
+
+        client.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
+            sessionId: "session-123",
+            update: .toolCall(ToolCallUpdate(toolCallId: "tool-1", title: "Reading", kind: .read, status: .inProgress))
+        ))))
+        await waitUntil { manager.status == .tool }
+
+        client.releasePromptGate()
+        await waitUntil { manager.status == .idle }
+    }
+
+    func testSelectModeCallsSetModeAndUpdatesCurrentMode() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.promptCalls.count == 1 }
+
+        manager.selectMode("architect")
+
+        await waitUntil { client.setModeCalls.contains { $0.modeId == "architect" } }
+        XCTAssertEqual(client.setModeCalls.first?.sessionID, "session-123")
+        XCTAssertEqual(manager.currentMode, "architect")
+    }
+
+    func testSelectModeRevertsOnFailure() async throws {
+        let client = FakeClient()
+        client.setModeError = ACPClientError.requestTimedOut
+        let manager = makeManager(client: client)
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.promptCalls.count == 1 }
+
+        manager.selectMode("architect")
+
+        await waitUntil { manager.currentMode == nil }
+        XCTAssertTrue(manager.messages.contains { $0.role == .system && $0.text.contains("Couldn't switch mode") })
+    }
+
     func testPermissionRequestPublishesAndResolves() async throws {
         let client = FakeClient()
         let manager = makeManager(client: client)
@@ -150,7 +319,14 @@ final class DevinSessionManagerTests: XCTestCase {
             await handler(ACPServerRequest(
                 id: 7,
                 method: "session/request_permission",
-                params: try jsonValue(RequestPermissionRequest(sessionId: "session-123", toolCallId: "tool-1", title: "Run", kind: .execute))
+                params: try jsonValue(RequestPermissionRequest(
+                    sessionId: "session-123",
+                    toolCall: PermissionToolCallInfo(toolCallId: "tool-1", title: "Run", kind: .execute),
+                    options: [
+                        PermissionOption(optionId: "allow-once", name: "Allow once", kind: .allowOnce),
+                        PermissionOption(optionId: "reject-once", name: "Reject", kind: .rejectOnce)
+                    ]
+                ))
             ))
         }
         await waitUntil { manager.pendingPermission != nil }
@@ -158,7 +334,144 @@ final class DevinSessionManagerTests: XCTestCase {
         let result = try await task.value
 
         if case .success(let value) = result {
-            XCTAssertEqual(value, .object(["outcome": .string("approved")]))
+            XCTAssertEqual(value, .object(["outcome": .object(["outcome": .string("selected"), "optionId": .string("allow-once")])]))
+        } else {
+            XCTFail("Expected permission success")
+        }
+    }
+
+    /// Regression test: denying must select a `reject_*` option by its
+    /// real `optionId`, not send back a bare "denied" string the ACP
+    /// server can't act on.
+    func testPermissionRequestDenyingSelectsRejectOption() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.handlers["session/request_permission"] != nil }
+        let handler = try XCTUnwrap(client.handlers["session/request_permission"])
+
+        let task = Task {
+            await handler(ACPServerRequest(
+                id: 8,
+                method: "session/request_permission",
+                params: try jsonValue(RequestPermissionRequest(
+                    sessionId: "session-123",
+                    toolCall: PermissionToolCallInfo(toolCallId: "tool-1", title: "Run", kind: .execute),
+                    options: [
+                        PermissionOption(optionId: "allow-once", name: "Allow once", kind: .allowOnce),
+                        PermissionOption(optionId: "reject-once", name: "Reject", kind: .rejectOnce)
+                    ]
+                ))
+            ))
+        }
+        await waitUntil { manager.pendingPermission != nil }
+        manager.respondToPermission(approved: false)
+        let result = try await task.value
+
+        if case .success(let value) = result {
+            XCTAssertEqual(value, .object(["outcome": .object(["outcome": .string("selected"), "optionId": .string("reject-once")])]))
+        } else {
+            XCTFail("Expected permission success")
+        }
+    }
+
+    /// Regression test: the "once" variant must be preferred over
+    /// "always" by kind, not by array position — an agent is free to
+    /// list `allow_always` before `allow_once`.
+    func testPermissionRequestApprovingPrefersOnceEvenWhenListedSecond() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.handlers["session/request_permission"] != nil }
+        let handler = try XCTUnwrap(client.handlers["session/request_permission"])
+
+        let task = Task {
+            await handler(ACPServerRequest(
+                id: 10,
+                method: "session/request_permission",
+                params: try jsonValue(RequestPermissionRequest(
+                    sessionId: "session-123",
+                    toolCall: PermissionToolCallInfo(toolCallId: "tool-1", title: "Run", kind: .execute),
+                    options: [
+                        PermissionOption(optionId: "allow-always", name: "Allow always", kind: .allowAlways),
+                        PermissionOption(optionId: "allow-once", name: "Allow once", kind: .allowOnce)
+                    ]
+                ))
+            ))
+        }
+        await waitUntil { manager.pendingPermission != nil }
+        manager.respondToPermission(approved: true)
+        let result = try await task.value
+
+        if case .success(let value) = result {
+            XCTAssertEqual(value, .object(["outcome": .object(["outcome": .string("selected"), "optionId": .string("allow-once")])]))
+        } else {
+            XCTFail("Expected permission success")
+        }
+    }
+
+    /// Regression test: if the agent only offers options of the opposite
+    /// polarity (e.g. only allow-kind options), denying must respond
+    /// `cancelled` — it must never silently select an allow option just
+    /// because it's the only one available, which would turn a user's
+    /// Deny into an Allow.
+    func testPermissionRequestDenyingWithOnlyAllowOptionsRespondsCancelled() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.handlers["session/request_permission"] != nil }
+        let handler = try XCTUnwrap(client.handlers["session/request_permission"])
+
+        let task = Task {
+            await handler(ACPServerRequest(
+                id: 11,
+                method: "session/request_permission",
+                params: try jsonValue(RequestPermissionRequest(
+                    sessionId: "session-123",
+                    toolCall: PermissionToolCallInfo(toolCallId: "tool-1", title: "Run", kind: .execute),
+                    options: [PermissionOption(optionId: "allow-once", name: "Allow once", kind: .allowOnce)]
+                ))
+            ))
+        }
+        await waitUntil { manager.pendingPermission != nil }
+        manager.respondToPermission(approved: false)
+        let result = try await task.value
+
+        if case .success(let value) = result {
+            XCTAssertEqual(value, .object(["outcome": .object(["outcome": .string("cancelled")])]))
+        } else {
+            XCTFail("Expected permission success")
+        }
+    }
+
+    /// Regression test for the ACP v1 spec requirement: cancelling a turn
+    /// with a pending permission request must respond with the
+    /// `cancelled` outcome, not a `selected` option — the client is
+    /// abandoning the turn, not actually deciding allow/reject.
+    func testStopRespondsToPendingPermissionWithCancelledOutcome() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.handlers["session/request_permission"] != nil }
+        let handler = try XCTUnwrap(client.handlers["session/request_permission"])
+
+        let task = Task {
+            await handler(ACPServerRequest(
+                id: 9,
+                method: "session/request_permission",
+                params: try jsonValue(RequestPermissionRequest(
+                    sessionId: "session-123",
+                    toolCall: PermissionToolCallInfo(toolCallId: "tool-1", title: "Run", kind: .execute),
+                    options: [PermissionOption(optionId: "allow-once", name: "Allow once", kind: .allowOnce)]
+                ))
+            ))
+        }
+        await waitUntil { manager.pendingPermission != nil }
+        manager.stop()
+        let result = try await task.value
+
+        if case .success(let value) = result {
+            XCTAssertEqual(value, .object(["outcome": .object(["outcome": .string("cancelled")])]))
         } else {
             XCTFail("Expected permission success")
         }

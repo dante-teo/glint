@@ -108,6 +108,12 @@ struct ContentView: View {
 
 struct ToolbarHeader: View {
     @EnvironmentObject var store: WorkspaceStore
+    /// Shared with any pane content that needs to avoid rendering under the
+    /// floating glass toolbar (see `ContentView.floatingHeader`) — e.g.
+    /// non-terminal SwiftUI panes like `AgentPaneView`, which (unlike
+    /// terminal surfaces) have no "padded shell launcher" trick to keep
+    /// their own header out from under the islands.
+    static let height: CGFloat = 52
     /// Traffic lights disappear in full screen, so the 78pt gutter we
     /// reserve for them (when the sidebar is collapsed) must collapse too
     /// or the toolbar starts with a dead zone.
@@ -183,7 +189,7 @@ struct ToolbarHeader: View {
         // traffic lights at all.
         .padding(.leading, store.sidebarCollapsed && !isFullscreen ? 78 : 12)
         .padding(.trailing, 14)
-        .frame(height: 52)
+        .frame(height: Self.height)
         // Invisible drag strip across the whole header. In framed split mode
         // the panes have their own close buttons in this top region, so empty
         // toolbar gaps must click through to the pane chrome instead.
