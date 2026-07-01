@@ -66,7 +66,7 @@ xcodebuild test -project Glint.xcodeproj -scheme Glint -configuration Debug -des
 Then run the static sweeps:
 
 ```bash
-rg -n "[\\p{Han}]" Glint docs README.md README.en.md --glob '*.swift' --glob '*.xcstrings' --glob '*.md' --glob '*.html' --glob '!Resources/themes.json'
+rg -n "[\\p{Han}]" Glint docs README.md --glob '*.swift' --glob '*.xcstrings' --glob '*.md' --glob '*.html' --glob '!Resources/themes.json'
 rg -n "previewTheme\\(id: store\\.themeName\\)|preferredColorScheme\\(\\.dark\\)|Theme\\.bgPane\\.opacity\\(0\\.6\\)|Semi-transparent theme-color scrim" Glint --glob '*.swift'
 python3 -m json.tool Glint/Resources/Localizable.xcstrings >/tmp/glint-localizable-check.json
 rg -n "darkAqua|Color\\.black|Color\\.white|NSColor\\(" Glint --glob '*.swift'
