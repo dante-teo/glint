@@ -93,7 +93,6 @@ struct AgentComposer: View {
     let onSend: () -> Void
 
     @FocusState private var isFocused: Bool
-    @State private var projectError: String?
     @State private var isPickingImages = false
     @State private var showContextUsage = false
     @State private var isModeLabelHovered = false
@@ -241,20 +240,15 @@ struct AgentComposer: View {
                 }
             }
 
-            if projectError != nil || !isSessionActive {
-                projectSection
-            }
-
-            // Toolbar Row. Mirrors the common "left cluster of pickers,
-            // flexible gap, right cluster of icon-only actions" composer
-            // layout (e.g. Codex's model/reasoning pickers on the left,
-            // send button on the right): every pill/icon here is
-            // `.fixedSize()` so it hugs its own content instead of
-            // stretching to fill the row — without that, SwiftUI's `Menu`
-            // on macOS can claim more width than its label actually needs,
-            // which visually reads as huge, uneven gaps between controls.
+            // Toolbar Row: a plain HStack, left to right, each control
+            // sized to its own content. The only flexible space is the
+            // `Spacer` below, which pushes the context-usage indicator and
+            // send button to the trailing edge.
             HStack(spacing: 6) {
                 plusMenu
+                if !projectIsValid || !isSessionActive {
+                    projectSection
+                }
                 modelMenu
                 approvalMenu
                 if mode == .plan {
@@ -290,11 +284,9 @@ struct AgentComposer: View {
         .shadow(color: Color.black.opacity(0.25), radius: 20, y: 8)
         .onAppear {
             isFocused = true
-            validateProject()
             connectIfNeeded()
         }
         .onChange(of: workspace.agentProjectPath) { _, _ in
-            validateProject()
             connectIfNeeded()
         }
         .onChange(of: manager.status) { _, status in
@@ -413,7 +405,7 @@ struct AgentComposer: View {
                 }
             }
         } label: {
-            controlPill(icon: approvalIcon, title: store.permissionReviewMode.title, maxWidth: 116)
+            controlPill(icon: approvalIcon, title: store.permissionReviewMode.title)
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -574,7 +566,7 @@ struct AgentComposer: View {
                 }
             }
         } label: {
-            controlPill(icon: "cpu", title: modelMenuLabel, maxWidth: 150)
+            controlPill(icon: "cpu", title: modelMenuLabel)
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -670,7 +662,7 @@ struct AgentComposer: View {
             .background(Circle().fill(Theme.overlay(0.05)))
     }
 
-    private func controlPill(icon: String, title: String, maxWidth: CGFloat) -> some View {
+    private func controlPill(icon: String, title: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(.system(size: 11.5, weight: .semibold))
@@ -684,7 +676,7 @@ struct AgentComposer: View {
         }
         .foregroundStyle(Theme.text3)
         .padding(.horizontal, 9)
-        .frame(maxWidth: maxWidth, minHeight: 28, maxHeight: 28, alignment: .leading)
+        .frame(height: 28)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Theme.overlay(0.05))
@@ -693,13 +685,6 @@ struct AgentComposer: View {
 
     private var projectSection: some View {
         HStack(spacing: 8) {
-            if let projectError {
-                Text(projectError)
-                    .font(AppFonts.ui(11))
-                    .foregroundStyle(Theme.orange)
-                    .lineLimit(1)
-            }
-
             if isSessionActive {
                 // Project is locked once session is running
                 HStack(spacing: 6) {
@@ -755,7 +740,7 @@ struct AgentComposer: View {
                     )
                 }
                 .menuStyle(.borderlessButton)
-                .frame(maxWidth: 180, alignment: .trailing)
+                .fixedSize()
             }
         }
     }
@@ -783,27 +768,13 @@ struct AgentComposer: View {
     }
 
     private func chooseProject(_ path: String) {
-        if store.setAgentProjectPath(workspaceID: workspace.id, path: path) {
-            projectError = nil
-        } else {
-            projectError = String(localized: "Folder is missing.")
-        }
+        store.setAgentProjectPath(workspaceID: workspace.id, path: path)
     }
 
     private func chooseFolder() {
         Task { @MainActor in
             guard let folder = await FolderPicker.pickProjectFolder() else { return }
             chooseProject(folder.path)
-        }
-    }
-
-    private func validateProject() {
-        if projectPath == nil {
-            projectError = String(localized: "Choose a folder.")
-        } else if !projectIsValid {
-            projectError = String(localized: "Folder is unavailable.")
-        } else {
-            projectError = nil
         }
     }
 
