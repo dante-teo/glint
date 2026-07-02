@@ -2391,7 +2391,22 @@ final class WorkspaceStore: ObservableObject {
             if let projectPath {
                 return Self.standardizedAgentProjectPath(projectPath)
             }
-            return focusedPaneLiveCwd().flatMap(Self.standardizedAgentProjectPath)
+            // The focused pane's "live cwd" is a best-effort signal (OSC 7,
+            // falling back to proc_pidinfo) that can transiently resolve to
+            // the filesystem root — e.g. a brand-new shell pane whose
+            // foreground process hasn't reported (or finished `cd`-ing away
+            // from) a real working directory yet. "/" is never a real
+            // project root, so silently auto-filling it here would both
+            // hand a fresh agent session unintended access to the entire
+            // disk and — since "/" passes `isValidAgentProjectPath` like
+            // any other real directory — make the composer treat a project
+            // as already chosen, hiding the folder picker entirely and
+            // leaving the user with no visible way to pick the folder they
+            // actually meant. Leave it nil instead so the picker shows and
+            // the user must choose explicitly.
+            guard let liveCwd = focusedPaneLiveCwd().flatMap(Self.standardizedAgentProjectPath),
+                  liveCwd != "/" else { return nil }
+            return liveCwd
         }()
         // Clean up any existing uncommitted workspace first (e.g. user opened
         // the folder picker twice without sending a message).

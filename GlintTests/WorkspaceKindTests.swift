@@ -65,6 +65,29 @@ final class WorkspaceKindTests: XCTestCase {
         XCTAssertFalse(agent?.committed ?? true)
     }
 
+    /// Regression test: the focused pane's "live cwd" (used to auto-suggest
+    /// a project when none is passed explicitly) is a best-effort signal
+    /// that can transiently resolve to the filesystem root — e.g. a
+    /// freshly-spawned shell pane whose foreground process hasn't reported
+    /// a real working directory yet. "/" must never be silently accepted
+    /// as the suggested project: since it's a real, existing directory, it
+    /// would pass validation and make the composer treat a project as
+    /// already chosen — hiding the folder picker entirely and leaving the
+    /// user with no way to pick the folder they actually meant, while also
+    /// handing a fresh agent session unintended access to the whole disk.
+    func testAddAgentWorkspaceNeverAutoSuggestsFilesystemRoot() {
+        let (store, terminalID) = makeStore()
+        let terminalIdx = store.workspaces.firstIndex { $0.id == terminalID }!
+        let paneID = store.workspaces[terminalIdx].panes.keys.first!
+        store.workspaces[terminalIdx].panes[paneID]?.workingDirectory = "/"
+
+        store.addAgentWorkspace(provider: .devin)
+
+        let agent = store.workspaces.first { $0.kind == .agent }
+        XCTAssertNil(agent?.agentProjectPath)
+        XCTAssertEqual(agent?.name, "Devin Agent")
+    }
+
     func testAddAgentWorkspaceCleansUpPriorUncommitted() {
         let (store, _) = makeStore()
         store.addAgentWorkspace(provider: .devin)
