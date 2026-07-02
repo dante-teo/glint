@@ -6,15 +6,22 @@
     <description>Most recent Glint changes.</description>
     <language>en</language>
     <item>
-      <title>Glint 1.5.2</title>
-      <sparkle:version>202607012149</sparkle:version>
-      <sparkle:shortVersionString>1.5.2</sparkle:shortVersionString>
-      <pubDate>Wed, 01 Jul 2026 21:52:41 +0000</pubDate>
+      <title>Glint 1.5.3</title>
+      <sparkle:version>202607020652</sparkle:version>
+      <sparkle:shortVersionString>1.5.3</sparkle:shortVersionString>
+      <pubDate>Thu, 02 Jul 2026 06:55:31 +0000</pubDate>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[<div style="font-family:-apple-system,sans-serif;"><h3>更新内容 · What's new in 1.5.2</h3><ul>
+      <description><![CDATA[<div style="font-family:-apple-system,sans-serif;"><h3>更新内容 · What's new in 1.5.3</h3><ul>
+    <li>fix(agent): move folder picker into composer toolbar, drop dead width hacks</li>
+    <li>fix(agent): never auto-suggest the filesystem root as a new agent project</li>
+    <li>fix(agent): stop test suite from leaking into real session store, harden stale tool-call sweep</li>
+    <li>fix(agent): fix message ordering, wire up real model switching, and fix stuck-connect bugs</li>
+    <li>fix(agent): stop composer/message overlap and fix card auto-sizing</li>
+    <li>release: update appcast for v1.5.2</li>
+  </ul></div><!--GLINT_HISTORY_BELOW--><hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"><div style="font-family:-apple-system,sans-serif;"><h3 style="color:#666;">历史版本 · Previous releases</h3></div><div style="font-family:-apple-system,sans-serif;"><h3>更新内容 · What's new in 1.5.2</h3><ul>
     <li>feat(agent): add provider-agnostic managed agent core</li>
     <li>release: update appcast for v1.5.1</li>
-  </ul></div><!--GLINT_HISTORY_BELOW--><hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"><div style="font-family:-apple-system,sans-serif;"><h3 style="color:#666;">历史版本 · Previous releases</h3></div><div style="font-family:-apple-system,sans-serif;"><h3>更新内容 · What's new in 1.5.1</h3><ul>
+  </ul></div><hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"><div style="font-family:-apple-system,sans-serif;"><h3>更新内容 · What's new in 1.5.1</h3><ul>
     <li>feat(agent): polish composer and tool UI</li>
     <li>fix(agent): make ACP tool calls inspectable and recoverable</li>
     <li>fix(agent): fix stuck tool calls, permission protocol, and composer UX</li>
@@ -52,10 +59,60 @@
     <li>feat(agent): add prevent-sleep toggle for running agents</li>
     <li>fix(pane): dim overlay follows focus instead of sticking to newest split</li>
     <li>release: update appcast for v1.2.1</li>
-  </ul></div><hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"><div style="font-family:-apple-system,sans-serif;"><h3>更新内容 · What's new in 1.2.1</h3><ul>
-    <li>feat(agent): add Always play sounds toggle in Settings</li>
-    <li>release: update appcast for v1.2.0</li>
   </ul></div>]]></description>
+      <enclosure url="https://github.com/dante-teo/glint/releases/download/v1.5.3/Glint-1.5.3.dmg" length="42069798" type="application/octet-stream" sparkle:edSignature="4z/oyC4A+WlgjVPvJgbF3B3BbAHNcBrjxnCyosTjtrpJIKrPYn/VeEtfexoeKYoQn0freMNOl3lJC2HFqkHDBA==" />
+    </item>
+    <item>
+      <title>Glint 1.5.2</title>
+      <sparkle:version>202607012149</sparkle:version>
+      <sparkle:shortVersionString>1.5.2</sparkle:shortVersionString>
+      <pubDate>Wed, 01 Jul 2026 21:52:41 +0000</pubDate>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description>&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.5.2&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;feat(agent): add provider-agnostic managed agent core&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.5.1&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;&lt;!--GLINT_HISTORY_BELOW--&gt;&lt;hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3 style="color:#666;"&gt;历史版本 · Previous releases&lt;/h3&gt;&lt;/div&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.5.1&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;feat(agent): polish composer and tool UI&lt;/li&gt;
+    &lt;li&gt;fix(agent): make ACP tool calls inspectable and recoverable&lt;/li&gt;
+    &lt;li&gt;fix(agent): fix stuck tool calls, permission protocol, and composer UX&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.5.0&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;&lt;hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.5.0&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;feat(appearance): refresh base portrait app icon&lt;/li&gt;
+    &lt;li&gt;feat(agent): wire Devin session teardown for archive/delete/quit (Phase 5)&lt;/li&gt;
+    &lt;li&gt;feat(agent): implement Devin agent pane UI (Phase 4)&lt;/li&gt;
+    &lt;li&gt;feat(agent): implement Devin ACP phase 3&lt;/li&gt;
+    &lt;li&gt;feat(agent): add inline Devin project picker&lt;/li&gt;
+    &lt;li&gt;feat(agent): add new workspace picker&lt;/li&gt;
+    &lt;li&gt;feat(workspace): add agent workspace domain model (Phase 1)&lt;/li&gt;
+    &lt;li&gt;docs: fold agent orchestration plan into AGENTS.md, drop the plan file&lt;/li&gt;
+    &lt;li&gt;docs: mark agent orchestration phase 2 complete&lt;/li&gt;
+    &lt;li&gt;docs: add agent orchestration implementation plan&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.4.2&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;&lt;hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.4.2&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;feat(app-icon): replace flat icon grid with two-level portrait + color picker&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.4.1&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;&lt;hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.4.1&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;feat(app-icon): rework themed portrait icons&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.4.0&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;&lt;hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.4.0&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;feat(app-icon): add portrait icon presets&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.3.0&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;&lt;hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.3.0&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;feat(app-icon): add portrait line art icon&lt;/li&gt;
+    &lt;li&gt;chore: remove stale research assets&lt;/li&gt;
+    &lt;li&gt;chore: enable macOS Codex plugin for project&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.2.3&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;&lt;hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.2.3&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;fix(pane): propagate split focus on click via notification&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.2.2&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;&lt;hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.2.2&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;feat(agent): add prevent-sleep toggle for running agents&lt;/li&gt;
+    &lt;li&gt;fix(pane): dim overlay follows focus instead of sticking to newest split&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.2.1&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;&lt;hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.2.1&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;feat(agent): add Always play sounds toggle in Settings&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.2.0&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;</description>
       <enclosure url="https://github.com/dante-teo/glint/releases/download/v1.5.2/Glint-1.5.2.dmg" length="42906052" type="application/octet-stream" sparkle:edSignature="uaF0Y3JhkwYBkJdiDpyrWiYxj8/gAghcIPIJZLgV9Rwn/2rvaJFZAKs+ObHS5B/ko5dVZH5q6pIw5KX2Ba4DAg==" />
     </item>
     <item>
