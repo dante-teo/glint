@@ -98,16 +98,37 @@ final class DevinSessionManagerTests: XCTestCase {
         }
     }
 
+    /// Always isolates conversation persistence to a throwaway temp
+    /// directory unless a caller explicitly passes its own. Leaving
+    /// `sessionsDirectory` as `nil` here would fall through to
+    /// `DevinSessionManager`'s real default (`~/.glint/sessions`) — the
+    /// user's actual production conversation store — and every one of the
+    /// ~30 call sites that used to rely on that default was silently
+    /// writing (and never cleaning up) real files there on every test run.
     private func makeManager(client: FakeClient = FakeClient(),
                              sessionsDirectory: URL? = nil) -> DevinSessionManager {
-        DevinSessionManager(
+        let directory = sessionsDirectory ?? Self.makeTemporarySessionsDirectory(self)
+        return DevinSessionManager(
             workspaceID: UUID(),
             paneID: PaneID(value: 0),
             onStatusChange: { _ in },
             onSessionID: { _ in },
             clientFactory: { client },
-            sessionsDirectory: sessionsDirectory
+            sessionsDirectory: directory
         )
+    }
+
+    /// Creates a fresh, uniquely-named temp directory for a single test's
+    /// conversation persistence and registers a teardown block to remove
+    /// it, mirroring the pattern already used by the resume/persistence
+    /// tests below.
+    private static func makeTemporarySessionsDirectory(_ testCase: XCTestCase) -> URL {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("glint-devin-manager-tests", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        testCase.addTeardownBlock { try? FileManager.default.removeItem(at: dir) }
+        return dir
     }
 
     private func waitUntil(_ predicate: @escaping @MainActor () -> Bool,
@@ -513,6 +534,49 @@ final class DevinSessionManagerTests: XCTestCase {
         XCTAssertEqual(manager.messages.first { $0.toolCallId == "tool-1" }?.text, "Read file")
     }
 
+    /// Regression test: per the ACP spec `toolCallId` is unique within a
+    /// session, but a reused id (e.g. a misbehaving/reconnecting agent)
+    /// must never resurrect an already-`completed` row back to
+    /// "pending"/"in progress" — that would misleadingly read "Working"
+    /// forever if the new occurrence's own completion event is ever
+    /// dropped. A reused id with a non-terminal status must instead create
+    /// a fresh row, leaving the original completed row untouched.
+    func testReusedToolCallIdAfterCompletionDoesNotRegressToWorking() async throws {
+        let client = FakeClient()
+        let manager = makeManager(client: client)
+        manager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { client.promptCalls.count == 1 }
+
+        client.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
+            sessionId: "session-123",
+            update: .toolCall(ToolCallUpdate(toolCallId: "tool-1", title: "Reading", kind: .read, status: .completed))
+        ))))
+        await waitUntil { manager.messages.contains { $0.toolCallId == "tool-1" && $0.toolStatus == .completed } }
+
+        // A later, unrelated notification reuses the same id with a fresh
+        // non-terminal status.
+        client.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
+            sessionId: "session-123",
+            update: .toolCall(ToolCallUpdate(toolCallId: "tool-1", title: "Reading again", kind: .read, status: .pending))
+        ))))
+        await waitUntil {
+            manager.messages.filter { $0.toolCallId == "tool-1" }.count == 2
+        }
+
+        let toolCalls = manager.messages.filter { $0.toolCallId == "tool-1" }
+        XCTAssertEqual(toolCalls[0].toolStatus, .completed, "the original completed row must not regress")
+        XCTAssertEqual(toolCalls[1].toolStatus, .pending, "the reused id must land on a new row")
+
+        // The new occurrence can still complete normally on its own row.
+        client.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
+            sessionId: "session-123",
+            update: .toolCallUpdate(ToolCallDelta(toolCallId: "tool-1", status: .completed))
+        ))))
+        await waitUntil {
+            manager.messages.filter { $0.toolCallId == "tool-1" && $0.toolStatus == .completed }.count == 2
+        }
+    }
+
     func testPromptCompletionMarksUnfinishedToolCallStale() async throws {
         let client = FakeClient()
         let manager = makeManager(client: client)
@@ -534,6 +598,68 @@ final class DevinSessionManagerTests: XCTestCase {
             manager.messages.contains { $0.toolCallId == "tool-1" && $0.toolAbandonedReason != nil }
         }
         XCTAssertEqual(manager.status, .idle)
+    }
+
+    /// Regression test for a crash-recovery gap: every *documented* turn-end
+    /// path (finishActiveTurn/markFailed/stop/prepareForClose) sweeps
+    /// unfinished tool calls to "stale", but a process that dies (crash,
+    /// force-quit) without going through any of them can leave a
+    /// `pending`/`in_progress`, non-abandoned tool call sitting in the
+    /// on-disk conversation. Starting a brand-new turn on the *next*
+    /// launch — proof the old one is over — must sweep it immediately, not
+    /// leave it reading "Working" until some later, unrelated event
+    /// happens to touch it.
+    func testSendPromptSweepsLeftoverUnfinishedToolCallFromUncleanShutdown() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("glint-devin-session-store", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: dir) }
+
+        let workspaceID = UUID()
+        let crashedClient = FakeClient()
+        crashedClient.armPromptGate()
+        addTeardownBlock { crashedClient.releasePromptGate() }
+        let crashedManager = DevinSessionManager(
+            workspaceID: workspaceID,
+            paneID: PaneID(value: 0),
+            onStatusChange: { _ in },
+            onSessionID: { _ in },
+            clientFactory: { crashedClient },
+            sessionsDirectory: dir
+        )
+        crashedManager.sendFirstPrompt(text: "first", projectPath: "/tmp")
+        await waitUntil { crashedClient.promptCalls.count == 1 }
+
+        crashedClient.subject.send(ACPNotification(method: "session/update", params: try jsonValue(SessionNotification(
+            sessionId: "session-123",
+            update: .toolCall(ToolCallUpdate(toolCallId: "leftover-tool", title: "Running", kind: .execute, status: .inProgress))
+        ))))
+        await waitUntil { crashedManager.messages.contains { $0.toolCallId == "leftover-tool" } }
+        // Let the debounced save land — simulating the state on disk right
+        // before the process disappears without ever closing the session.
+        try? await Task.sleep(nanoseconds: 400_000_000)
+
+        // A fresh launch loads the persisted conversation as-is: the tool
+        // call is still non-terminal and not yet abandoned.
+        let restoredClient = FakeClient()
+        let restoredManager = DevinSessionManager(
+            workspaceID: workspaceID,
+            paneID: PaneID(value: 0),
+            onStatusChange: { _ in },
+            onSessionID: { _ in },
+            clientFactory: { restoredClient },
+            sessionsDirectory: dir
+        )
+        let leftoverBeforeSend = try XCTUnwrap(restoredManager.messages.first { $0.toolCallId == "leftover-tool" })
+        XCTAssertEqual(leftoverBeforeSend.toolStatus, .inProgress)
+        XCTAssertNil(leftoverBeforeSend.toolAbandonedReason)
+
+        // Sending the very next message must sweep it immediately, before
+        // the new turn does anything else.
+        restoredManager.sendFirstPrompt(text: "second", projectPath: "/tmp")
+        let leftoverAfterSend = try XCTUnwrap(restoredManager.messages.first { $0.toolCallId == "leftover-tool" })
+        XCTAssertNotNil(leftoverAfterSend.toolAbandonedReason)
     }
 
     func testPromptFailureMarksActiveToolCallStaleAndFailed() async throws {

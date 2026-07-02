@@ -175,6 +175,16 @@ final class AgentSessionController: ObservableObject {
         let displayText = trimmed.isEmpty
             ? (images.count == 1 ? String(localized: "Sent an image") : String(format: String(localized: "Sent %d images"), images.count))
             : trimmed
+        // Defense in depth: every documented exit from a turn (finishActiveTurn,
+        // markFailed, stop(), prepareForClose()) already sweeps unfinished tool
+        // calls to "stale" on its own way out, so this should normally be a
+        // no-op. But starting a brand-new turn is itself unambiguous proof the
+        // previous one is over, so re-sweep here too — it costs nothing when
+        // there's nothing to abandon, and it guarantees no tool call row can
+        // ride into a new turn still reading "Working" if some not-yet-covered
+        // path ever let one slip through the earlier sweeps.
+        abandonUnfinishedToolCalls(reason: String(localized: "A new message was sent before this tool reported completion."))
+
         messages.append(Message(role: .user, text: displayText))
         scheduleSave()
 
@@ -698,6 +708,27 @@ final class AgentSessionController: ObservableObject {
         return messages[lastIndex].messageId == messageId ? lastIndex : nil
     }
 
+    /// Per the ACP spec, `toolCallId` is unique within a session, but a
+    /// misbehaving/reconnecting agent could still resend one. Matches the
+    /// *last* (most recent) row with this id, not the first — mirroring
+    /// `indexForChunk`'s tail-only philosophy — and, if that row is already
+    /// terminal (`completed`/`failed`) while the incoming status is
+    /// explicitly non-terminal, treats the update as describing a brand-new
+    /// occurrence instead of resurrecting the finished row back to
+    /// "pending"/"in progress". Without this, a reused id could permanently
+    /// flip an already-completed tool call's badge back to "Working" while
+    /// silently overwriting its real output with whatever the new,
+    /// unrelated occurrence reports — and if that new occurrence's own
+    /// completion event is ever dropped, the row would misleadingly read
+    /// "Working" forever instead of "Completed" or "Stale".
+    private func toolCallMergeIndex(for id: String, incomingStatus: ToolCallStatus?) -> Int? {
+        guard let idx = messages.lastIndex(where: { $0.toolCallId == id }) else { return nil }
+        if messages[idx].toolStatus?.isTerminal == true, incomingStatus?.isTerminal == false {
+            return nil
+        }
+        return idx
+    }
+
     private func mergeToolCall(id: String,
                                title: String?,
                                status: ToolCallStatus?,
@@ -708,7 +739,7 @@ final class AgentSessionController: ObservableObject {
                                rawOutput: ACPJSONValue?) {
         let display = title ?? String(localized: "Tool call")
         let now = Date()
-        if let idx = messages.firstIndex(where: { $0.toolCallId == id }) {
+        if let idx = toolCallMergeIndex(for: id, incomingStatus: status) {
             if let title {
                 messages[idx].text = title
             }
