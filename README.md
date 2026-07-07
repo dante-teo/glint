@@ -46,7 +46,7 @@ Devin has two selectable icon families:
 - `Devin*` / `DevinMark`: the default portrait family.
 - `DevinPixel*` / `DevinPixelMark`: the optional pixel-monster family.
 
-Oh My Pi uses a single portrait family, `OhMyPi*` / `OhMyPiMark` — currently Devin's portrait art copied verbatim into dedicated assets so it can be swapped for original artwork later without touching any view code.
+Oh My Pi uses a single pixel pi character family, `OhMyPi*` / `OhMyPiMark`.
 
 Regenerate the pixel-monster family with:
 
@@ -55,6 +55,14 @@ python3 scripts/generate_devin_pixel_monster_icons.py
 ```
 
 The generator updates the asset catalog and writes a visual contact sheet to `design/devin-pixel-monster-icons/contact-sheet.png`. The pixel monster should remain a real character animation: body, face, limb, expression, or silhouette changes should carry each state, not decorative effects on a static logo.
+
+Regenerate the Oh My Pi family with:
+
+```bash
+python3 scripts/generate_ohmypi_pixel_pi_icons.py
+```
+
+The generator updates the asset catalog and writes a visual contact sheet to `design/ohmypi-pixel-pi-icons/contact-sheet.png`. The Oh My Pi mascot should remain visibly based on the pi symbol while changing body, face, limb, expression, or silhouette across states.
 
 ## Upgrade & Uninstall
 

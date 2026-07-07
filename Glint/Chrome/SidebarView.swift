@@ -1380,9 +1380,9 @@ private struct DevinMascotIcon: View {
     }
 }
 
-/// Oh My Pi's mascot — currently Devin's portrait art copied verbatim
-/// into dedicated OhMyPi* assets (see asset catalog); swap those PNGs
-/// for dedicated artwork later without touching this view.
+/// Oh My Pi's pixel pi mascot, rendered per-status as animated PNGs.
+/// The status dot beacon handles visual state indication; the sprite itself
+/// adds character motion and a small brand-specific pi silhouette.
 private struct OhMyPiMascotIcon: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let status: PaneAgentStatus?
