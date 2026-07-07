@@ -543,6 +543,9 @@ final class WorkspaceStore: ObservableObject {
     /// Whether Glint's Devin hook entries are registered in `~/.config/devin/config.json`.
     @Published var devinHooksInstalled: Bool = false
 
+    /// Whether Glint's Oh My Pi hook extension is registered in `~/.omp/agent/hooks/post/`.
+    @Published var ompHooksInstalled: Bool = false
+
     /// Whether Glint's modified-Enter shell keybindings are present in the
     /// user's shell rc (~/.zshrc / ~/.bashrc). Opt-in, default off.
     @Published var shellKeybindsInstalled: Bool = false
@@ -724,6 +727,11 @@ final class WorkspaceStore: ObservableObject {
         didSet { UserDefaults.standard.set(restoreDevinSession, forKey: "glint.restoreDevinSession") }
     }
 
+    /// Same as `restoreClaudeSession` but for Oh My Pi — feeds `omp --continue`.
+    @Published var restoreOmpSession: Bool = (UserDefaults.standard.object(forKey: "glint.restoreOmpSession") as? Bool) ?? false {
+        didSet { UserDefaults.standard.set(restoreOmpSession, forKey: "glint.restoreOmpSession") }
+    }
+
     /// Master switch for the external control socket (control.sock). Off by
     /// default — the socket lets any local process holding the 0600 token
     /// inject keystrokes into your terminals, so it's opt-in. The didSet
@@ -899,6 +907,13 @@ final class WorkspaceStore: ObservableObject {
                 isInstalled: DevinHookInstaller.isInstalled,
                 install: { DevinHookInstaller.installIfNeeded(socketPath: socketPath) }
             ),
+            AgentHookSpec(
+                handledKey: "glint.ompHooksAutoInstalled",
+                displayName: "Oh My Pi",
+                isPresent: OhMyPiHookInstaller.isAgentPresent,
+                isInstalled: OhMyPiHookInstaller.isInstalled,
+                install: { OhMyPiHookInstaller.installIfNeeded(socketPath: socketPath) }
+            ),
         ]
     }
 
@@ -946,6 +961,7 @@ final class WorkspaceStore: ObservableObject {
             WorkspaceStore.current?.codexHooksInstalled = CodexHookInstaller.isInstalled()
             WorkspaceStore.current?.opencodeHooksInstalled = OpenCodeHookInstaller.isInstalled()
             WorkspaceStore.current?.devinHooksInstalled = DevinHookInstaller.isInstalled()
+            WorkspaceStore.current?.ompHooksInstalled = OhMyPiHookInstaller.isInstalled()
         }
     }
 
@@ -992,6 +1008,16 @@ final class WorkspaceStore: ObservableObject {
         self.devinHooksInstalled = DevinHookInstaller.isInstalled()
     }
 
+    func installOmpHooks() {
+        OhMyPiHookInstaller.installIfNeeded(socketPath: AgentBridge.shared.socketPath)
+        self.ompHooksInstalled = OhMyPiHookInstaller.isInstalled()
+    }
+
+    func uninstallOmpHooks() {
+        OhMyPiHookInstaller.uninstall()
+        self.ompHooksInstalled = OhMyPiHookInstaller.isInstalled()
+    }
+
     func installShellKeybinds() {
         ShellKeybindInstaller.install()
         self.shellKeybindsInstalled = ShellKeybindInstaller.isInstalled()
@@ -1009,6 +1035,7 @@ final class WorkspaceStore: ObservableObject {
     var codexDetected: Bool { CodexHookInstaller.isAgentPresent() }
     var opencodeDetected: Bool { OpenCodeHookInstaller.isAgentPresent() }
     var devinDetected: Bool { DevinHookInstaller.isAgentPresent() }
+    var ompDetected: Bool { OhMyPiHookInstaller.isAgentPresent() }
 
     /// Locale to inject into the SwiftUI environment. Driven by
     /// `preferredLanguage`. On macOS 14+, SwiftUI re-resolves
@@ -1153,6 +1180,7 @@ final class WorkspaceStore: ObservableObject {
         self.codexHooksInstalled = CodexHookInstaller.isInstalled()
         self.opencodeHooksInstalled = OpenCodeHookInstaller.isInstalled()
         self.devinHooksInstalled = DevinHookInstaller.isInstalled()
+        self.ompHooksInstalled = OhMyPiHookInstaller.isInstalled()
         self.shellKeybindsInstalled = ShellKeybindInstaller.isInstalled()
         updateDockBadge()
         syncActiveFramedSplitMode()
@@ -1243,6 +1271,7 @@ final class WorkspaceStore: ObservableObject {
             case "codex"    where restoreCodexSession:    return "codex resume --last\n"
             case "opencode" where restoreOpenCodeSession: return "opencode --continue\n"
             case "devin"    where restoreDevinSession:    return "devin --continue\n"
+            case "omp"      where restoreOmpSession:      return "omp --continue\n"
             default: return nil
             }
         }()
@@ -1754,6 +1783,7 @@ final class WorkspaceStore: ObservableObject {
         case .codex: return "codex"
         case .opencode: return "opencode"
         case .devin: return "devin"
+        case .omp: return "omp"
         case nil: return nil
         }
     }
@@ -1767,6 +1797,7 @@ final class WorkspaceStore: ObservableObject {
         if lower.contains("codex") { return .codex }
         if lower.contains("opencode") { return .opencode }
         if lower.contains("devin") { return .devin }
+        if lower == "omp" { return .omp }
         return nil
     }
 
@@ -2327,6 +2358,7 @@ enum WorkspaceIconKind {
     case codex
     case opencode
     case devin
+    case omp
     case ssh
     case vim
     case python
@@ -2343,7 +2375,7 @@ enum WorkspaceIconKind {
         case .python: return "chevron.left.forwardslash.chevron.right"
         case .node:   return "hexagon.fill"
         case .git:    return "arrow.triangle.branch"
-        case .claude, .codex, .opencode, .devin, .other:
+        case .claude, .codex, .opencode, .devin, .omp, .other:
             return nil
         }
     }
@@ -2355,6 +2387,7 @@ enum WorkspaceIconKind {
         case .codex:  return "λ"
         case .opencode: return "O"
         case .devin:  return "D"
+        case .omp:    return "π"
         case .other(let s):
             return s.first.map { String($0).uppercased() } ?? "?"
         default:
@@ -2748,6 +2781,7 @@ extension WorkspaceStore {
             case .codex: return .codex
             case .opencode: return .opencode
             case .devin: return .devin
+            case .omp: return .omp
             }
         }
 
@@ -2761,6 +2795,7 @@ extension WorkspaceStore {
         if names.contains(where: { $0 == "codex" || $0.contains("codex") }) { return .codex }
         if names.contains(where: { $0 == "opencode" || $0.contains("opencode") }) { return .opencode }
         if names.contains(where: { $0 == "devin" || $0.contains("devin") }) { return .devin }
+        if names.contains(where: { $0 == "omp" }) { return .omp }
         if names.contains(where: { $0 == "vim" || $0 == "nvim" || $0 == "vi" }) { return .vim }
         if names.contains(where: { $0 == "python" || $0 == "python3" || $0 == "ipython" }) { return .python }
         if names.contains(where: { $0 == "node" || $0 == "deno" || $0 == "bun" }) { return .node }

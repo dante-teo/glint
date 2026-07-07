@@ -801,6 +801,10 @@ private struct WorkspaceCard: View {
             if case .devin = kind { return true }
             return false
         }()
+        let isOmp: Bool = {
+            if case .omp = kind { return true }
+            return false
+        }()
         return Group {
             if isClaude {
                 ClaudeMascotIcon(status: status)
@@ -810,6 +814,8 @@ private struct WorkspaceCard: View {
                 OpenCodeMascotIcon(status: status)
             } else if isDevin {
                 DevinMascotIcon(status: status)
+            } else if isOmp {
+                OhMyPiMascotIcon(status: status)
             } else if let sf = kind.sfSymbol {
                 // No squircle container — a bit larger so the bare glyph
                 // holds the same visual weight as the mascots.
@@ -824,7 +830,7 @@ private struct WorkspaceCard: View {
         }
         .frame(width: 28, height: 28)
         .overlay(alignment: .bottomTrailing) {
-            if !isOpenCode && !isDevin {
+            if !isOpenCode && !isDevin && !isOmp {
                 AgentStatusDot(status: status)
                     .offset(x: 3, y: 3)
             }
@@ -1212,6 +1218,18 @@ enum MascotAsset {
             }
         }
     }
+
+    static func omp(for s: PaneAgentStatus?) -> String {
+        switch s {
+        case .none, .some(.idle): return "OhMyPiIdle"
+        case .some(.thinking): return "OhMyPiThinking"
+        case .some(.tool): return "OhMyPiToolCall"
+        case .some(.compacting): return "OhMyPiCompressing"
+        case .some(.needsPermission): return "OhMyPiNeedsPermission"
+        case .some(.justCompleted): return "OhMyPiDone"
+        case .some(.failed): return "OhMyPiFailed"
+        }
+    }
 }
 
 /// Animated Claude mascot driven by per-status GIFs (idle / thinking /
@@ -1342,6 +1360,37 @@ private struct DevinMascotIcon: View {
     var body: some View {
         AnimatedGIFView(assetName: MascotAsset.devin(for: status, style: store.devinIconStyle),
                         animates: !reduceMotion)
+            .frame(width: 34, height: 34)
+            .frame(width: 28, height: 28)
+            .scaleEffect(celebrateScale * tapScale, anchor: .bottom)
+            .onChange(of: status) { oldStatus, newStatus in
+                if newStatus == .justCompleted && oldStatus != .justCompleted {
+                    celebrateScale = 1.22
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.5)) {
+                        celebrateScale = 1.0
+                    }
+                }
+            }
+            .onTapGesture {
+                tapScale = 0.85
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.5)) {
+                    tapScale = 1.0
+                }
+            }
+    }
+}
+
+/// Oh My Pi's mascot — currently Devin's portrait art copied verbatim
+/// into dedicated OhMyPi* assets (see asset catalog); swap those PNGs
+/// for dedicated artwork later without touching this view.
+private struct OhMyPiMascotIcon: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let status: PaneAgentStatus?
+    @State private var celebrateScale: CGFloat = 1.0
+    @State private var tapScale: CGFloat = 1.0
+
+    var body: some View {
+        AnimatedGIFView(assetName: MascotAsset.omp(for: status), animates: !reduceMotion)
             .frame(width: 34, height: 34)
             .frame(width: 28, height: 28)
             .scaleEffect(celebrateScale * tapScale, anchor: .bottom)

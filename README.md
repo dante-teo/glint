@@ -46,6 +46,8 @@ Devin has two selectable icon families:
 - `Devin*` / `DevinMark`: the default portrait family.
 - `DevinPixel*` / `DevinPixelMark`: the optional pixel-monster family.
 
+Oh My Pi uses a single portrait family, `OhMyPi*` / `OhMyPiMark` — currently Devin's portrait art copied verbatim into dedicated assets so it can be swapped for original artwork later without touching any view code.
+
 Regenerate the pixel-monster family with:
 
 ```bash

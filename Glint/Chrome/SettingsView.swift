@@ -1101,6 +1101,7 @@ private struct AgentsPane: View {
     @State private var codexInstallFailed = false
     @State private var opencodeInstallFailed = false
     @State private var devinInstallFailed = false
+    @State private var ompInstallFailed = false
 
     var body: some View {
         SettingsCard("Claude Code",
@@ -1307,6 +1308,53 @@ private struct AgentsPane: View {
                     DevinIconStyleSwatch(style: .portrait)
                     DevinIconStyleSwatch(style: .pixelMonster)
                 }
+            }
+        }
+
+        SettingsCard("Oh My Pi",
+                     footer: "Glint installs a hook extension at ~/.omp/agent/hooks/post/glint-agent-bridge.ts so Oh My Pi (omp) sessions surface the same status as Claude.") {
+            SettingsRow("Status", subtitle: ompInstallFailed
+                        ? "Install failed — check Console for [glint] logs."
+                        : (store.ompHooksInstalled
+                           ? "Hook extension installed."
+                           : (store.ompDetected
+                              ? "Oh My Pi detected — install the hook to show its status."
+                              : "Oh My Pi not detected on this Mac."))) {
+                HStack(spacing: 8) {
+                    StatusPill(
+                        label: store.ompHooksInstalled ? "Installed" : (store.ompDetected ? "Not installed" : "Not detected"),
+                        tone: store.ompHooksInstalled ? .ok : .neutral
+                    )
+                    if store.ompHooksInstalled {
+                        Button("Uninstall") {
+                            store.uninstallOmpHooks()
+                            ompInstallFailed = false
+                        }
+                            .controlSize(.small)
+                    } else {
+                        Button("Install") {
+                            store.installOmpHooks()
+                            ompInstallFailed = !store.ompHooksInstalled
+                        }
+                            .controlSize(.small)
+                            .tint(store.accent)
+                    }
+                }
+            }
+            SettingsDivider()
+            SettingsRow("Resume session on launch",
+                        subtitle: "When Glint reopens, run `omp --continue` in any pane that was running Oh My Pi at last quit.") {
+                Toggle("", isOn: $store.restoreOmpSession)
+                    .toggleStyle(.switch).labelsHidden()
+            }
+            SettingsDivider()
+            SettingsRow("Hook file",
+                        subtitle: "Auto-loaded by omp on startup; it only reports when Glint's pane environment variables are present.") {
+                Text("~/.omp/agent/hooks/post/glint-agent-bridge.ts")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(Theme.text3)
+                    .lineLimit(1)
+                    .truncationMode(.head)
             }
         }
 
