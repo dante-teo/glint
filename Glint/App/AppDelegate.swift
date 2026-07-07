@@ -50,28 +50,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         // Closing the window already ran this confirmation (and the window
-        // is gone by now) — don't ask twice on the way out, but still give
-        // any live agent sessions a chance to shut down gracefully below.
-        if !didConfirmViaWindowClose, !Self.confirmTerminationIfBusy() {
-            return .terminateCancel
-        }
-        return Self.beginGracefulAgentShutdown()
-    }
-
-    /// Devin subprocesses get a bounded window (~2s) to shut down cleanly —
-    /// ACP `session/close` + process teardown — before the app actually
-    /// quits. Returns `.terminateNow` immediately when there's nothing live
-    /// to close, otherwise `.terminateLater` and replies once shutdown (or
-    /// its timeout) finishes.
-    private static func beginGracefulAgentShutdown() -> NSApplication.TerminateReply {
-        guard let store = WorkspaceStore.current, store.hasLiveAgentSessions else {
-            return .terminateNow
-        }
-        Task { @MainActor in
-            await store.closeAllLiveAgentSessionsForQuit()
-            NSApp.reply(toApplicationShouldTerminate: true)
-        }
-        return .terminateLater
+        // is gone by now) — don't ask twice on the way out.
+        if didConfirmViaWindowClose { return .terminateNow }
+        if Self.confirmTerminationIfBusy() { return .terminateNow }
+        return .terminateCancel
     }
 
     /// Shared by ⌘Q and the window close button: if any pane still has real

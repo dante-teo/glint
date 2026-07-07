@@ -26,13 +26,9 @@ struct PaneView: View {
         if let wsID = workspaceID,
            let ws = store.workspaces.first(where: { $0.id == wsID }),
            let pane = ws.panes[paneID] {
-            if ws.kind == .agent {
-                AgentPaneView(workspace: ws, paneID: paneID)
-            } else {
-                paneBody(workspaceID: wsID,
-                         focusedPane: ws.selectedTab?.focusedPane ?? paneID,
-                         cwd: pane.workingDirectory)
-            }
+            paneBody(workspaceID: wsID,
+                     focusedPane: ws.selectedTab?.focusedPane ?? paneID,
+                     cwd: pane.workingDirectory)
         } else {
             paneBacking
         }

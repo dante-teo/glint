@@ -1308,17 +1308,6 @@ private struct AgentsPane: View {
                     DevinIconStyleSwatch(style: .pixelMonster)
                 }
             }
-            SettingsDivider()
-            SettingsRow("Permission mode",
-                        subtitle: "Automate approvals using AI review or escalate risky actions to you.") {
-                Picker("", selection: $store.permissionReviewMode) {
-                    ForEach(PermissionReviewMode.allCases, id: \.self) { mode in
-                        Text(mode.title).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 310)
-            }
         }
 
         SettingsCard("Notifications",

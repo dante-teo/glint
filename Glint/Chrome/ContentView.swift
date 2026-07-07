@@ -108,12 +108,6 @@ struct ContentView: View {
 
 struct ToolbarHeader: View {
     @EnvironmentObject var store: WorkspaceStore
-    /// Shared with any pane content that needs to avoid rendering under the
-    /// floating glass toolbar (see `ContentView.floatingHeader`) — e.g.
-    /// non-terminal SwiftUI panes like `AgentPaneView`, which (unlike
-    /// terminal surfaces) have no "padded shell launcher" trick to keep
-    /// their own header out from under the islands.
-    static let height: CGFloat = 52
     /// Traffic lights disappear in full screen, so the 78pt gutter we
     /// reserve for them (when the sidebar is collapsed) must collapse too
     /// or the toolbar starts with a dead zone.
@@ -189,7 +183,7 @@ struct ToolbarHeader: View {
         // traffic lights at all.
         .padding(.leading, store.sidebarCollapsed && !isFullscreen ? 78 : 12)
         .padding(.trailing, 14)
-        .frame(height: Self.height)
+        .frame(height: 52)
         // Invisible drag strip across the whole header. In framed split mode
         // the panes have their own close buttons in this top region, so empty
         // toolbar gaps must click through to the pane chrome instead.
@@ -1335,7 +1329,7 @@ private struct WorkspaceSwitcherPopover: View {
             header
             ScrollView {
                 LazyVStack(spacing: 1) {
-                    ForEach(store.activeWorkspaces) { ws in
+                    ForEach(store.workspaces) { ws in
                         WorkspaceSwitcherRow(
                             ws: ws,
                             isCurrent: ws.id == store.selectedWorkspaceID,
@@ -1382,7 +1376,7 @@ private struct WorkspaceSwitcherPopover: View {
                 .kerning(1.1)
                 .foregroundStyle(Theme.text4)
             Spacer()
-            Text("\(store.activeWorkspaces.count)")
+            Text("\(store.workspaces.count)")
                 .font(.system(size: 10.5, weight: .medium, design: .monospaced))
                 .foregroundStyle(Theme.text4)
         }
@@ -1393,7 +1387,7 @@ private struct WorkspaceSwitcherPopover: View {
 
     private var newWorkspaceRow: some View {
         Button {
-            store.showNewWorkspacePopover()
+            store.addWorkspace()
             dismiss()
         } label: {
             HStack(spacing: 10) {
@@ -1512,13 +1506,6 @@ private struct WorkspaceSwitcherRow: View {
             case .failed:          return String(localized: "error")
             case .idle:            break
             }
-        }
-        if ws.kind == .agent {
-            if let path = ws.agentProjectPath, !path.isEmpty {
-                let name = URL(fileURLWithPath: path).lastPathComponent
-                if !name.isEmpty { return name }
-            }
-            return ws.displayName
         }
         let n = ws.panes.count
         let unit = String(localized: n == 1 ? "pane" : "panes")

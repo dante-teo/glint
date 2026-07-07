@@ -196,7 +196,7 @@ struct SidebarView: View {
 
     private var newWorkspaceCard: some View {
         Button {
-            store.showNewWorkspacePopover()
+            store.addWorkspace()
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "plus")
@@ -225,12 +225,6 @@ struct SidebarView: View {
         .buttonStyle(.plain)
         .onHover { newWorkspaceHovered = $0 }
         .animation(.easeOut(duration: 0.16), value: newWorkspaceHovered)
-        .popover(isPresented: $store.newWorkspacePopoverOpen, arrowEdge: .bottom) {
-            NewWorkspacePopover {
-                store.newWorkspacePopoverOpen = false
-            }
-            .environmentObject(store)
-        }
     }
 
     private var searchField: some View {
@@ -728,9 +722,7 @@ private struct WorkspaceCard: View {
         }
         .contextMenu {
             if archived {
-                Button(ws.kind == .agent ? "Resume Session" : "Unarchive") {
-                    store.unarchiveWorkspace(ws.id)
-                }
+                Button("Unarchive") { store.unarchiveWorkspace(ws.id) }
                 Button("Rename") { startEditing() }
                 Divider()
                 Button("Delete Workspace", role: .destructive) {
@@ -738,11 +730,9 @@ private struct WorkspaceCard: View {
                 }
             } else {
                 Button("Rename") { startEditing() }
-                Button("New Workspace") { store.showNewWorkspacePopover() }
+                Button("New Workspace") { store.addWorkspace() }
                 Divider()
-                Button(ws.kind == .agent ? "Archive Session" : "Archive") {
-                    store.archiveWorkspace(ws.id)
-                }
+                Button("Archive") { store.archiveWorkspace(ws.id) }
                 Button("Delete Workspace", role: .destructive) {
                     store.deleteWorkspace(ws.id)
                 }
@@ -922,24 +912,12 @@ private struct WorkspaceCard: View {
 
     private func workspaceMetadataRow(active: Bool) -> some View {
         HStack(spacing: 5) {
-            if ws.kind == .agent {
-                metadataBadge(agentProjectLabel, active: active)
-            } else {
-                if let tabs = tabCountText {
-                    metadataBadge(tabs, active: active)
-                }
-                metadataBadge(paneCountText, active: active)
+            if let tabs = tabCountText {
+                metadataBadge(tabs, active: active)
             }
+            metadataBadge(paneCountText, active: active)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var agentProjectLabel: String {
-        if let path = ws.agentProjectPath, !path.isEmpty {
-            let name = URL(fileURLWithPath: path).lastPathComponent
-            if !name.isEmpty { return name }
-        }
-        return ws.displayName
     }
 
     private func metadataBadge(_ text: String, active: Bool) -> some View {

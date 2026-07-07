@@ -4,15 +4,6 @@ import AppKit
 
 // MARK: - Domain types
 
-enum WorkspaceKind: String, Codable, Equatable {
-    case terminal
-    case agent
-}
-
-enum AgentProvider: String, Codable {
-    case devin
-}
-
 enum SplitDirection: String, Codable, Hashable {
     case horizontal
     case vertical
@@ -160,21 +151,6 @@ struct Workspace: Identifiable, Codable {
     /// so unarchive resumes from the saved state via the same code path as
     /// an app restart. ⌘1…⌘9 skip archived workspaces.
     var archived: Bool
-    /// Whether this is a terminal workspace or an agent workspace.
-    var kind: WorkspaceKind
-    /// Which agent provider backs this workspace (nil for terminals).
-    var agentProvider: AgentProvider?
-    /// True once the user has sent their first message. Uncommitted agent
-    /// workspaces are hidden from the sidebar and stripped on save, so
-    /// abandoned "New Agent" sessions never clutter the UI. Terminals are
-    /// always committed.
-    var committed: Bool
-    /// Absolute path to the project folder selected when creating an agent
-    /// workspace. Fed into ACP `session/new(cwd:)`.
-    var agentProjectPath: String?
-    /// ACP session ID assigned by `session/new`. Set after the session
-    /// starts; nil before that and for terminal workspaces.
-    var agentSessionID: String?
     /// Open tabs, in display order. Never empty — a workspace always has at
     /// least one tab.
     var tabs: [WorkspaceTab]
@@ -194,7 +170,6 @@ struct Workspace: Identifiable, Codable {
 
     private enum CodingKeys: String, CodingKey {
         case id, name, userNamed, accentHex, symbol, archived
-        case kind, agentProvider, committed, agentProjectPath, agentSessionID
         case tabs, selectedTabID, nextTabSeq, panes, nextPaneSeq
         // Legacy single-tree keys, still read so pre-tabs saves migrate.
         case root, focusedPane
@@ -203,23 +178,13 @@ struct Workspace: Identifiable, Codable {
     init(id: UUID, name: String, userNamed: Bool, accentHex: String, symbol: String,
          tabs: [WorkspaceTab], selectedTabID: TabID, nextTabSeq: UInt32,
          panes: [PaneID: Pane], nextPaneSeq: UInt32,
-         archived: Bool = false,
-         kind: WorkspaceKind = .terminal,
-         agentProvider: AgentProvider? = nil,
-         committed: Bool = true,
-         agentProjectPath: String? = nil,
-         agentSessionID: String? = nil) {
+         archived: Bool = false) {
         self.id = id
         self.name = name
         self.userNamed = userNamed
         self.accentHex = accentHex
         self.symbol = symbol
         self.archived = archived
-        self.kind = kind
-        self.agentProvider = agentProvider
-        self.committed = committed
-        self.agentProjectPath = agentProjectPath
-        self.agentSessionID = agentSessionID
         self.tabs = tabs
         self.selectedTabID = selectedTabID
         self.nextTabSeq = nextTabSeq
@@ -238,13 +203,6 @@ struct Workspace: Identifiable, Codable {
         self.symbol = try c.decode(String.self, forKey: .symbol)
         // Older saves predate the archive feature — default to active.
         self.archived = (try? c.decode(Bool.self, forKey: .archived)) ?? false
-        // Pre-agent saves have no kind/committed — default to .terminal / true
-        // so existing workspaces load unchanged.
-        self.kind = try c.decodeIfPresent(WorkspaceKind.self, forKey: .kind) ?? .terminal
-        self.agentProvider = try c.decodeIfPresent(AgentProvider.self, forKey: .agentProvider)
-        self.committed = try c.decodeIfPresent(Bool.self, forKey: .committed) ?? true
-        self.agentProjectPath = try c.decodeIfPresent(String.self, forKey: .agentProjectPath)
-        self.agentSessionID = try c.decodeIfPresent(String.self, forKey: .agentSessionID)
         self.panes = try c.decode([PaneID: Pane].self, forKey: .panes)
         self.nextPaneSeq = try c.decode(UInt32.self, forKey: .nextPaneSeq)
 
@@ -281,12 +239,6 @@ struct Workspace: Identifiable, Codable {
         try c.encode(accentHex, forKey: .accentHex)
         try c.encode(symbol, forKey: .symbol)
         if archived { try c.encode(true, forKey: .archived) }   // omit the common case
-        // Agent fields: omit defaults so terminal workspaces stay clean.
-        if kind != .terminal { try c.encode(kind, forKey: .kind) }
-        try c.encodeIfPresent(agentProvider, forKey: .agentProvider)
-        if !committed { try c.encode(false, forKey: .committed) }
-        try c.encodeIfPresent(agentProjectPath, forKey: .agentProjectPath)
-        try c.encodeIfPresent(agentSessionID, forKey: .agentSessionID)
         try c.encode(tabs, forKey: .tabs)
         try c.encode(selectedTabID, forKey: .selectedTabID)
         try c.encode(nextTabSeq, forKey: .nextTabSeq)
@@ -461,10 +413,6 @@ final class WorkspaceStore: ObservableObject {
         didSet { updateSleepAssertion() }
     }
 
-    /// Drives the new-workspace popover attached to the sidebar's "+"
-    /// button. Cmd+N opens it (auto-expanding the sidebar if collapsed).
-    @Published var newWorkspacePopoverOpen: Bool = false
-
     /// Drives the command-palette overlay. Toggled by the toolbar's ⌘
     /// button and the ⌘⇧P global shortcut.
     @Published var commandPaletteOpen: Bool = false
@@ -485,13 +433,6 @@ final class WorkspaceStore: ObservableObject {
         // do nothing because the search field isn't on screen.
         if sidebarCollapsed { sidebarCollapsed = false }
         sidebarSearchFocusTick &+= 1
-    }
-
-    /// Open the new-workspace type picker popover, auto-expanding the
-    /// sidebar if it was collapsed so the popover has something to anchor to.
-    func showNewWorkspacePopover() {
-        if sidebarCollapsed { sidebarCollapsed = false }
-        newWorkspacePopoverOpen = true
     }
 
     /// Preferred UI language identifier. `"system"` follows the OS; `"en"`
@@ -910,13 +851,6 @@ final class WorkspaceStore: ObservableObject {
         didSet { UserDefaults.standard.set(!warnBeforeUnsafePaste, forKey: "glint.skipUnsafePasteConfirmation") }
     }
 
-    @Published var permissionReviewMode: PermissionReviewMode = {
-        let raw = UserDefaults.standard.string(forKey: "glint.permissionReviewMode") ?? ""
-        return PermissionReviewMode(rawValue: raw) ?? .manual
-    }() {
-        didSet { UserDefaults.standard.set(permissionReviewMode.rawValue, forKey: "glint.permissionReviewMode") }
-    }
-
     /// Offer to install both agents' hooks on the very first launch so
     /// status tracking works out of the box — but ask first (these write
     /// into another tool's config files), and ask exactly once. "Not Now"
@@ -1092,7 +1026,6 @@ final class WorkspaceStore: ObservableObject {
     /// Persistent NSView per global pane identity. Surfaces are keyed by
     /// (workspaceID, paneID) so switching workspaces doesn't destroy them.
     private var surfaceViews: [WorkspacePaneKey: GhosttySurfaceView] = [:]
-    private var agentSessions: [WorkspacePaneKey: DevinSessionManager] = [:]
     private var dockBadgePaneStatuses: [WorkspacePaneKey: PaneAgentStatus] = [:]
 
     private var saveCancellable: AnyCancellable?
@@ -1699,19 +1632,9 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func persist() {
-        // Strip uncommitted agent workspaces — they are ephemeral and must
-        // never survive to disk. Also fix up the selected ID if it pointed
-        // at one of the stripped workspaces.
-        let committedWorkspaces = workspaces.filter { $0.committed }
-        let savedSelection: UUID? = {
-            guard let id = selectedWorkspaceID else { return nil }
-            if committedWorkspaces.contains(where: { $0.id == id }) { return id }
-            return committedWorkspaces.first(where: { !$0.archived })?.id
-                ?? committedWorkspaces.first?.id
-        }()
         let state = PersistedState(
-            workspaces: committedWorkspaces,
-            selectedWorkspaceID: savedSelection,
+            workspaces: workspaces,
+            selectedWorkspaceID: selectedWorkspaceID,
             sidebarCollapsed: sidebarCollapsed
         )
         Persistence.save(state)
@@ -1723,13 +1646,11 @@ final class WorkspaceStore: ObservableObject {
         workspaces.first { $0.id == selectedWorkspaceID }
     }
 
-    /// Sidebar's main list: every workspace that isn't parked in the archive
-    /// and has been committed (user sent at least one message for agent
-    /// workspaces; terminals are always committed). ⌘1…⌘9 and the cycle
-    /// shortcuts index into this, not `workspaces`, so keyboard navigation
-    /// matches what the user actually sees.
+    /// Sidebar's main list: every workspace that isn't parked in the archive.
+    /// ⌘1…⌘9 and the cycle shortcuts index into this, not `workspaces`,
+    /// so the keyboard navigation matches what the user actually sees.
     var activeWorkspaces: [Workspace] {
-        workspaces.filter { !$0.archived && $0.committed }
+        workspaces.filter { !$0.archived }
     }
 
     var archivedWorkspaces: [Workspace] {
@@ -1809,8 +1730,6 @@ final class WorkspaceStore: ObservableObject {
 
     func splitFocused(_ direction: SplitDirection) {
         guard let i = currentIndex, let t = workspaces[i].selectedTabIndex else { return }
-        // Agent workspaces don't support split panes (one session per workspace).
-        if workspaces[i].kind == .agent { NSSound.beep(); return }
         let inheritedCwd = focusedPaneLiveCwd()
         let new = PaneID(value: workspaces[i].nextPaneSeq)
         workspaces[i].nextPaneSeq += 1
@@ -1939,8 +1858,6 @@ final class WorkspaceStore: ObservableObject {
         // Clean up the TTY lookup file before dropping the view reference.
         surfaceViews[key]?.removeTTYLookupFile()
         surfaceViews.removeValue(forKey: key)
-        agentSessions[key]?.closeSession()
-        agentSessions.removeValue(forKey: key)
         // The pane is gone for good — drop its scrollback snapshot too.
         ScrollbackArchive.delete(
             id: ScrollbackArchive.fileID(forPaneKey: "\(workspaces[i].id.uuidString):\(target.value)"))
@@ -2055,14 +1972,6 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func selectWorkspace(_ id: UUID) {
-        // Auto-cleanup: navigating away from an uncommitted agent workspace
-        // silently deletes it (user never sent a message, so nothing to keep).
-        if let old = selectedWorkspaceID, old != id,
-           let oldIdx = workspaces.firstIndex(where: { $0.id == old }),
-           !workspaces[oldIdx].committed {
-            closeAgentSessions(forWorkspaceID: old)
-            workspaces.remove(at: oldIdx)
-        }
         selectedWorkspaceID = id
         acknowledgeCompletionIfNeeded(for: id)
     }
@@ -2095,8 +2004,6 @@ final class WorkspaceStore: ObservableObject {
     /// after the current tab and selects it.
     func newTab() {
         guard let i = currentIndex else { return }
-        // Agent workspaces are one-session-per-workspace (v1).
-        if workspaces[i].kind == .agent { NSSound.beep(); return }
         let inheritedCwd = focusedPaneLiveCwd()
         let pane = PaneID(value: workspaces[i].nextPaneSeq)
         workspaces[i].nextPaneSeq += 1
@@ -2143,8 +2050,6 @@ final class WorkspaceStore: ObservableObject {
             workspaces[i].panes.removeValue(forKey: pane)
             surfaceViews[key]?.removeTTYLookupFile()
             surfaceViews.removeValue(forKey: key)
-            agentSessions[key]?.closeSession()
-            agentSessions.removeValue(forKey: key)
             ScrollbackArchive.delete(
                 id: ScrollbackArchive.fileID(forPaneKey: "\(wsID.uuidString):\(pane.value)"))
             paneAgentState.removeValue(forKey: key)
@@ -2248,17 +2153,6 @@ final class WorkspaceStore: ObservableObject {
             view.removeTTYLookupFile()
         }
         surfaceViews = surfaceViews.filter { $0.key.workspace != id }
-        for (key, session) in agentSessions where key.workspace == id {
-            session.closeSessionAndDeleteConversation()
-        }
-        agentSessions = agentSessions.filter { $0.key.workspace != id }
-        if workspaces[idx].kind == .agent {
-            // A session may never have been opened this run — e.g. the
-            // workspace was restored from a prior launch but its pane was
-            // never visited — so there's no live manager to delegate the
-            // file removal to. Delete it directly so this always cleans up.
-            DevinSessionManager.deleteConversation(workspaceID: id)
-        }
         clearDockBadges(for: workspaces[idx].panes.keys.map { WorkspacePaneKey(workspace: id, pane: $0) })
         // And their scrollback snapshots.
         for paneID in workspaces[idx].panes.keys {
@@ -2308,10 +2202,6 @@ final class WorkspaceStore: ObservableObject {
             view.removeTTYLookupFile()
         }
         surfaceViews = surfaceViews.filter { $0.key.workspace != id }
-        for (key, session) in agentSessions where key.workspace == id {
-            session.closeSessionPreservingConversation()
-        }
-        agentSessions = agentSessions.filter { $0.key.workspace != id }
         clearDockBadges(for: workspaces[idx].panes.keys.map { WorkspacePaneKey(workspace: id, pane: $0) })
         paneAgentState = paneAgentState.filter { $0.key.workspace != id }
         paneProcesses = paneProcesses.filter { $0.key.workspace != id }
@@ -2363,14 +2253,6 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func addWorkspace() {
-        // Match selectWorkspace()/addAgentWorkspace(): an uncommitted agent
-        // workspace has no user message or session to preserve, so creating a
-        // terminal from it should not leave a hidden workspace in memory.
-        for discarded in workspaces where !discarded.committed {
-            closeAgentSessions(forWorkspaceID: discarded.id)
-        }
-        workspaces.removeAll { !$0.committed }
-
         let palette = [
             ("5E5CE6", "•"), ("FF6582", "•"), ("30D158", "•"),
             ("FF9F0A", "•"), ("64D2FF", "•"), ("BF5AF2", "•"),
@@ -2380,242 +2262,6 @@ final class WorkspaceStore: ObservableObject {
         let ws = Workspace.fresh(name: "New workspace", accentHex: pick.0, symbol: pick.1)
         workspaces.append(ws)
         selectedWorkspaceID = ws.id
-    }
-
-    /// Create an uncommitted agent workspace backed by `provider`. The
-    /// workspace is selected immediately but hidden
-    /// from the sidebar until `commitAgentWorkspace()` is called (on first
-    /// message send). Any prior uncommitted workspace is silently discarded.
-    func addAgentWorkspace(provider: AgentProvider, projectPath: String? = nil) {
-        let suggestedProjectPath: String? = {
-            if let projectPath {
-                return Self.standardizedAgentProjectPath(projectPath)
-            }
-            // The focused pane's "live cwd" is a best-effort signal (OSC 7,
-            // falling back to proc_pidinfo) that can transiently resolve to
-            // the filesystem root — e.g. a brand-new shell pane whose
-            // foreground process hasn't reported (or finished `cd`-ing away
-            // from) a real working directory yet. "/" is never a real
-            // project root, so silently auto-filling it here would both
-            // hand a fresh agent session unintended access to the entire
-            // disk and — since "/" passes `isValidAgentProjectPath` like
-            // any other real directory — make the composer treat a project
-            // as already chosen, hiding the folder picker entirely and
-            // leaving the user with no visible way to pick the folder they
-            // actually meant. Leave it nil instead so the picker shows and
-            // the user must choose explicitly.
-            guard let liveCwd = focusedPaneLiveCwd().flatMap(Self.standardizedAgentProjectPath),
-                  liveCwd != "/" else { return nil }
-            return liveCwd
-        }()
-        // Clean up any existing uncommitted workspace first (e.g. user opened
-        // the folder picker twice without sending a message).
-        for discarded in workspaces where !discarded.committed {
-            closeAgentSessions(forWorkspaceID: discarded.id)
-        }
-        workspaces.removeAll { !$0.committed }
-
-        let palette = [
-            ("5E5CE6", "•"), ("FF6582", "•"), ("30D158", "•"),
-            ("FF9F0A", "•"), ("64D2FF", "•"), ("BF5AF2", "•"),
-        ]
-        let pick = palette[workspaces.count % palette.count]
-        let fallbackName = String(localized: "Devin Agent")
-        let folderName = suggestedProjectPath
-            .flatMap { Self.agentProjectDisplayName(for: $0) } ?? fallbackName
-        let pane = PaneID(value: 0)
-        let tab = WorkspaceTab(id: TabID(value: 0), name: nil,
-                               root: .leaf(pane), focusedPane: pane)
-        let ws = Workspace(
-            id: UUID(),
-            name: folderName,
-            userNamed: false,
-            accentHex: pick.0,
-            symbol: pick.1,
-            tabs: [tab],
-            selectedTabID: tab.id,
-            nextTabSeq: 1,
-            panes: [pane: Pane(id: pane, title: folderName)],
-            nextPaneSeq: 1,
-            kind: .agent,
-            agentProvider: provider,
-            committed: false,
-            agentProjectPath: suggestedProjectPath
-        )
-        workspaces.append(ws)
-        selectedWorkspaceID = ws.id
-    }
-
-    static func standardizedAgentProjectPath(_ path: String) -> String? {
-        let expanded: String
-        if path == "~" || path.hasPrefix("~/") {
-            expanded = NSString(string: path).expandingTildeInPath
-        } else {
-            expanded = path
-        }
-        let url = URL(fileURLWithPath: expanded).standardizedFileURL
-        var isDir: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir),
-              isDir.boolValue else { return nil }
-        return url.path
-    }
-
-    static func agentProjectDisplayName(for path: String) -> String? {
-        let name = URL(fileURLWithPath: path).lastPathComponent
-        return name.isEmpty ? nil : name
-    }
-
-    func isValidAgentProjectPath(_ path: String?) -> Bool {
-        guard let path, !path.isEmpty else { return false }
-        return Self.standardizedAgentProjectPath(path) != nil
-    }
-
-    func recentAgentProjectPaths(excluding workspaceID: UUID? = nil) -> [String] {
-        var seen = Set<String>()
-        var paths: [String] = []
-        for workspace in workspaces.reversed()
-            where workspace.kind == .agent && workspace.committed && workspace.id != workspaceID {
-            guard let path = workspace.agentProjectPath,
-                  let standardized = Self.standardizedAgentProjectPath(path),
-                  !seen.contains(standardized) else { continue }
-            seen.insert(standardized)
-            paths.append(standardized)
-        }
-        return paths
-    }
-
-    @discardableResult
-    func setAgentProjectPath(workspaceID: UUID, path: String) -> Bool {
-        guard let idx = workspaces.firstIndex(where: { $0.id == workspaceID }),
-              workspaces[idx].kind == .agent,
-              let standardized = Self.standardizedAgentProjectPath(path) else { return false }
-        workspaces[idx].agentProjectPath = standardized
-        if let displayName = Self.agentProjectDisplayName(for: standardized) {
-            if !workspaces[idx].userNamed {
-                workspaces[idx].name = displayName
-            }
-            for paneID in workspaces[idx].panes.keys {
-                workspaces[idx].panes[paneID]?.title = displayName
-            }
-        }
-        return true
-    }
-
-    /// Closes and drops any live `agentSessions` entries for `workspaceID`.
-    /// `AgentComposer.connectIfNeeded()` can start a real ACP process (and
-    /// resolve/create a live session) as soon as an agent pane appears —
-    /// before the user ever sends a first message and therefore before
-    /// `commitAgentWorkspace(_:)` runs. The uncommitted-workspace
-    /// auto-cleanup paths (`selectWorkspace`, `addWorkspace`,
-    /// `addAgentWorkspace`) only ever did a bare `workspaces` array
-    /// removal, which was safe when an uncommitted workspace truly
-    /// couldn't populate `agentSessions` with anything live — that
-    /// assumption no longer holds, so those paths must call this first or
-    /// they leak the process/session.
-    private func closeAgentSessions(forWorkspaceID workspaceID: UUID) {
-        for key in agentSessions.keys where key.workspace == workspaceID {
-            agentSessions[key]?.closeSession()
-            agentSessions.removeValue(forKey: key)
-        }
-    }
-
-    func agentSession(workspaceID: UUID, paneID: PaneID) -> DevinSessionManager {
-        let key = WorkspacePaneKey(workspace: workspaceID, pane: paneID)
-        if let session = agentSessions[key] { return session }
-        let session = DevinSessionManager(
-            workspaceID: workspaceID,
-            paneID: paneID,
-            onStatusChange: { [weak self] status in
-                guard let self else { return }
-                switch status {
-                case .idle:
-                    self.paneAgentState[key] = PaneAgentState(
-                        kind: .devin,
-                        status: .idle,
-                        updatedAt: Date()
-                    )
-                case .starting, .thinking:
-                    self.paneAgentState[key] = PaneAgentState(
-                        kind: .devin,
-                        status: .thinking,
-                        updatedAt: Date()
-                    )
-                case .tool:
-                    self.paneAgentState[key] = PaneAgentState(
-                        kind: .devin,
-                        status: .tool,
-                        updatedAt: Date()
-                    )
-                case .needsPermission:
-                    self.paneAgentState[key] = PaneAgentState(
-                        kind: .devin,
-                        status: .needsPermission,
-                        updatedAt: Date()
-                    )
-                case .cancelling:
-                    self.paneAgentState[key] = PaneAgentState(
-                        kind: .devin,
-                        status: .thinking,
-                        detail: String(localized: "Cancelling"),
-                        updatedAt: Date()
-                    )
-                case .failed(let message):
-                    self.paneAgentState[key] = PaneAgentState(
-                        kind: .devin,
-                        status: .failed,
-                        detail: message,
-                        updatedAt: Date()
-                    )
-                }
-            },
-            onSessionID: { [weak self] sessionID in
-                guard let self,
-                      let idx = self.workspaces.firstIndex(where: { $0.id == workspaceID }) else { return }
-                self.workspaces[idx].agentSessionID = sessionID
-            }
-        )
-        agentSessions[key] = session
-        return session
-    }
-
-    /// True when at least one agent pane has a live `DevinSessionManager`
-    /// that needs a chance to shut down (ACP `session/close` + process
-    /// teardown) before the app can actually quit.
-    var hasLiveAgentSessions: Bool { !agentSessions.isEmpty }
-
-    /// Closes every live agent session in parallel, waiting up to
-    /// `timeout`. `ACPClient.closeSession` already self-bounds to ~2s
-    /// internally, but this adds its own hard outer cap so a stuck close
-    /// (or process teardown) can never hold up quitting the app — the real
-    /// work runs as an unstructured task raced against a timeout task, and
-    /// whichever finishes first resumes the continuation exactly once via
-    /// `ResumeOnce` (mirroring `ACPClient.PendingRequest`'s guarded resume).
-    func closeAllLiveAgentSessionsForQuit(timeout: TimeInterval = 2.0) async {
-        guard !agentSessions.isEmpty else { return }
-        let sessions = Array(agentSessions.values)
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            let resumeOnce = ResumeOnce(continuation)
-            Task {
-                await withTaskGroup(of: Void.self) { group in
-                    for session in sessions {
-                        group.addTask { await session.closeSessionForQuit() }
-                    }
-                }
-                resumeOnce.resume()
-            }
-            Task {
-                try? await Task.sleep(nanoseconds: UInt64(max(0, timeout) * 1_000_000_000))
-                resumeOnce.resume()
-            }
-        }
-    }
-
-    /// Mark an agent workspace as committed so it appears in the sidebar
-    /// and persists across launches. Called when the user sends their first
-    /// message.
-    func commitAgentWorkspace(_ id: UUID) {
-        guard let idx = workspaces.firstIndex(where: { $0.id == id }) else { return }
-        workspaces[idx].committed = true
     }
 
     // MARK: tree ops
@@ -2670,29 +2316,6 @@ final class WorkspaceStore: ObservableObject {
         case .leaf(let id): return id
         case .split(_, _, let a, _): return firstLeaf(a)
         }
-    }
-}
-
-/// Resumes a `CheckedContinuation` exactly once no matter how many racing
-/// tasks call `resume()` — `CheckedContinuation` traps on a double resume,
-/// and `closeAllLiveAgentSessionsForQuit` races the real close-all work
-/// against a timeout task, either of which may finish first. Mirrors
-/// `ACPClient.PendingRequest`'s lock-guarded single-resume pattern.
-private final class ResumeOnce: @unchecked Sendable {
-    private let continuation: CheckedContinuation<Void, Never>
-    private let lock = NSLock()
-    private var didResume = false
-
-    init(_ continuation: CheckedContinuation<Void, Never>) {
-        self.continuation = continuation
-    }
-
-    func resume() {
-        lock.lock()
-        defer { lock.unlock() }
-        guard !didResume else { return }
-        didResume = true
-        continuation.resume()
     }
 }
 
@@ -3096,15 +2719,8 @@ extension WorkspaceStore {
 
     /// Pick the most representative icon for a workspace based on what its
     /// panes are currently running. AI / SSH / dev tools beat plain shell.
-    /// Agent workspaces short-circuit to their provider's icon.
     private func liveIconKind(for workspace: Workspace) -> WorkspaceIconKind {
-        if workspace.kind == .agent {
-            switch workspace.agentProvider {
-            case .devin: return .devin
-            case nil:    return .shell
-            }
-        }
-        return liveIconKind(paneIDs: Array(workspace.panes.keys), workspaceID: workspace.id)
+        liveIconKind(paneIDs: Array(workspace.panes.keys), workspaceID: workspace.id)
     }
 
     /// Shared icon picker over an arbitrary pane set — used for both the whole
