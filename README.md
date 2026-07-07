@@ -41,20 +41,9 @@ The app bundle icon is a conventional macOS `AppIcon.appiconset` under `Glint/Re
 
 Agent status icons are bundled in `Glint/Resources/Assets.xcassets`. Animated status assets are 128x128 transparent APNGs stored as `.png` files inside `.dataset` folders; compact marks are 24x24 and 48x48 rasters inside `.imageset` folders.
 
-Devin has two selectable icon families:
-
-- `Devin*` / `DevinMark`: the default portrait family.
-- `DevinPixel*` / `DevinPixelMark`: the optional pixel-monster family.
+Glint currently ships agent status integrations for Claude Code, Codex, OpenCode, and Oh My Pi.
 
 Oh My Pi uses a single pixel pi character family, `OhMyPi*` / `OhMyPiMark`.
-
-Regenerate the pixel-monster family with:
-
-```bash
-python3 scripts/generate_devin_pixel_monster_icons.py
-```
-
-The generator updates the asset catalog and writes a visual contact sheet to `design/devin-pixel-monster-icons/contact-sheet.png`. The pixel monster should remain a real character animation: body, face, limb, expression, or silhouette changes should carry each state, not decorative effects on a static logo.
 
 Regenerate the Oh My Pi family with:
 

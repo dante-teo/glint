@@ -16,7 +16,6 @@
 		24B83C558586A3693F938175 /* SleepAssertionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 835C2FC636D1BDDB4AFE8A39 /* SleepAssertionManager.swift */; };
 		2E52C3AC5AD998CD3604D6BE /* GhosttyKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 81DADCF27E710CC77846E961 /* GhosttyKit.xcframework */; };
 		2FE06733037CAFCAE91D785E /* OhMyPiHookInstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C473EE40887968668355291 /* OhMyPiHookInstallerTests.swift */; };
-		34997DD4A4F9B64A754FE77F /* DevinHookInstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F58E2127BAE2C9F5155CF07 /* DevinHookInstallerTests.swift */; };
 		3932A4CFEFF6FB81AE283645 /* AgentHookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 265A192AC9BD06DB09346E90 /* AgentHookInstaller.swift */; };
 		3A7EFF6FAB2F2AF7006A6B49 /* CwdInheritanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C8B584A039DB106E33D41EF /* CwdInheritanceTests.swift */; };
 		3CB9F41E3B1CB4A8790D9159 /* GhosttyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC6FFB5185C403F6F44A1687 /* GhosttyManager.swift */; };
@@ -36,6 +35,7 @@
 		930665E39CE84564CBF9D300 /* GlintTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 150EEF32284061D527E51866 /* GlintTheme.swift */; };
 		942ED7C1C1A2E823BA52F67A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3023490E670A10EC38870B12 /* Assets.xcassets */; };
 		A1A72E96C61443EFFEA8A712 /* Barlow-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = 76ADFA17E75A528997343B1C /* Barlow-Regular.otf */; };
+		A3DFE0A3135D4D16BA284852 /* AgentHookEventTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBC436F69C7759D13EFB0BF8 /* AgentHookEventTests.swift */; };
 		AB89FA6EF5785EC4026F4402 /* VisualEffectBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0656F7C1D48AE0429C1888B /* VisualEffectBackground.swift */; };
 		AC6C263FBCEAF29D274E0881 /* Barlow-SemiBold.otf in Resources */ = {isa = PBXBuildFile; fileRef = 8970AF928E9F330D5C81C2C3 /* Barlow-SemiBold.otf */; };
 		B70CAFEBB2416E25B0FFED97 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = C48F9D3C512A0ABE8369D0F4 /* Sparkle */; };
@@ -78,7 +78,6 @@
 		050E267AE14712D4D6633B4F /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		05F2CA2243872C8111048EF2 /* AgentBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBridge.swift; sourceTree = "<group>"; };
 		08FC2FBC9E8729A5ECBF857C /* PaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneView.swift; sourceTree = "<group>"; };
-		0F58E2127BAE2C9F5155CF07 /* DevinHookInstallerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevinHookInstallerTests.swift; sourceTree = "<group>"; };
 		150EEF32284061D527E51866 /* GlintTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlintTheme.swift; sourceTree = "<group>"; };
 		16137B405E48DBE262A15B6D /* PaneSurfaceRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneSurfaceRepresentable.swift; sourceTree = "<group>"; };
 		1E646AABA8ADCE8A2A5C6F55 /* PaneTreeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneTreeView.swift; sourceTree = "<group>"; };
@@ -130,6 +129,7 @@
 		F8A1F24DAA7220AD4EE961E2 /* UsageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageStore.swift; sourceTree = "<group>"; };
 		F9D0615395D05BE6077AC0E7 /* Barlow-Bold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Barlow-Bold.otf"; sourceTree = "<group>"; };
 		FADAA48EED9EC6EB9662C6D1 /* AgentBusyStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBusyStatusTests.swift; sourceTree = "<group>"; };
+		FBC436F69C7759D13EFB0BF8 /* AgentHookEventTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentHookEventTests.swift; sourceTree = "<group>"; };
 		FC6FFB5185C403F6F44A1687 /* GhosttyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -174,12 +174,12 @@
 			isa = PBXGroup;
 			children = (
 				FADAA48EED9EC6EB9662C6D1 /* AgentBusyStatusTests.swift */,
+				FBC436F69C7759D13EFB0BF8 /* AgentHookEventTests.swift */,
 				4EEF00CBEF45A9D60423A207 /* AgentKindResolutionTests.swift */,
 				049EF5193FE5D19E86C9EC85 /* AppearanceThemeTests.swift */,
 				5008237EE4CC1A3404DAC751 /* AppIconAssetTests.swift */,
 				A04F39D8F313EF380039FB6F /* AppIconPresetGroupingTests.swift */,
 				8C8B584A039DB106E33D41EF /* CwdInheritanceTests.swift */,
-				0F58E2127BAE2C9F5155CF07 /* DevinHookInstallerTests.swift */,
 				DE559C44534F14D1C4C817A8 /* FontDefaultsTests.swift */,
 				2C3EBDD619911358E7495969 /* LiquidGlassSplitWindowTests.swift */,
 				349714D49AE52D84995314FD /* MascotAssetTests.swift */,
@@ -409,12 +409,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				13F72CF42254CD4C9ED3A64F /* AgentBusyStatusTests.swift in Sources */,
+				A3DFE0A3135D4D16BA284852 /* AgentHookEventTests.swift in Sources */,
 				81532B36FEC3039B8EAD9CB1 /* AgentKindResolutionTests.swift in Sources */,
 				F9117BBBA7223329225B694D /* AppIconAssetTests.swift in Sources */,
 				3F8C84DA957F29F442D9B82A /* AppIconPresetGroupingTests.swift in Sources */,
 				F0C9D4521F90D3DE4F02E29A /* AppearanceThemeTests.swift in Sources */,
 				3A7EFF6FAB2F2AF7006A6B49 /* CwdInheritanceTests.swift in Sources */,
-				34997DD4A4F9B64A754FE77F /* DevinHookInstallerTests.swift in Sources */,
 				C1102E6BF39B44928974869A /* FontDefaultsTests.swift in Sources */,
 				D12A23FB9E6AB95C264AA888 /* LiquidGlassSplitWindowTests.swift in Sources */,
 				04E75EAD5165E8D96C1C5517 /* MascotAssetTests.swift in Sources */,

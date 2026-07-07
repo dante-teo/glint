@@ -833,11 +833,6 @@ struct TabIcon: View {
                 AnimatedGIFView(assetName: MascotAsset.opencode(for: status),
                                 animates: !reduceMotion && isBusy)
                     .frame(width: size * 1.21, height: size * 1.21)
-            case .devin:
-                AnimatedGIFView(assetName: MascotAsset.devin(for: status,
-                                                             style: store.devinIconStyle),
-                                animates: !reduceMotion && isBusy)
-                    .frame(width: size * 1.21, height: size * 1.21)
             case .omp:
                 AnimatedGIFView(assetName: MascotAsset.omp(for: status),
                                 animates: !reduceMotion && isBusy)
@@ -1561,10 +1556,6 @@ private struct WorkspaceMicroIcon: View {
             if case .opencode = kind { return true }
             return false
         }()
-        let isDevin: Bool = {
-            if case .devin = kind { return true }
-            return false
-        }()
         let isOmp: Bool = {
             if case .omp = kind { return true }
             return false
@@ -1577,11 +1568,6 @@ private struct WorkspaceMicroIcon: View {
                     .aspectRatio(contentMode: .fill)
             } else if isOpenCode {
                 Image("OpenCodeMark")
-                    .resizable()
-                    .interpolation(.high)
-                    .aspectRatio(contentMode: .fit)
-            } else if isDevin {
-                Image(store.devinIconStyle == .pixelMonster ? "DevinPixelMark" : "DevinMark")
                     .resizable()
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fit)

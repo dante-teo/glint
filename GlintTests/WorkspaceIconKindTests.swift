@@ -21,10 +21,6 @@ final class WorkspaceIconKindTests: XCTestCase {
         XCTAssertNil(WorkspaceIconKind.opencode.sfSymbol)
     }
 
-    func testDevinHasNoSFSymbol() {
-        XCTAssertNil(WorkspaceIconKind.devin.sfSymbol)
-    }
-
     func testOmpHasNoSFSymbol() {
         XCTAssertNil(WorkspaceIconKind.omp.sfSymbol)
     }
@@ -41,10 +37,6 @@ final class WorkspaceIconKindTests: XCTestCase {
 
     func testOpenCodeLetter() {
         XCTAssertEqual(WorkspaceIconKind.opencode.letter, "O")
-    }
-
-    func testDevinLetter() {
-        XCTAssertEqual(WorkspaceIconKind.devin.letter, "D")
     }
 
     func testOmpLetter() {

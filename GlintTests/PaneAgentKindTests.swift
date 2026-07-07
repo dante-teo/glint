@@ -17,10 +17,6 @@ final class PaneAgentKindTests: XCTestCase {
         XCTAssertEqual(PaneAgentKind.opencode.displayName, "OpenCode")
     }
 
-    func testDevinDisplayName() {
-        XCTAssertEqual(PaneAgentKind.devin.displayName, "Devin")
-    }
-
     func testOmpDisplayName() {
         XCTAssertEqual(PaneAgentKind.omp.displayName, "Oh My Pi")
     }
@@ -39,10 +35,6 @@ final class PaneAgentKindTests: XCTestCase {
         XCTAssertTrue(isIconKind(PaneAgentKind.opencode.iconKind, .opencode))
     }
 
-    func testDevinIconKind() {
-        XCTAssertTrue(isIconKind(PaneAgentKind.devin.iconKind, .devin))
-    }
-
     func testOmpIconKind() {
         XCTAssertTrue(isIconKind(PaneAgentKind.omp.iconKind, .omp))
     }
@@ -54,7 +46,7 @@ final class PaneAgentKindTests: XCTestCase {
     private func isIconKind(_ actual: WorkspaceIconKind, _ expected: WorkspaceIconKind) -> Bool {
         switch (actual, expected) {
         case (.claude, .claude), (.codex, .codex),
-             (.opencode, .opencode), (.devin, .devin), (.omp, .omp),
+             (.opencode, .opencode), (.omp, .omp),
              (.shell, .shell), (.ssh, .ssh), (.vim, .vim),
              (.python, .python), (.node, .node), (.git, .git):
             return true

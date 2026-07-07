@@ -22,9 +22,6 @@
     "+%@" : {
 
     },
-    "~/.config/devin/config.json" : {
-
-    },
     "~/.config/opencode/plugins/glint-agent-bridge.js" : {
 
     },
@@ -119,9 +116,6 @@
     "How Claude panes are drawn in the sidebar and tabs." : {
       "extractionState" : "manual"
     },
-    "How Devin panes are drawn in the sidebar and tabs." : {
-      "extractionState" : "manual"
-    },
     "Icon style" : {
       "extractionState" : "manual"
     },
@@ -204,9 +198,6 @@
       "extractionState" : "manual"
     },
     "When Glint reopens, run `codex resume --last` in any pane that was running Codex at last quit." : {
-      "extractionState" : "manual"
-    },
-    "When Glint reopens, run `devin --continue` in any pane that was running Devin at last quit." : {
       "extractionState" : "manual"
     },
     "When Glint reopens, run `opencode --continue` in any pane that was running OpenCode at last quit." : {

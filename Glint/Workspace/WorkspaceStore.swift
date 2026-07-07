@@ -519,16 +519,6 @@ final class WorkspaceStore: ObservableObject {
         }
     }
 
-    /// Which Devin icon family the UI draws: the existing portrait badge, or
-    /// the blocky pixel monster inspired by Devin's blue/green mark.
-    @Published var devinIconStyle: DevinIconStyle = {
-        DevinIconStyle.resolved(rawValue: UserDefaults.standard.string(forKey: "glint.devinIconStyle"))
-    }() {
-        didSet {
-            UserDefaults.standard.set(devinIconStyle.rawValue, forKey: "glint.devinIconStyle")
-        }
-    }
-
     /// Whether Glint's Claude Code hook script is currently registered in
     /// `~/.claude/settings.json`. Mirrors `AgentHookInstaller.isInstalled()`
     /// so the Settings UI can react without polling.
@@ -539,9 +529,6 @@ final class WorkspaceStore: ObservableObject {
 
     /// Whether Glint's OpenCode plugin is installed in `~/.config/opencode/plugins`.
     @Published var opencodeHooksInstalled: Bool = false
-
-    /// Whether Glint's Devin hook entries are registered in `~/.config/devin/config.json`.
-    @Published var devinHooksInstalled: Bool = false
 
     /// Whether Glint's Oh My Pi hook extension is registered in `~/.omp/agent/hooks/post/`.
     @Published var ompHooksInstalled: Bool = false
@@ -722,11 +709,6 @@ final class WorkspaceStore: ObservableObject {
         didSet { UserDefaults.standard.set(restoreOpenCodeSession, forKey: "glint.restoreOpenCodeSession") }
     }
 
-    /// Same as `restoreClaudeSession` but for Devin — feeds `devin --continue`.
-    @Published var restoreDevinSession: Bool = (UserDefaults.standard.object(forKey: "glint.restoreDevinSession") as? Bool) ?? false {
-        didSet { UserDefaults.standard.set(restoreDevinSession, forKey: "glint.restoreDevinSession") }
-    }
-
     /// Same as `restoreClaudeSession` but for Oh My Pi — feeds `omp --continue`.
     @Published var restoreOmpSession: Bool = (UserDefaults.standard.object(forKey: "glint.restoreOmpSession") as? Bool) ?? false {
         didSet { UserDefaults.standard.set(restoreOmpSession, forKey: "glint.restoreOmpSession") }
@@ -901,13 +883,6 @@ final class WorkspaceStore: ObservableObject {
                 install: { OpenCodeHookInstaller.installIfNeeded(socketPath: socketPath) }
             ),
             AgentHookSpec(
-                handledKey: "glint.devinHooksAutoInstalled",
-                displayName: "Devin",
-                isPresent: DevinHookInstaller.isAgentPresent,
-                isInstalled: DevinHookInstaller.isInstalled,
-                install: { DevinHookInstaller.installIfNeeded(socketPath: socketPath) }
-            ),
-            AgentHookSpec(
                 handledKey: "glint.ompHooksAutoInstalled",
                 displayName: "Oh My Pi",
                 isPresent: OhMyPiHookInstaller.isAgentPresent,
@@ -960,7 +935,6 @@ final class WorkspaceStore: ObservableObject {
             WorkspaceStore.current?.claudeHooksInstalled = AgentHookInstaller.isInstalled()
             WorkspaceStore.current?.codexHooksInstalled = CodexHookInstaller.isInstalled()
             WorkspaceStore.current?.opencodeHooksInstalled = OpenCodeHookInstaller.isInstalled()
-            WorkspaceStore.current?.devinHooksInstalled = DevinHookInstaller.isInstalled()
             WorkspaceStore.current?.ompHooksInstalled = OhMyPiHookInstaller.isInstalled()
         }
     }
@@ -998,16 +972,6 @@ final class WorkspaceStore: ObservableObject {
         self.opencodeHooksInstalled = OpenCodeHookInstaller.isInstalled()
     }
 
-    func installDevinHooks() {
-        DevinHookInstaller.installIfNeeded(socketPath: AgentBridge.shared.socketPath)
-        self.devinHooksInstalled = DevinHookInstaller.isInstalled()
-    }
-
-    func uninstallDevinHooks() {
-        DevinHookInstaller.uninstall()
-        self.devinHooksInstalled = DevinHookInstaller.isInstalled()
-    }
-
     func installOmpHooks() {
         OhMyPiHookInstaller.installIfNeeded(socketPath: AgentBridge.shared.socketPath)
         self.ompHooksInstalled = OhMyPiHookInstaller.isInstalled()
@@ -1034,7 +998,6 @@ final class WorkspaceStore: ObservableObject {
     var claudeDetected: Bool { AgentHookInstaller.isAgentPresent() }
     var codexDetected: Bool { CodexHookInstaller.isAgentPresent() }
     var opencodeDetected: Bool { OpenCodeHookInstaller.isAgentPresent() }
-    var devinDetected: Bool { DevinHookInstaller.isAgentPresent() }
     var ompDetected: Bool { OhMyPiHookInstaller.isAgentPresent() }
 
     /// Locale to inject into the SwiftUI environment. Driven by
@@ -1179,7 +1142,6 @@ final class WorkspaceStore: ObservableObject {
         self.claudeHooksInstalled = AgentHookInstaller.isInstalled()
         self.codexHooksInstalled = CodexHookInstaller.isInstalled()
         self.opencodeHooksInstalled = OpenCodeHookInstaller.isInstalled()
-        self.devinHooksInstalled = DevinHookInstaller.isInstalled()
         self.ompHooksInstalled = OhMyPiHookInstaller.isInstalled()
         self.shellKeybindsInstalled = ShellKeybindInstaller.isInstalled()
         updateDockBadge()
@@ -1270,7 +1232,6 @@ final class WorkspaceStore: ObservableObject {
             case "claude"   where restoreClaudeSession:   return "claude --continue\n"
             case "codex"    where restoreCodexSession:    return "codex resume --last\n"
             case "opencode" where restoreOpenCodeSession: return "opencode --continue\n"
-            case "devin"    where restoreDevinSession:    return "devin --continue\n"
             case "omp"      where restoreOmpSession:      return "omp --continue\n"
             default: return nil
             }
@@ -1399,7 +1360,9 @@ final class WorkspaceStore: ObservableObject {
               let hook = info["hook"] as? String,
               let key = Self.parsePaneKey(paneStr) else { return }
 
-        let explicitKind = (info["agent"] as? String).flatMap(Self.agentKind(named:))
+        let explicitAgent = (info["agent"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        let explicitKind = explicitAgent.flatMap(Self.agentKind(named:))
+        if explicitAgent != nil && explicitKind == nil { return }
         let foregroundKind = surfaceViews[key]?.foregroundProcessName()
             .flatMap(Self.agentKind(named:))
         let polledKind = paneProcesses[key].flatMap(Self.agentKind(named:))
@@ -1782,7 +1745,6 @@ final class WorkspaceStore: ObservableObject {
         case .claude: return "claude"
         case .codex: return "codex"
         case .opencode: return "opencode"
-        case .devin: return "devin"
         case .omp: return "omp"
         case nil: return nil
         }
@@ -1796,7 +1758,6 @@ final class WorkspaceStore: ObservableObject {
         if lower.contains("claude") { return .claude }
         if lower.contains("codex") { return .codex }
         if lower.contains("opencode") { return .opencode }
-        if lower.contains("devin") { return .devin }
         if lower == "omp" { return .omp }
         return nil
     }
@@ -2357,7 +2318,6 @@ enum WorkspaceIconKind {
     case claude
     case codex
     case opencode
-    case devin
     case omp
     case ssh
     case vim
@@ -2375,7 +2335,7 @@ enum WorkspaceIconKind {
         case .python: return "chevron.left.forwardslash.chevron.right"
         case .node:   return "hexagon.fill"
         case .git:    return "arrow.triangle.branch"
-        case .claude, .codex, .opencode, .devin, .omp, .other:
+        case .claude, .codex, .opencode, .omp, .other:
             return nil
         }
     }
@@ -2386,7 +2346,6 @@ enum WorkspaceIconKind {
         case .claude: return "✦"
         case .codex:  return "λ"
         case .opencode: return "O"
-        case .devin:  return "D"
         case .omp:    return "π"
         case .other(let s):
             return s.first.map { String($0).uppercased() } ?? "?"
@@ -2402,16 +2361,6 @@ enum WorkspaceIconKind {
 enum ClaudeIconStyle: String, CaseIterable {
     case mascot
     case spark
-}
-
-/// Devin icon family for the whole UI. Raw values persist in UserDefaults.
-enum DevinIconStyle: String, CaseIterable {
-    case portrait
-    case pixelMonster
-
-    static func resolved(rawValue: String?) -> DevinIconStyle {
-        rawValue.flatMap(DevinIconStyle.init(rawValue:)) ?? .portrait
-    }
 }
 
 /// Dock-icon palette options shown in Settings. `.default` is the bundle
@@ -2760,7 +2709,7 @@ extension WorkspaceStore {
     /// workspace (all panes) and a single tab (just that tab's leaves).
     private func liveIconKind(paneIDs: [PaneID], workspaceID: UUID) -> WorkspaceIconKind {
         // Agent push-state wins over pid polling — if any pane reported a
-        // claude/codex/opencode/devin hook, surface that. With several agent panes (e.g.
+        // claude/codex/opencode hook, surface that. With several agent panes (e.g.
         // claude + codex side by side) the busy one wins; when all are equally
         // busy/idle, the most recently active wins. `paneIDs` may come from a
         // Dictionary's keys, so without this ordering the icon would be
@@ -2780,7 +2729,6 @@ extension WorkspaceStore {
             case .claude: return .claude
             case .codex: return .codex
             case .opencode: return .opencode
-            case .devin: return .devin
             case .omp: return .omp
             }
         }
@@ -2794,7 +2742,6 @@ extension WorkspaceStore {
         if names.contains(where: { $0.contains("claude") })        { return .claude }
         if names.contains(where: { $0 == "codex" || $0.contains("codex") }) { return .codex }
         if names.contains(where: { $0 == "opencode" || $0.contains("opencode") }) { return .opencode }
-        if names.contains(where: { $0 == "devin" || $0.contains("devin") }) { return .devin }
         if names.contains(where: { $0 == "omp" }) { return .omp }
         if names.contains(where: { $0 == "vim" || $0 == "nvim" || $0 == "vi" }) { return .vim }
         if names.contains(where: { $0 == "python" || $0 == "python3" || $0 == "ipython" }) { return .python }

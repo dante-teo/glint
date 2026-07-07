@@ -5,7 +5,6 @@ enum PaneAgentKind: String, Codable {
     case claude
     case codex
     case opencode
-    case devin
     case omp
 
     /// Human-facing label for the per-pane summary popover.
@@ -14,7 +13,6 @@ enum PaneAgentKind: String, Codable {
         case .claude:   return "Claude"
         case .codex:    return "Codex"
         case .opencode: return "OpenCode"
-        case .devin:    return "Devin"
         case .omp:      return "Oh My Pi"
         }
     }

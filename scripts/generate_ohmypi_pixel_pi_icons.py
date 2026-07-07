@@ -5,9 +5,8 @@ Generates:
   - static 24px and 48px OhMyPiMark PNGs
   - design/ohmypi-pixel-pi-icons/contact-sheet.png for visual review
 
-The mascot is a hand-authored pixel character based on the pi symbol. It
-matches the existing Claude/Devin status-animation pattern: one tiny character
-with status-specific body motion, face changes, and accent pixels.
+The mascot is a hand-authored pixel character based on the pi symbol, with
+status-specific body motion, face changes, and accent pixels.
 
 Usage:
   python3 scripts/generate_ohmypi_pixel_pi_icons.py

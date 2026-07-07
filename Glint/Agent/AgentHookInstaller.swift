@@ -23,7 +23,7 @@ private func setPosixPermissions(_ mode: Int, atPath path: String) {
 /// Strip Glint-owned hook entries (recognised by `glint-report.sh` in the
 /// command) from events that are NOT in `currentEvents`. Returns the cleaned
 /// hooks dict and whether any changes were made. Shared by Claude, Codex,
-/// and Devin merge functions so stale hooks from previous Glint versions
+/// and other merge functions so stale hooks from previous Glint versions
 /// (e.g. StopFailure removed in v0.1.26) don't linger across upgrades.
 /// User-authored hooks under the same event key are preserved.
 private func hooksStrippingStaleEntries(
@@ -192,9 +192,8 @@ enum AgentHookInstaller {
             }
         }
         // Only nuke the shared reporter if no other installed agent still
-        // references it (Codex and Devin share the same script).
-        if !AgentHookInstaller.isInstalled() && !CodexHookInstaller.isInstalled()
-            && !DevinHookInstaller.isInstalled() {
+        // references it (Codex shares the same script).
+        if !AgentHookInstaller.isInstalled() && !CodexHookInstaller.isInstalled() {
             let script = home.appendingPathComponent(".glint/hooks/glint-report.sh")
             try? FileManager.default.removeItem(at: script)
         }
@@ -368,7 +367,7 @@ enum AgentHookInstaller {
     /// Argv[2] = agent kind ("claude" or "codex"); defaults to "claude" so
     /// existing Claude installs keep working without a script rewrite.
     ///
-    /// Fallback: some CLI agents (e.g. Devin) don't propagate the parent
+    /// Fallback: some CLI agents don't propagate the parent
     /// shell's env vars to hook subprocesses. When `GLINT_PANE_ID` is
     /// unset, the script resolves the controlling TTY via `ps` and reads
     /// a per-TTY lookup file written by Glint at surface creation time.
@@ -379,7 +378,7 @@ enum AgentHookInstaller {
     # Glint CLI-agent hook reporter. Argv[1] = hook event, argv[2] = agent kind.
 
     # Fast path: env vars set directly by Glint's terminal (Claude, Codex, …).
-    # Fallback: resolve via controlling TTY when vars are missing (Devin, …).
+    # Fallback: resolve via controlling TTY when vars are missing.
     if [ -z "$GLINT_PANE_ID" ] || [ -z "$GLINT_AGENT_SOCK" ]; then
       _TTY=$(ps -o tty= -p $$ 2>/dev/null | tr -d ' ')
       [ -z "$_TTY" ] || [ "$_TTY" = "??" ] && _TTY=$(ps -o tty= -p $PPID 2>/dev/null | tr -d ' ')
@@ -515,9 +514,8 @@ enum CodexHookInstaller {
             }
         }
         // Only nuke the shared reporter if no other installed agent still
-        // references it — Claude, Codex, and Devin all share the same script.
-        if !AgentHookInstaller.isInstalled() && !CodexHookInstaller.isInstalled()
-            && !DevinHookInstaller.isInstalled() {
+        // references it — Claude and Codex share the same script.
+        if !AgentHookInstaller.isInstalled() && !CodexHookInstaller.isInstalled() {
             let script = home.appendingPathComponent(".glint/hooks/glint-report.sh")
             try? FileManager.default.removeItem(at: script)
         }
@@ -985,213 +983,6 @@ enum ShellKeybindInstaller {
     }
 }
 
-/// Installs Glint hook entries into Devin CLI's user-level config at
-/// `~/.config/devin/config.json` under the `"hooks"` key.
-///
-/// Devin CLI uses a hook format compatible with Claude Code — same JSON
-/// schema, same event names. The shared `glint-report.sh` script handles
-/// the reporting; Devin's entries pass `devin` as the agent kind argument
-/// so the pane is correctly attributed.
-///
-/// Unlike Claude/Codex, Devin's config file may contain non-hook keys
-/// (`version`, `agent`, `permissions`, …) which must be preserved.
-enum DevinHookInstaller {
-    /// Events Glint reacts to. Subset of Devin's supported lifecycle hooks.
-    /// Differs from Claude/Codex: Devin lacks StopFailure and PreCompact,
-    /// but adds SessionEnd and PostCompaction.
-    static let hookEvents: [String] = [
-        "SessionStart",
-        "SessionEnd",
-        "UserPromptSubmit",
-        "PreToolUse",
-        "PostToolUse",
-        "PermissionRequest",
-        "PostCompaction",
-        "Stop",
-    ]
-
-    /// Thin wrapper around the file-level `hooksStrippingStaleEntries` so
-    /// tests can call it via `DevinHookInstaller.hooksStrippingStaleEvents`.
-    static func hooksStrippingStaleEvents(
-        _ hooks: [String: Any],
-        currentEvents: Set<String>
-    ) -> (cleaned: [String: Any], changed: Bool) {
-        hooksStrippingStaleEntries(hooks, currentEvents: currentEvents)
-    }
-
-    static func isInstalled() -> Bool {
-        let url = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config/devin/config.json")
-        guard let data = try? Data(contentsOf: url),
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let hooks = root["hooks"] as? [String: Any] else {
-            return false
-        }
-        for (_, bucket) in hooks {
-            guard let arr = bucket as? [Any] else { continue }
-            for entry in arr {
-                guard let group = entry as? [String: Any],
-                      let inner = group["hooks"] as? [[String: Any]] else { continue }
-                if inner.contains(where: { ($0["command"] as? String)?.contains("glint-report.sh") == true }) {
-                    return true
-                }
-            }
-        }
-        return false
-    }
-
-    /// Whether Devin CLI itself looks installed on this Mac.
-    static func isAgentPresent() -> Bool {
-        AgentPresence.directoryExists(".config/devin")
-            || AgentPresence.commandExists("devin")
-    }
-
-    static func installIfNeeded(socketPath: String) {
-        guard let scriptPath = AgentHookInstaller.ensureReporterScript() else { return }
-        mergeDevinHooks(scriptPath: scriptPath)
-        _ = socketPath
-    }
-
-    /// Remove Glint's entries from `~/.config/devin/config.json`. The reporter
-    /// script is shared with Claude/Codex/OpenCode, so it's only deleted when
-    /// no other installed agent still references it.
-    static func uninstall() {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let url = home.appendingPathComponent(".config/devin/config.json")
-        if let data = try? Data(contentsOf: url),
-           var root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            var hooks = (root["hooks"] as? [String: Any]) ?? [:]
-            var touched = false
-            for (event, bucket) in hooks {
-                guard let arr = bucket as? [Any] else { continue }
-                let filtered = arr.filter { entry in
-                    guard let group = entry as? [String: Any],
-                          let inner = group["hooks"] as? [[String: Any]] else { return true }
-                    return !inner.contains { ($0["command"] as? String)?.contains("glint-report.sh") == true }
-                }
-                if filtered.count != arr.count {
-                    touched = true
-                    if filtered.isEmpty {
-                        hooks.removeValue(forKey: event)
-                    } else {
-                        hooks[event] = filtered
-                    }
-                }
-            }
-            if touched {
-                if hooks.isEmpty {
-                    root.removeValue(forKey: "hooks")
-                } else {
-                    root["hooks"] = hooks
-                }
-                if let out = SafeJSON.data(
-                    root,
-                    options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-                ) {
-                    let mode = posixPermissions(atPath: url.path)
-                    try? out.write(to: url, options: [.atomic])
-                    setPosixPermissions(mode, atPath: url.path)
-                }
-                NSLog("[glint] devin hooks removed from \(url.path)")
-            }
-        }
-        // Only nuke the shared reporter if no other agent still references it.
-        if !AgentHookInstaller.isInstalled()
-            && !CodexHookInstaller.isInstalled()
-            && !DevinHookInstaller.isInstalled() {
-            let script = home.appendingPathComponent(".glint/hooks/glint-report.sh")
-            try? FileManager.default.removeItem(at: script)
-        }
-    }
-
-    private static func mergeDevinHooks(scriptPath: String) {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let devinDir = home.appendingPathComponent(".config/devin", isDirectory: true)
-        let url = devinDir.appendingPathComponent("config.json")
-        do {
-            try FileManager.default.createDirectory(at: devinDir, withIntermediateDirectories: true)
-        } catch {
-            NSLog("[glint] couldn't create ~/.config/devin: \(error)")
-            return
-        }
-
-        var root: [String: Any] = [:]
-        if let data = try? Data(contentsOf: url), !data.isEmpty {
-            guard let parsed = try? JSONSerialization.jsonObject(with: data),
-                  let dict = parsed as? [String: Any] else {
-                let backup = url.appendingPathExtension("glint-backup")
-                try? FileManager.default.copyItem(at: url, to: backup)
-                setPosixPermissions(posixPermissions(atPath: url.path), atPath: backup.path)
-                NSLog("[glint] ~/.config/devin/config.json isn't a JSON object; backed up to \(backup.lastPathComponent), skipping merge")
-                return
-            }
-            root = dict
-        }
-
-        var hooks = (root["hooks"] as? [String: Any]) ?? [:]
-        var changed = false
-        for event in hookEvents {
-            var bucket = (hooks[event] as? [Any]) ?? []
-            let filtered = bucket.filter { entry in
-                guard let group = entry as? [String: Any],
-                      let inner = group["hooks"] as? [[String: Any]] else { return true }
-                return !inner.contains { ($0["command"] as? String)?.contains("glint-report.sh") == true }
-            }
-            let ours: [String: Any] = [
-                "matcher": "",
-                "hooks": [[
-                    "type": "command",
-                    "command": "\(scriptPath) \(event) devin",
-                ]],
-            ]
-            bucket = filtered + [ours]
-            if !equalsJSON(hooks[event], bucket) {
-                hooks[event] = bucket
-                changed = true
-            }
-        }
-
-        let (cleaned, staleChanged) = hooksStrippingStaleEntries(
-            hooks, currentEvents: Set(hookEvents)
-        )
-        if staleChanged { hooks = cleaned; changed = true }
-
-        if !changed { return }
-        root["hooks"] = hooks
-        guard let data = SafeJSON.data(
-            root,
-            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        ) else {
-            NSLog("[glint] ~/.config/devin/config.json: hook tree not serializable, skipping write")
-            return
-        }
-        do {
-            let mode = posixPermissions(atPath: url.path)
-            let prev = url.appendingPathExtension("glint-prev")
-            if FileManager.default.fileExists(atPath: url.path),
-               !FileManager.default.fileExists(atPath: prev.path) {
-                try? FileManager.default.copyItem(at: url, to: prev)
-                setPosixPermissions(mode, atPath: prev.path)
-            }
-            try data.write(to: url, options: [.atomic])
-            setPosixPermissions(mode, atPath: url.path)
-            NSLog("[glint] devin hooks merged into \(url.path)")
-        } catch {
-            NSLog("[glint] writing ~/.config/devin/config.json failed: \(error)")
-        }
-    }
-
-    private static func equalsJSON(_ a: Any?, _ b: Any) -> Bool {
-        guard let a else { return false }
-        let opts: JSONSerialization.WritingOptions = [.sortedKeys]
-        guard let da = SafeJSON.data(a, options: opts),
-              let db = SafeJSON.data(b, options: opts) else {
-            return false
-        }
-        return da == db
-    }
-}
-
 /// Installs a global Oh My Pi (omp) hook extension that forwards omp
 /// lifecycle events to Glint's local agent socket.
 ///
@@ -1200,7 +991,7 @@ enum DevinHookInstaller {
 /// self-contained file rather than merge a JSON config. The hook module
 /// runs in-process inside omp's own Bun runtime, so `$GLINT_PANE_ID` /
 /// `$GLINT_AGENT_SOCK` are already in `process.env` with no TTY fallback
-/// needed (unlike Devin, which spawns a subprocess per hook event).
+/// needed.
 enum OhMyPiHookInstaller {
     private static let pluginFileName = "glint-agent-bridge.ts"
     private static let marker = "Glint Oh My Pi hook"

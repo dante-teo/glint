@@ -22,12 +22,8 @@ final class AgentKindResolutionTests: XCTestCase {
         XCTAssertEqual(WorkspaceStore.agentKind(named: "opencode"), .opencode)
     }
 
-    func testDevin() {
-        XCTAssertEqual(WorkspaceStore.agentKind(named: "devin"), .devin)
-    }
-
-    func testDevinMixedCase() {
-        XCTAssertEqual(WorkspaceStore.agentKind(named: "Devin"), .devin)
+    func testDevinIsNoLongerRecognized() {
+        XCTAssertNil(WorkspaceStore.agentKind(named: "devin"))
     }
 
     func testOmp() {
@@ -72,8 +68,8 @@ final class AgentKindResolutionTests: XCTestCase {
         XCTAssertEqual(WorkspaceStore.agentToken(forProcessName: "opencode"), "opencode")
     }
 
-    func testDevinToken() {
-        XCTAssertEqual(WorkspaceStore.agentToken(forProcessName: "devin"), "devin")
+    func testDevinTokenReturnsNil() {
+        XCTAssertNil(WorkspaceStore.agentToken(forProcessName: "devin"))
     }
 
     func testOmpToken() {

@@ -1100,7 +1100,6 @@ private struct AgentsPane: View {
     @State private var claudeInstallFailed = false
     @State private var codexInstallFailed = false
     @State private var opencodeInstallFailed = false
-    @State private var devinInstallFailed = false
     @State private var ompInstallFailed = false
 
     var body: some View {
@@ -1253,61 +1252,6 @@ private struct AgentsPane: View {
                     .foregroundStyle(Theme.text3)
                     .lineLimit(1)
                     .truncationMode(.head)
-            }
-        }
-
-        SettingsCard("Devin",
-                     footer: "Glint merges its hook entries into ~/.config/devin/config.json so Devin CLI sessions surface the same status as Claude.") {
-            SettingsRow("Status", subtitle: devinInstallFailed
-                        ? "Install failed — check Console for [glint] logs."
-                        : (store.devinHooksInstalled
-                           ? "Hooks merged into your Devin config."
-                           : (store.devinDetected
-                              ? "Devin detected — install the reporter to show its status."
-                              : "Devin not detected on this Mac."))) {
-                HStack(spacing: 8) {
-                    StatusPill(
-                        label: store.devinHooksInstalled ? "Installed" : (store.devinDetected ? "Not installed" : "Not detected"),
-                        tone: store.devinHooksInstalled ? .ok : .neutral
-                    )
-                    if store.devinHooksInstalled {
-                        Button("Uninstall") {
-                            store.uninstallDevinHooks()
-                            devinInstallFailed = false
-                        }
-                            .controlSize(.small)
-                    } else {
-                        Button("Install") {
-                            store.installDevinHooks()
-                            devinInstallFailed = !store.devinHooksInstalled
-                        }
-                            .controlSize(.small)
-                            .tint(store.accent)
-                    }
-                }
-            }
-            SettingsDivider()
-            SettingsRow("Resume session on launch",
-                        subtitle: "When Glint reopens, run `devin --continue` in any pane that was running Devin at last quit.") {
-                Toggle("", isOn: $store.restoreDevinSession)
-                    .toggleStyle(.switch).labelsHidden()
-            }
-            SettingsDivider()
-            SettingsRow("Hook config",
-                        subtitle: "Hooks are stored in Devin's native user config alongside your existing settings.") {
-                Text("~/.config/devin/config.json")
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(Theme.text3)
-                    .lineLimit(1)
-                    .truncationMode(.head)
-            }
-            SettingsDivider()
-            SettingsRow("Icon style",
-                        subtitle: "How Devin panes are drawn in the sidebar and tabs.") {
-                HStack(spacing: 8) {
-                    DevinIconStyleSwatch(style: .portrait)
-                    DevinIconStyleSwatch(style: .pixelMonster)
-                }
             }
         }
 
@@ -1716,46 +1660,6 @@ private struct ClaudeIconStyleSwatch: View {
                         .resizable().interpolation(.high)
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 28, height: 28)
-                }
-            }
-            .frame(width: 38, height: 38)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(isSelected ? store.accent.opacity(0.12) : Theme.overlay(0.03))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .strokeBorder(isSelected ? store.accent.opacity(0.85) : Theme.overlay(0.08),
-                                  lineWidth: 1)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-private struct DevinIconStyleSwatch: View {
-    @EnvironmentObject var store: WorkspaceStore
-    let style: DevinIconStyle
-
-    private var isSelected: Bool { store.devinIconStyle == style }
-
-    var body: some View {
-        Button {
-            store.devinIconStyle = style
-        } label: {
-            Group {
-                switch style {
-                case .portrait:
-                    AnimatedGIFView(assetName: MascotAsset.devin(for: .idle, style: .portrait),
-                                    animates: false)
-                        .frame(width: 34, height: 34)
-                case .pixelMonster:
-                    AnimatedGIFView(assetName: MascotAsset.devin(for: .idle, style: .pixelMonster),
-                                    animates: false)
-                        .frame(width: 34, height: 34)
                 }
             }
             .frame(width: 38, height: 38)

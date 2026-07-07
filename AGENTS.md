@@ -36,6 +36,8 @@ The unfocused-pane dim wash (`Color.black` in `PaneView.paneBody`) must be **alw
 
 `paneAgentState` on `WorkspaceStore` is a `@Published` dictionary mutated from ~18 sites (subscript writes, `removeValue`, bulk `filter` reassignment). All mutations trigger its `didSet` hook. To add a new side effect driven by agent state (as `updateSleepAssertion()` does), add a call in the `didSet` — do not scatter calls across individual mutation sites, which is fragile and easy to miss. IOKit is already linked in `project.yml`.
 
+Agent hook events may include an explicit `agent` token. If the token is present but unsupported, `handleAgentEvent(_:)` must ignore the event instead of falling back to Claude. The Claude fallback is only for missing/empty tokens from legacy hook scripts; treating unknown explicit tokens as Claude can make stale removed-agent hooks show false Claude activity.
+
 ### App icon preset architecture
 
 The Dock icon picker in Settings uses a two-level model: `PortraitStyle` (line art) x `IconColorTheme` (color palette) = `AppIconPreset` (the flat enum persisted to UserDefaults). The resolution helpers on `AppIconPreset` (`portraitStyle`, `colorTheme`, `preset(portrait:color:)`) map between the two representations.

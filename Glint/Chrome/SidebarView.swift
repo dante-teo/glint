@@ -797,10 +797,6 @@ private struct WorkspaceCard: View {
             if case .opencode = kind { return true }
             return false
         }()
-        let isDevin: Bool = {
-            if case .devin = kind { return true }
-            return false
-        }()
         let isOmp: Bool = {
             if case .omp = kind { return true }
             return false
@@ -812,8 +808,6 @@ private struct WorkspaceCard: View {
                 CodexMascotIcon(status: status)
             } else if isOpenCode {
                 OpenCodeMascotIcon(status: status)
-            } else if isDevin {
-                DevinMascotIcon(status: status)
             } else if isOmp {
                 OhMyPiMascotIcon(status: status)
             } else if let sf = kind.sfSymbol {
@@ -830,7 +824,7 @@ private struct WorkspaceCard: View {
         }
         .frame(width: 28, height: 28)
         .overlay(alignment: .bottomTrailing) {
-            if !isOpenCode && !isDevin && !isOmp {
+            if !isOpenCode && !isOmp {
                 AgentStatusDot(status: status)
                     .offset(x: 3, y: 3)
             }
@@ -840,11 +834,9 @@ private struct WorkspaceCard: View {
                 ? (isClaude
                     ? Color(red: 0.92, green: 0.55, blue: 0.32).opacity(0.5)
                     : isCodex
-                        ? Color(red: 0.32, green: 0.38, blue: 1.0).opacity(0.5)
-                        : isOpenCode
-                            ? Color(red: 0.95, green: 0.94, blue: 0.90).opacity(0.32)
-                            : isDevin
-                                ? Color(red: 0.16, green: 0.43, blue: 0.81).opacity(0.5)
+                            ? Color(red: 0.32, green: 0.38, blue: 1.0).opacity(0.5)
+                            : isOpenCode
+                                ? Color(red: 0.95, green: 0.94, blue: 0.90).opacity(0.32)
                                 : store.accent.opacity(0.5))
                 : .clear,
             radius: 8
@@ -1190,35 +1182,6 @@ enum MascotAsset {
         }
     }
 
-    static func devin(for s: PaneAgentStatus?) -> String {
-        devin(for: s, style: .portrait)
-    }
-
-    static func devin(for s: PaneAgentStatus?, style: DevinIconStyle = .portrait) -> String {
-        switch style {
-        case .portrait:
-            switch s {
-            case .none, .some(.idle): return "DevinIdle"
-            case .some(.thinking): return "DevinThinking"
-            case .some(.tool): return "DevinToolCall"
-            case .some(.compacting): return "DevinCompressing"
-            case .some(.needsPermission): return "DevinNeedsPermission"
-            case .some(.justCompleted): return "DevinDone"
-            case .some(.failed): return "DevinFailed"
-            }
-        case .pixelMonster:
-            switch s {
-            case .none, .some(.idle): return "DevinPixelIdle"
-            case .some(.thinking): return "DevinPixelThinking"
-            case .some(.tool): return "DevinPixelToolCall"
-            case .some(.compacting): return "DevinPixelCompressing"
-            case .some(.needsPermission): return "DevinPixelNeedsPermission"
-            case .some(.justCompleted): return "DevinPixelDone"
-            case .some(.failed): return "DevinPixelFailed"
-            }
-        }
-    }
-
     static func omp(for s: PaneAgentStatus?) -> String {
         switch s {
         case .none, .some(.idle): return "OhMyPiIdle"
@@ -1327,39 +1290,6 @@ private struct OpenCodeMascotIcon: View {
 
     var body: some View {
         AnimatedGIFView(assetName: MascotAsset.opencode(for: status), animates: !reduceMotion)
-            .frame(width: 34, height: 34)
-            .frame(width: 28, height: 28)
-            .scaleEffect(celebrateScale * tapScale, anchor: .bottom)
-            .onChange(of: status) { oldStatus, newStatus in
-                if newStatus == .justCompleted && oldStatus != .justCompleted {
-                    celebrateScale = 1.22
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.5)) {
-                        celebrateScale = 1.0
-                    }
-                }
-            }
-            .onTapGesture {
-                tapScale = 0.85
-                withAnimation(.spring(response: 0.32, dampingFraction: 0.5)) {
-                    tapScale = 1.0
-                }
-            }
-    }
-}
-
-/// Devin's hexagonal logo, rendered per-status as tinted static PNGs —
-/// same pattern as OpenCode. The status dot beacon handles visual state
-/// indication; the tinted variants give a subtle at-a-glance cue.
-private struct DevinMascotIcon: View {
-    @EnvironmentObject var store: WorkspaceStore
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let status: PaneAgentStatus?
-    @State private var celebrateScale: CGFloat = 1.0
-    @State private var tapScale: CGFloat = 1.0
-
-    var body: some View {
-        AnimatedGIFView(assetName: MascotAsset.devin(for: status, style: store.devinIconStyle),
-                        animates: !reduceMotion)
             .frame(width: 34, height: 34)
             .frame(width: 28, height: 28)
             .scaleEffect(celebrateScale * tapScale, anchor: .bottom)
