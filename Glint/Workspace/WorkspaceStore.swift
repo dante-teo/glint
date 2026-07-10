@@ -402,6 +402,8 @@ final class WorkspaceStore: ObservableObject {
         didSet { syncActiveFramedSplitMode() }
     }
     @Published var sidebarCollapsed: Bool
+    /// Transient navigation state; intentionally absent from `state.json`.
+    @Published var sidebarMode: SidebarMode = .workspaces
     /// Latest foreground-process name per (workspace, pane). Polled every
     /// few seconds; drives the workspace card icon. Non-persistent.
     @Published var paneProcesses: [WorkspacePaneKey: String] = [:]
@@ -412,6 +414,9 @@ final class WorkspaceStore: ObservableObject {
     @Published var paneAgentState: [WorkspacePaneKey: PaneAgentState] = [:] {
         didSet { updateSleepAssertion() }
     }
+    /// Replay tombstones outlive transient pane state so a retried session-end
+    /// event cannot clear a newer session in the same pane.
+    private var paneAgentReplayEventIDs: [WorkspacePaneKey: [String]] = [:]
 
     /// Drives the command-palette overlay. Toggled by the toolbar's ⌘
     /// button and the ⌘⇧P global shortcut.
@@ -432,6 +437,7 @@ final class WorkspaceStore: ObservableObject {
         // Auto-expand sidebar if collapsed — otherwise ⌘F appears to
         // do nothing because the search field isn't on screen.
         if sidebarCollapsed { sidebarCollapsed = false }
+        sidebarMode = .workspaces
         sidebarSearchFocusTick &+= 1
     }
 
@@ -1351,98 +1357,57 @@ final class WorkspaceStore: ObservableObject {
 
     // MARK: agent hook events
 
-    /// Translate one hook from the AgentBridge into pane state. The hook
-    /// itself only carries the event name — full payload routing comes later
-    /// once we wire `data` through.
+    /// Normalize legacy notifications and reduce both protocol generations
+    /// through the same pure lifecycle state machine.
     func handleAgentEvent(_ info: [AnyHashable: Any]?) {
-        guard let info,
-              let paneStr = info["pane"] as? String,
-              let hook = info["hook"] as? String,
-              let key = Self.parsePaneKey(paneStr) else { return }
+        guard let info else { return }
+        let normalized: AgentEvent
+        let key: WorkspacePaneKey
 
-        let explicitAgent = (info["agent"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-        let explicitKind = explicitAgent.flatMap(Self.agentKind(named:))
-        if explicitAgent != nil && explicitKind == nil { return }
-        let foregroundKind = surfaceViews[key]?.foregroundProcessName()
-            .flatMap(Self.agentKind(named:))
-        let polledKind = paneProcesses[key].flatMap(Self.agentKind(named:))
-        // Fall back to .claude when nothing resolves: the hook wrapper's own
-        // AGENT arg defaults to "claude" when unset (AgentBridge then omits the
-        // empty token), so an unresolvable kind means "a hook fired for a pane
-        // we can't otherwise classify" — better to show an agent than to drop
-        // the event and leave the pane looking like a bare shell.
-        let kind = explicitKind ?? paneAgentState[key]?.kind ?? foregroundKind ?? polledKind ?? .claude
-
-        // Note: we deliberately do NOT force-write paneProcesses here. The
-        // 1s poller owns that dictionary and replaces it wholesale, so any
-        // value written from this path lived at most one tick. Icon/state
-        // already prefer paneAgentState (set below), which this event keeps
-        // authoritative.
-
-        var state = paneAgentState[key]
-            ?? PaneAgentState(kind: kind, status: .idle, detail: nil, updatedAt: Date())
-        state.kind = kind
-        let oldStatus = state.status
-        let now = Date()
-        switch hook {
-        case "SessionStart", "SessionEnd":
-            state.status = .idle
-        case "UserPromptSubmit":  state.status = .thinking
-        case "PreToolUse":        state.status = .tool
-        case "PostToolUse":
-            // Hook delivery is one process per event, so a PostToolUse from
-            // the previous tool can arrive just after PermissionRequest and
-            // incorrectly hide an active approval prompt. A real approval
-            // should be followed by PreToolUse, which clears this state once
-            // the requested tool actually starts.
-            if state.status == .needsPermission,
-               now.timeIntervalSince(state.updatedAt) < 2 {
-                return
-            }
-            state.status = .thinking
-        case "Notification":      break   // noisy: background/idle prompts, ignore
-        case "PermissionRequest": state.status = .needsPermission
-        case "PreCompact", "PostCompaction":
-            state.status = .compacting
-        case "Stop":
-            // `.justCompleted` persists until the user actually views this
-            // pane — see `acknowledgeCompletionIfNeeded(for:)`. This is an
-            // unread-style badge: switching to it clears it. We only skip
-            // the badge when the user is actually watching: Glint frontmost
-            // AND this pane on screen (its workspace selected and its tab
-            // the selected tab). A finish in a background tab of the current
-            // workspace still earns its green dot on the tab chip.
-            if NSApp.isActive && isPaneVisible(key) {
-                state.status = .idle
-            } else {
-                state.status = .justCompleted
-            }
-        case "StopFailure":
-            // The turn died on an API/transport error (socket closed, rate-
-            // limit, auth, overload). Claude fires StopFailure instead of Stop,
-            // so this is the only end-of-turn signal we get — without it the
-            // pane stays stuck on `.thinking`. Surface a sticky error badge,
-            // cleared when the user views the workspace (like justCompleted).
-            // Always set it, even if the user is watching: an error is worth a
-            // beat of red rather than silently snapping to idle.
-            state.status = .failed
-        default: break
+        if let event = info["eventEnvelope"] as? AgentEvent,
+           event.version > 0,
+           let parsedKey = Self.parsePaneKey(event.pane) {
+            normalized = event
+            key = parsedKey
+        } else {
+            guard let pane = info["pane"] as? String,
+                  let hook = info["hook"] as? String,
+                  let parsedKey = Self.parsePaneKey(pane) else { return }
+            key = parsedKey
+            let explicitAgent = (info["agent"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            let explicitKind = explicitAgent.flatMap(Self.agentKind(named:))
+            if explicitAgent != nil && explicitKind == nil { return }
+            let foregroundKind = surfaceViews[key]?.foregroundProcessName()
+                .flatMap(Self.agentKind(named:))
+            let polledKind = paneProcesses[key].flatMap(Self.agentKind(named:))
+            let kind = explicitKind
+                ?? paneAgentState[key]?.kind
+                ?? foregroundKind
+                ?? polledKind
+                ?? .claude
+            guard let event = try? AgentEventDecoder.decodeLegacy(
+                pane: pane,
+                hook: hook,
+                agent: kind
+            ) else { return }
+            normalized = event
         }
-        // Anchor the turn clock at the start of active work, then keep it
-        // through intermediate tool/thinking transitions — so the sidebar shows
-        // total turn time, not per-step time. Two events (re)set it:
-        //   • non-busy → busy: a fresh turn begins (UserPromptSubmit: idle → thinking)
-        //   • leaving needsPermission back into work: the user just approved, so
-        //     restart the clock — the (possibly long) approval wait shouldn't
-        //     count toward the post-approval work time.
-        let nowBusy = Self.isBusyStatus(state.status)
-        let startsTurn = nowBusy && !Self.isBusyStatus(oldStatus)
-        let resumesAfterApproval = nowBusy
-            && oldStatus == .needsPermission && state.status != .needsPermission
-        if startsTurn || resumesAfterApproval {
-            state.turnStartedAt = now
+
+        let oldStatus = paneAgentState[key]?.status ?? .idle
+        let userIsWatching = NSApp.isActive && isPaneVisible(key)
+        let reduction = AgentStateReducer.reduce(
+            paneAgentState[key],
+            event: normalized,
+            completionIsUnread: !userIsWatching,
+            replayEventIDs: paneAgentReplayEventIDs[key] ?? []
+        )
+        paneAgentReplayEventIDs[key] = reduction.replayEventIDs
+        guard reduction.disposition == .applied else { return }
+        guard let state = reduction.state else {
+            paneAgentState.removeValue(forKey: key)
+            clearDockBadge(for: key)
+            return
         }
-        state.updatedAt = now
         paneAgentState[key] = state
 
         // Audio cues fire whenever the user is NOT actively watching this
@@ -1450,7 +1415,6 @@ final class WorkspaceStore: ObservableObject {
         // a different workspace, or on a different tab of this workspace. If
         // Glint has focus AND the pane is on screen, stay quiet — unless
         // `playSoundsAlways` overrides the background-only rule.
-        let userIsWatching = NSApp.isActive && isPaneVisible(key)
         if (playSoundsAlways || !userIsWatching) && oldStatus != state.status {
             switch state.status {
             case .needsPermission where soundOnPermissionRequest:
@@ -1462,7 +1426,8 @@ final class WorkspaceStore: ObservableObject {
             // When the user IS watching, "Stop" sets status to .idle
             // (skipping .justCompleted) — catch that path so the
             // completion chime still fires under playSoundsAlways.
-            case .idle where playSoundsAlways && soundOnTurnComplete && hook == "Stop":
+            case .idle where playSoundsAlways && soundOnTurnComplete
+                && normalized.event == .turnCompleted:
                 NSSound(named: soundCompleteName)?.play()
             default:
                 break
@@ -1856,6 +1821,7 @@ final class WorkspaceStore: ObservableObject {
         // Drop the non-persistent side state too, or closed panes linger as
         // ghost entries forever.
         paneAgentState.removeValue(forKey: key)
+        paneAgentReplayEventIDs.removeValue(forKey: key)
         paneProcesses.removeValue(forKey: key)
         clearDockBadge(for: key)
         workspaces[i].tabs[t].focusedPane = survivor
@@ -1883,6 +1849,25 @@ final class WorkspaceStore: ObservableObject {
         guard let i = currentIndex, let t = workspaces[i].selectedTabIndex,
               workspaces[i].tabs[t].focusedPane != id else { return }
         workspaces[i].tabs[t].focusedPane = id
+    }
+
+    /// Route an Activity row to its owning workspace, tab, and split pane.
+    func routeToAgentPane(workspaceID: UUID, paneID: PaneID) {
+        guard let workspaceIndex = workspaces.firstIndex(where: { $0.id == workspaceID }),
+              let tabIndex = workspaces[workspaceIndex].tabs.firstIndex(where: {
+                  $0.root.leaves.contains(paneID)
+              }) else { return }
+        selectedWorkspaceID = workspaceID
+        workspaces[workspaceIndex].selectedTabID = workspaces[workspaceIndex].tabs[tabIndex].id
+        if workspaces[workspaceIndex].tabs[tabIndex].focusedPane != paneID {
+            workspaces[workspaceIndex].tabs[tabIndex].focusedPane = paneID
+        }
+        acknowledgeCompletionIfNeeded(for: workspaceID)
+    }
+
+    func showAgentActivity() {
+        sidebarCollapsed = false
+        sidebarMode = .activity
     }
 
     // MARK: - external control (control.sock)
@@ -2045,6 +2030,7 @@ final class WorkspaceStore: ObservableObject {
             ScrollbackArchive.delete(
                 id: ScrollbackArchive.fileID(forPaneKey: "\(wsID.uuidString):\(pane.value)"))
             paneAgentState.removeValue(forKey: key)
+            paneAgentReplayEventIDs.removeValue(forKey: key)
             paneProcesses.removeValue(forKey: key)
             clearDockBadge(for: key)
         }
@@ -2152,6 +2138,7 @@ final class WorkspaceStore: ObservableObject {
                 id: ScrollbackArchive.fileID(forPaneKey: "\(id.uuidString):\(paneID.value)"))
         }
         paneAgentState = paneAgentState.filter { $0.key.workspace != id }
+        paneAgentReplayEventIDs = paneAgentReplayEventIDs.filter { $0.key.workspace != id }
         paneProcesses = paneProcesses.filter { $0.key.workspace != id }
 
         let wasSelected = selectedWorkspaceID == id
@@ -2602,7 +2589,7 @@ extension WorkspaceStore {
                         e.updatedAt))
         }
         out.sort {
-            let (ra, rb) = (statusRank($0.info.status), statusRank($1.info.status))
+            let (ra, rb) = ($0.info.status.attentionRank, $1.info.status.attentionRank)
             if ra != rb { return ra > rb }
             return $0.updatedAt > $1.updatedAt
         }
@@ -2632,10 +2619,7 @@ extension WorkspaceStore {
     /// clock (set on the first non-busy → busy transition, kept through the
     /// turn). `.justCompleted`/`.failed`/`.idle` are turn-end / no-turn.
     static func isBusyStatus(_ s: PaneAgentStatus) -> Bool {
-        switch s {
-        case .thinking, .tool, .compacting, .needsPermission: return true
-        case .justCompleted, .failed, .idle:                  return false
-        }
+        s.isBusy
     }
 
     /// True when at least one pane across all workspaces has an agent
@@ -2655,23 +2639,9 @@ extension WorkspaceStore {
         }
     }
 
-    /// Attention ranking shared by the status merge and the icon pick.
-    private func statusRank(_ s: PaneAgentStatus) -> Int {
-        switch s {
-        case .needsPermission: return 5
-        case .failed:          return 4
-        case .compacting:      return 3
-        case .tool:            return 3
-        case .thinking:        return 3
-        case .justCompleted:   return 2
-        case .idle:            return 1
-        }
-    }
-
     private func mergeStatus(_ a: PaneAgentStatus?, _ b: PaneAgentStatus) -> PaneAgentStatus {
-        let rank = statusRank
         guard let a else { return b }
-        return rank(b) > rank(a) ? b : a
+        return b.attentionRank > a.attentionRank ? b : a
     }
 
     /// Most attention-worthy agent status across a single tab's panes — drives
@@ -2719,7 +2689,7 @@ extension WorkspaceStore {
             let key = WorkspacePaneKey(workspace: workspaceID, pane: paneID)
             guard let entry = paneAgentState[key] else { continue }
             guard let cur = bestAgent else { bestAgent = entry; continue }
-            let (curRank, newRank) = (statusRank(cur.status), statusRank(entry.status))
+            let (curRank, newRank) = (cur.status.attentionRank, entry.status.attentionRank)
             if newRank > curRank || (newRank == curRank && entry.updatedAt > cur.updatedAt) {
                 bestAgent = entry
             }

@@ -184,67 +184,17 @@ struct CommandPalette: View {
             ))
         }
 
-        items.append(.action(
-            title: "New Workspace",
-            subtitle: "Create a fresh workspace",
-            symbol: "plus.square",
-            shortcut: "",
-            tint: actionTint,
-            action: { store.addWorkspace() }
-        ))
-
-        items.append(.action(
-            title: "New Tab",
-            subtitle: "Open a tab in this workspace",
-            symbol: "plus.rectangle.on.rectangle",
-            shortcut: "⌘T",
-            tint: actionTint,
-            action: { store.newTab() }
-        ))
-        // Naming note: the store's `.horizontal` means an HSplit — panes
-        // side by side (see PaneTreeView) — which reads inverted as a
-        // label. User-facing copy is direction-explicit instead; the enum
-        // cases and shortcuts stay as-is (other files reference them).
-        items.append(.action(
-            title: "Split Right",
-            subtitle: "Open a new pane on the right",
-            symbol: "rectangle.split.2x1",
-            shortcut: "⌘D",
-            tint: actionTint,
-            action: { store.splitFocused(.horizontal) }
-        ))
-        items.append(.action(
-            title: "Split Down",
-            subtitle: "Stack a new pane below",
-            symbol: "rectangle.split.1x2",
-            shortcut: "⌘⇧D",
-            tint: actionTint,
-            action: { store.splitFocused(.vertical) }
-        ))
-        items.append(.action(
-            title: "Close Pane",
-            subtitle: "Close the focused pane",
-            symbol: "xmark.square",
-            shortcut: "⌘W",
-            tint: actionTint,
-            action: { store.closeFocused() }
-        ))
-        items.append(.action(
-            title: "Focus Next Pane",
-            subtitle: "Cycle pane focus within this workspace",
-            symbol: "arrow.triangle.2.circlepath",
-            shortcut: "⌘]",
-            tint: actionTint,
-            action: { store.focusNext() }
-        ))
-        items.append(.action(
-            title: "Toggle Sidebar",
-            subtitle: "Show or hide the workspace sidebar",
-            symbol: "sidebar.left",
-            shortcut: "⌘/",
-            tint: actionTint,
-            action: { store.sidebarCollapsed.toggle() }
-        ))
+        items.append(contentsOf: AppCommandRegistry.commands.map { command in
+            .action(
+                title: command.title,
+                subtitle: command.subtitle,
+                symbol: command.symbol,
+                shortcut: command.shortcut,
+                aliases: command.aliases,
+                tint: actionTint,
+                action: { AppCommandRegistry.execute(command.id, in: store) }
+            )
+        })
 
         return items
     }
@@ -411,60 +361,32 @@ private struct PaletteItem: Identifiable {
     /// rather than app copy — rows must render those verbatim, not as
     /// LocalizedStringKey (which would markdown-format names like "*foo*").
     let userContent: Bool
+    let aliases: [String]
     let action: () -> Void
 
     /// Fuzzy relevance of this item for `query` (already lowercased).
     /// nil = no match. Title matches outrank any subtitle match.
     func score(query: String) -> Int? {
-        if let t = Self.fuzzyScore(needle: query, haystack: title.lowercased()) {
+        if let t = FuzzyMatcher.score(needle: query, haystack: title.lowercased()) {
             return t + 1_000
         }
         if let sub = subtitle,
-           let s = Self.fuzzyScore(needle: query, haystack: sub.lowercased()) {
+           let s = FuzzyMatcher.score(needle: query, haystack: sub.lowercased()) {
             return s
         }
-        return nil
-    }
-
-    /// Subsequence fuzzy match with a simple additive score:
-    /// exact prefix > word-boundary starts > contiguous runs > scattered
-    /// characters. Returns nil when `needle` is not a subsequence of
-    /// `haystack`. Pure; both inputs are expected pre-lowercased. Greedy
-    /// left-to-right alignment — not optimal for every pathological
-    /// input, but predictable and dependency-free.
-    static func fuzzyScore(needle: String, haystack: String) -> Int? {
-        guard !needle.isEmpty else { return 0 }
-        let n = Array(needle)
-        let h = Array(haystack)
-        var score = 0
-        var ni = 0
-        var lastMatch = -2  // sentinel: not adjacent to index 0
-        for (hi, ch) in h.enumerated() {
-            guard ni < n.count, ch == n[ni] else { continue }
-            if hi == 0 {
-                score += 20                                    // start of string
-            } else if hi == lastMatch + 1 {
-                score += 10                                    // contiguous run
-            } else if !h[hi - 1].isLetter && !h[hi - 1].isNumber {
-                score += 15                                    // word boundary
-            } else {
-                score += 1                                     // scattered
-            }
-            lastMatch = hi
-            ni += 1
-        }
-        guard ni == n.count else { return nil }                // not a subsequence
-        if haystack.hasPrefix(needle) { score += 100 }         // prefix beats all
-        return score
+        return aliases.compactMap {
+            FuzzyMatcher.score(needle: query, haystack: $0.lowercased())
+        }.max()
     }
 
     static func action(title: String, subtitle: String, symbol: String,
-                       shortcut: String, tint: Color,
+                       shortcut: String, aliases: [String] = [], tint: Color,
                        action: @escaping () -> Void) -> PaletteItem {
         PaletteItem(title: title, subtitle: subtitle,
                     icon: .symbol(symbol, tint),
                     trailing: shortcut.isEmpty ? .kind("ACTION") : .kbd(shortcut),
                     userContent: false,
+                    aliases: aliases,
                     action: action)
     }
 
@@ -475,6 +397,7 @@ private struct PaletteItem: Identifiable {
                     icon: .swatch(accent),
                     trailing: .kind(isCurrent ? "CURRENT" : "WORKSPACE"),
                     userContent: true,
+                    aliases: [],
                     action: action)
     }
 }

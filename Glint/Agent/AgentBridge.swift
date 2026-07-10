@@ -176,24 +176,26 @@ final class AgentBridge {
         }
     }
 
-    private struct HookEnvelope: Decodable {
-        let pane: String
-        let hook: String
-        let agent: String?
-    }
-
     private func handle(line: Data) {
-        guard let env = try? JSONDecoder().decode(HookEnvelope.self, from: line) else {
+        guard let event = try? AgentEventDecoder.decode(line) else {
             NSLog("[glint] agent: malformed hook line (\(line.count) bytes)")
             return
         }
         DispatchQueue.main.async {
             var userInfo: [String: Any] = [
-                "pane": env.pane,
-                "hook": env.hook,
+                "pane": event.pane,
+                "eventEnvelope": event,
             ]
-            if let agent = env.agent, !agent.isEmpty {
-                userInfo["agent"] = agent
+            // Preserve the original notification contract for legacy hooks.
+            // Versioned consumers use `eventEnvelope`; old consumers still
+            // see the exact pane/hook/agent keys they understand.
+            if event.version == 0,
+               let raw = try? JSONSerialization.jsonObject(with: line) as? [String: Any] {
+                userInfo["hook"] = raw["hook"]
+                if let agent = raw["agent"] { userInfo["agent"] = agent }
+            } else {
+                userInfo["agent"] = event.agent.rawValue
+                userInfo["event"] = event.event.rawValue
             }
             NotificationCenter.default.post(
                 name: .glintAgentEvent,

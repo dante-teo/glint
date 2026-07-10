@@ -75,11 +75,17 @@ struct GlintApp: App {
             // events reach ghostty; workspace switching uses the tab-like
             // ⌘⇧[ / ⌘⇧] plus ⌘1…⌘9 direct jumps instead.
             CommandGroup(replacing: .newItem) {
-                Button("New Workspace") { workspaceStore.addWorkspace() }
+                Button(AppCommandRegistry.command(.newWorkspace).title) {
+                    AppCommandRegistry.execute(.newWorkspace, in: workspaceStore)
+                }
                     .keyboardShortcut("n", modifiers: .command)
-                Button("Next Workspace") { workspaceStore.selectNextWorkspace() }
+                Button(AppCommandRegistry.command(.nextWorkspace).title) {
+                    AppCommandRegistry.execute(.nextWorkspace, in: workspaceStore)
+                }
                     .keyboardShortcut("]", modifiers: [.command, .shift])
-                Button("Previous Workspace") { workspaceStore.selectPreviousWorkspace() }
+                Button(AppCommandRegistry.command(.previousWorkspace).title) {
+                    AppCommandRegistry.execute(.previousWorkspace, in: workspaceStore)
+                }
                     .keyboardShortcut("[", modifiers: [.command, .shift])
                 ForEach(1..<10, id: \.self) { n in
                     Button("Workspace \(n)") { workspaceStore.selectWorkspace(at: n - 1) }
@@ -89,32 +95,46 @@ struct GlintApp: App {
                 // Direction-explicit names; "horizontal/vertical" read
                 // opposite ways in different terminals and our own palette
                 // copy had it backwards. `.horizontal` = side by side.
-                Button("Split Right") { workspaceStore.splitFocused(.horizontal) }
+                Button(AppCommandRegistry.command(.splitRight).title) {
+                    AppCommandRegistry.execute(.splitRight, in: workspaceStore)
+                }
                     .keyboardShortcut("d", modifiers: .command)
-                Button("Split Down") { workspaceStore.splitFocused(.vertical) }
+                Button(AppCommandRegistry.command(.splitDown).title) {
+                    AppCommandRegistry.execute(.splitDown, in: workspaceStore)
+                }
                     .keyboardShortcut("d", modifiers: [.command, .shift])
-                Button("Close Pane") { workspaceStore.closeFocused() }
+                Button(AppCommandRegistry.command(.closePane).title) {
+                    AppCommandRegistry.execute(.closePane, in: workspaceStore)
+                }
                     .keyboardShortcut("w", modifiers: .command)
-                Button("Focus Next Pane") { workspaceStore.focusNext() }
+                Button(AppCommandRegistry.command(.focusNextPane).title) {
+                    AppCommandRegistry.execute(.focusNextPane, in: workspaceStore)
+                }
                     .keyboardShortcut("]", modifiers: .command)
-                Button("Focus Previous Pane") { workspaceStore.focusPrevious() }
+                Button(AppCommandRegistry.command(.focusPreviousPane).title) {
+                    AppCommandRegistry.execute(.focusPreviousPane, in: workspaceStore)
+                }
                     .keyboardShortcut("[", modifiers: .command)
                 Divider()
                 // Tabs deliberately avoid the workspace vocabulary (⌘1…9,
                 // ⌘⇧[ ]) so existing muscle memory is untouched: ⌘T opens,
                 // ⌘⇧W closes, and ⌃Tab / ⌃⇧Tab cycle (iTerm-compatible, and
                 // not a sequence the terminal itself needs).
-                Button("New Tab") { workspaceStore.newTab() }
+                Button(AppCommandRegistry.command(.newTab).title) {
+                    AppCommandRegistry.execute(.newTab, in: workspaceStore)
+                }
                     .keyboardShortcut("t", modifiers: .command)
-                Button("Close Tab") {
-                    if let ws = workspaceStore.selectedWorkspace {
-                        workspaceStore.closeTab(ws.selectedTabID)
-                    }
+                Button(AppCommandRegistry.command(.closeTab).title) {
+                    AppCommandRegistry.execute(.closeTab, in: workspaceStore)
                 }
                 .keyboardShortcut("w", modifiers: [.command, .shift])
-                Button("Next Tab") { workspaceStore.nextTab() }
+                Button(AppCommandRegistry.command(.nextTab).title) {
+                    AppCommandRegistry.execute(.nextTab, in: workspaceStore)
+                }
                     .keyboardShortcut(.tab, modifiers: .control)
-                Button("Previous Tab") { workspaceStore.previousTab() }
+                Button(AppCommandRegistry.command(.previousTab).title) {
+                    AppCommandRegistry.execute(.previousTab, in: workspaceStore)
+                }
                     .keyboardShortcut(.tab, modifiers: [.control, .shift])
             }
             CommandGroup(after: .toolbar) {
@@ -122,16 +142,16 @@ struct GlintApp: App {
                     workspaceStore.commandPaletteOpen.toggle()
                 }
                 .keyboardShortcut("p", modifiers: [.command, .shift])
-                Button("Find in Sidebar") {
-                    workspaceStore.focusSidebarSearch()
+                Button(AppCommandRegistry.command(.findInSidebar).title) {
+                    AppCommandRegistry.execute(.findInSidebar, in: workspaceStore)
                 }
                 .keyboardShortcut("f", modifiers: [.command, .option])
             }
             // Hijack the App menu's Settings… so ⌘, opens our in-window
             // sheet instead of trying to summon a separate scene.
             CommandGroup(replacing: .appSettings) {
-                Button("Settings…") {
-                    workspaceStore.settingsOpen = true
+                Button("\(AppCommandRegistry.command(.settings).title)…") {
+                    AppCommandRegistry.execute(.settings, in: workspaceStore)
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }

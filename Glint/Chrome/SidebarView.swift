@@ -42,7 +42,20 @@ struct SidebarView: View {
                     isFullscreen = false
                 }
 
-            VStack(spacing: 0) {
+            sidebarModePicker
+                .padding(.horizontal, 10)
+                .padding(.bottom, 8)
+
+            if store.sidebarMode == .workspaces {
+                workspaceMode
+            } else {
+                ActivitySidebarList()
+            }
+        }
+    }
+
+    private var workspaceMode: some View {
+        VStack(spacing: 0) {
                 searchField
                     .padding(.horizontal, 12)
                     .padding(.bottom, 4)
@@ -54,7 +67,7 @@ struct SidebarView: View {
                     VStack(spacing: 0) {
                         workspacesSectionHeader(activeCount: filteredActiveWorkspaces.count,
                                                 archivedCount: filteredArchivedWorkspaces.count)
-                        VStack(spacing: 6) {
+                        VStack(spacing: 2) {
                             ForEach(filteredActiveWorkspaces) { ws in
                                 WorkspaceCard(ws: ws,
                                               isDragging: draggingWorkspaceID == ws.id,
@@ -102,12 +115,63 @@ struct SidebarView: View {
                 .overlay(alignment: .top) {
                     Rectangle().fill(Theme.divider).frame(height: 1)
                 }
-            }
-            // From the search field down, empty stretches must NOT drag the
-            // window (isMovableByWindowBackground would otherwise grab every
-            // gap between cards).
-            .background(NoDragSurface())
         }
+        // From the search field down, empty stretches must NOT drag the
+        // window (isMovableByWindowBackground would otherwise grab every
+        // gap between cards).
+        .background(NoDragSurface())
+    }
+
+    private var sidebarModePicker: some View {
+        HStack(spacing: 2) {
+            sidebarModeButton(.workspaces, symbol: "square.grid.2x2", label: "Workspaces")
+            sidebarModeButton(.activity, symbol: "waveform.path.ecg", label: "Activity")
+        }
+        .padding(3)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Theme.overlay(0.055))
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("Sidebar mode"))
+    }
+
+    private func sidebarModeButton(
+        _ mode: SidebarMode,
+        symbol: String,
+        label: String
+    ) -> some View {
+        let selected = store.sidebarMode == mode
+        let count = mode == .activity
+            ? store.agentActivityItems.count
+            : 0
+        return Button {
+            store.sidebarMode = mode
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: symbol)
+                    .font(.system(size: 11, weight: .semibold))
+                Text(LocalizedStringKey(label))
+                    .font(AppFonts.ui(11.5, weight: .semibold))
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Capsule().fill(store.accent.opacity(0.22)))
+                }
+            }
+            .foregroundStyle(selected ? Theme.text1 : Theme.text3)
+            .frame(maxWidth: .infinity, minHeight: 28)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(selected ? Theme.overlay(0.11) : .clear)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("sidebar.mode.\(mode.rawValue)")
+        .accessibilityLabel(Text(LocalizedStringKey(label)))
+        .accessibilityValue(Text(selected ? "Selected" : ""))
     }
 
     // MARK: drag-to-reorder (manual gesture, deterministic pointer hit-test)
@@ -359,6 +423,215 @@ struct SidebarView: View {
         .accessibilityValue(Text("\(count)"))
     }
 
+}
+
+private struct ActivitySidebarList: View {
+    @EnvironmentObject var store: WorkspaceStore
+
+    private var items: [AgentActivityItem] {
+        store.agentActivityItems
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Agent Activity")
+                        .font(AppFonts.ui(13, weight: .semibold))
+                        .foregroundStyle(Theme.text1)
+                    Text("Across all workspaces")
+                        .font(AppFonts.ui(10.5))
+                        .foregroundStyle(Theme.text4)
+                }
+                Spacer()
+                Text("\(items.count)")
+                    .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Theme.text3)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+
+            Rectangle().fill(Theme.divider).frame(height: 1)
+
+            if items.isEmpty {
+                VStack(spacing: 10) {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 22, weight: .medium))
+                        .foregroundStyle(Theme.text4)
+                    Text("No agent activity")
+                        .font(AppFonts.ui(12.5, weight: .semibold))
+                        .foregroundStyle(Theme.text2)
+                    Text("Running turns, approvals, errors, and recent completions appear here.")
+                        .font(AppFonts.ui(10.5))
+                        .foregroundStyle(Theme.text4)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(24)
+                .accessibilityElement(children: .combine)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 3) {
+                        ForEach(items) { item in
+                            ActivitySidebarRow(item: item)
+                        }
+                    }
+                    .padding(8)
+                }
+                .scrollContentBackground(.hidden)
+            }
+        }
+        .background(NoDragSurface())
+        .accessibilityIdentifier("sidebar.activity")
+    }
+}
+
+private struct ActivitySidebarRow: View {
+    @EnvironmentObject var store: WorkspaceStore
+    let item: AgentActivityItem
+    @State private var showingDetails = false
+    @State private var hovered = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Button {
+                store.routeToAgentPane(
+                    workspaceID: item.workspaceID,
+                    paneID: item.paneID
+                )
+            } label: {
+                rowContent
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(accessibilityLabel))
+            .accessibilityHint(Text("Focuses this terminal pane"))
+
+            Button {
+                showingDetails.toggle()
+            } label: {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.text4)
+                    .frame(width: 26, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Activity details")
+            .accessibilityLabel(Text("Activity details"))
+            .popover(isPresented: $showingDetails, arrowEdge: .trailing) {
+                ActivityDetailPopover(item: item)
+                    .environmentObject(store)
+            }
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(hovered ? Theme.overlay(0.065) : Theme.overlay(0.025))
+        )
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 1)
+                .fill(agentStatusLabelColor(item.status))
+                .frame(width: 2)
+                .padding(.vertical, 7)
+        }
+        .onHover { hovered = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovered)
+        .accessibilityIdentifier("activity.row.\(item.id)")
+    }
+
+    private var rowContent: some View {
+        HStack(alignment: .top, spacing: 8) {
+            TabIcon(kind: item.kind.iconKind, size: 22, status: item.status)
+                .frame(width: 24, height: 24)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 5) {
+                    Text(item.kind.displayName)
+                        .font(AppFonts.ui(12, weight: .semibold))
+                        .foregroundStyle(Theme.text1)
+                        .lineLimit(1)
+                    Text(agentStatusLabel(item.status))
+                        .font(AppFonts.ui(9.5, weight: .semibold))
+                        .foregroundStyle(agentStatusLabelColor(item.status))
+                        .lineLimit(1)
+                    Spacer(minLength: 3)
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        Text(agentElapsedLabel(since: item.since, now: context.date))
+                            .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                            .foregroundStyle(Theme.text4)
+                    }
+                }
+                Text(verbatim: item.workspaceName)
+                    .font(AppFonts.ui(11.5, weight: .medium))
+                    .foregroundStyle(Theme.text2)
+                    .lineLimit(1)
+                Text("\(item.tabName) · Pane \(item.paneNumber)")
+                    .font(AppFonts.ui(10))
+                    .foregroundStyle(Theme.text4)
+                    .lineLimit(1)
+                if let detail = item.detail, !detail.isEmpty {
+                    Text(verbatim: detail)
+                        .font(AppFonts.ui(10))
+                        .foregroundStyle(Theme.text3)
+                        .lineLimit(2)
+                }
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    private var accessibilityLabel: String {
+        "\(item.kind.displayName), \(agentStatusLabel(item.status)), \(item.workspaceName), \(item.tabName), Pane \(item.paneNumber)"
+    }
+}
+
+private struct ActivityDetailPopover: View {
+    @EnvironmentObject var store: WorkspaceStore
+    let item: AgentActivityItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 9) {
+                TabIcon(kind: item.kind.iconKind, size: 26, status: item.status)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(item.kind.displayName)
+                        .font(AppFonts.ui(13, weight: .semibold))
+                        .foregroundStyle(Theme.text1)
+                    Text(agentStatusLabel(item.status))
+                        .font(AppFonts.ui(10.5, weight: .semibold))
+                        .foregroundStyle(agentStatusLabelColor(item.status))
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: item.workspaceName)
+                    .font(AppFonts.ui(12, weight: .semibold))
+                    .foregroundStyle(Theme.text2)
+                Text("\(item.tabName) · Pane \(item.paneNumber)")
+                    .font(AppFonts.ui(10.5))
+                    .foregroundStyle(Theme.text3)
+                if let detail = item.detail, !detail.isEmpty {
+                    Text(verbatim: detail)
+                        .font(AppFonts.ui(11))
+                        .foregroundStyle(Theme.text2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Button("Focus Pane") {
+                store.routeToAgentPane(workspaceID: item.workspaceID, paneID: item.paneID)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(store.accent)
+            .controlSize(.small)
+        }
+        .padding(14)
+        .frame(width: 260, alignment: .leading)
+        .background(VisualEffectBackground(material: .menu))
+    }
 }
 
 /// Bottom-of-sidebar usage readout (above New Workspace). One row per agent
@@ -629,12 +902,12 @@ private struct WorkspaceCard: View {
         // here — a single agent's status is already on the icon + secondary row.
         let allPanes = store.workspacePaneSummary(ws)
         let multiInfos = allPanes.count >= 2 ? allPanes : []
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .center, spacing: 8) {
             // Purely decorative for VoiceOver — the icon (incl. mascot GIF
             // and status dot) repeats what label/value below already say.
             workspaceIcon(active: active, status: status)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 if isEditing {
                     TextField("", text: $draftName)
                         .textFieldStyle(.plain)
@@ -668,7 +941,8 @@ private struct WorkspaceCard: View {
                     .accessibilityHidden(true)
             }
         }
-        .padding(8)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 5)
         .background(cardBackground(active: active))
         // Flash/pulse overlays are decorative — hide from VoiceOver
         // so the combined element doesn't pick up phantom children.
@@ -822,7 +1096,7 @@ private struct WorkspaceCard: View {
                     .foregroundStyle(Theme.text2)
             }
         }
-        .frame(width: 28, height: 28)
+        .frame(width: 24, height: 24)
         .overlay(alignment: .bottomTrailing) {
             if !isOpenCode && !isOmp {
                 AgentStatusDot(status: status)
@@ -875,7 +1149,7 @@ private struct WorkspaceCard: View {
         // metadata badges (idle) are replaced by the plain status line
         // (running). 16 ≥ the taller branch (the 9.5pt capsule badges), so the
         // idle height stays the reference and the running state grows to match.
-        .frame(minHeight: 16, alignment: .leading)
+        .frame(minHeight: 14, alignment: .leading)
         .id(key)
         .transition(.opacity)
         .animation(.easeInOut(duration: 0.18), value: key)
@@ -909,27 +1183,13 @@ private struct WorkspaceCard: View {
     }
 
     private func workspaceMetadataRow(active: Bool) -> some View {
-        HStack(spacing: 5) {
-            if let tabs = tabCountText {
-                metadataBadge(tabs, active: active)
-            }
-            metadataBadge(paneCountText, active: active)
-        }
+        Text(([tabCountText, paneCountText] as [String?])
+            .compactMap { $0 }
+            .joined(separator: " · "))
+        .font(AppFonts.ui(10.5, weight: .medium))
+        .foregroundStyle(active ? Theme.text3 : Theme.text4)
+        .lineLimit(1)
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func metadataBadge(_ text: String, active: Bool) -> some View {
-        Text(text)
-            .font(AppFonts.ui(9.5, weight: .semibold))
-            .foregroundStyle(active ? Theme.text2 : Theme.text3)
-            .lineLimit(1)
-            .fixedSize(horizontal: true, vertical: false)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(Theme.overlay(active ? 0.10 : 0.06))
-            )
     }
 
     /// Stable identity for the secondary row — bucket `idle` and `nil`

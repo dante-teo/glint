@@ -20,7 +20,7 @@ struct ContentView: View {
                 // rejected: with nothing but flat near-black behind it,
                 // glass has nothing to refract and reads as a gray slab.)
                 SidebarView()
-                    .frame(width: 244)
+                    .frame(width: 268)
                     .background(Theme.bgPane.opacity(store.chromeOpacity))
                     .overlay(alignment: .trailing) {
                         Rectangle().fill(Theme.divider).frame(width: 1)
@@ -164,6 +164,7 @@ struct ToolbarHeader: View {
             TabBar()
                 .padding(.horizontal, 12)
             HStack(spacing: 4) {
+                ToolbarActivityButton()
                 ToolbarIconButton(symbol: "command", help: "Command Palette (⌘⇧P)") {
                     store.commandPaletteOpen = true
                 }
@@ -223,6 +224,34 @@ struct ToolbarHeader: View {
         }
     }
 
+}
+
+private struct ToolbarActivityButton: View {
+    @EnvironmentObject var store: WorkspaceStore
+
+    private var count: Int {
+        store.agentActivityItems.count
+    }
+
+    var body: some View {
+        ToolbarIconButton(symbol: "waveform.path.ecg", help: "Agent Activity") {
+            store.showAgentActivity()
+        }
+        .overlay(alignment: .topTrailing) {
+            if count > 0 {
+                Text(count > 9 ? "9+" : "\(count)")
+                    .font(.system(size: 8, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, count > 9 ? 3 : 2.5)
+                    .frame(minWidth: 14, minHeight: 14)
+                    .background(Capsule().fill(store.accent))
+                    .offset(x: 2, y: -1)
+                    .accessibilityHidden(true)
+            }
+        }
+        .accessibilityLabel(Text("Agent Activity"))
+        .accessibilityValue(Text("\(count) active items"))
+    }
 }
 
 // MARK: - Tabs (in-header, variant B: centered chips)

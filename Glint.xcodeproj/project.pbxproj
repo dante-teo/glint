@@ -12,7 +12,10 @@
 		1115F230E14FBE3C1FC754A2 /* GhosttySurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E298AD81B1615CBBFD69F48A /* GhosttySurfaceView.swift */; };
 		13F72CF42254CD4C9ED3A64F /* AgentBusyStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FADAA48EED9EC6EB9662C6D1 /* AgentBusyStatusTests.swift */; };
 		175E069EE844FB32C6EE51BB /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EDE0D7C434B8E9C76C4A297 /* Persistence.swift */; };
+		1948E0A09B32978FAAB9B196 /* AgentActivityPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 890C02C2DB94859DC9DD3190 /* AgentActivityPresentationTests.swift */; };
+		20BE1D6F0A729AAF07A6EC0B /* AgentEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE5A130306A61FA469CC14BA /* AgentEvent.swift */; };
 		21C03B3AE912F4D30FA6F92C /* PaneAgentState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41DDB9C7B5A277B7924270A3 /* PaneAgentState.swift */; };
+		2338E3D40D81F7199274F1AF /* AgentEventPlatformTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E4596661229797DAC5F7ED /* AgentEventPlatformTests.swift */; };
 		24B83C558586A3693F938175 /* SleepAssertionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 835C2FC636D1BDDB4AFE8A39 /* SleepAssertionManager.swift */; };
 		2E52C3AC5AD998CD3604D6BE /* GhosttyKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 81DADCF27E710CC77846E961 /* GhosttyKit.xcframework */; };
 		2FE06733037CAFCAE91D785E /* OhMyPiHookInstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C473EE40887968668355291 /* OhMyPiHookInstallerTests.swift */; };
@@ -20,6 +23,7 @@
 		3A7EFF6FAB2F2AF7006A6B49 /* CwdInheritanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C8B584A039DB106E33D41EF /* CwdInheritanceTests.swift */; };
 		3CB9F41E3B1CB4A8790D9159 /* GhosttyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC6FFB5185C403F6F44A1687 /* GhosttyManager.swift */; };
 		3F8C84DA957F29F442D9B82A /* AppIconPresetGroupingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04F39D8F313EF380039FB6F /* AppIconPresetGroupingTests.swift */; };
+		412ADD1D9A8133BF95782E1F /* AppCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEFEC9D8CDC817A0E25819D6 /* AppCommand.swift */; };
 		44060AE541F2E43558D44D01 /* SleepAssertionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89C2698EF53640338D55832D /* SleepAssertionTests.swift */; };
 		47BB527385B84454ABF8FC40 /* themes.json in Resources */ = {isa = PBXBuildFile; fileRef = 6860F8F626EFDB9A289FC727 /* themes.json */; };
 		49DF8EE59313B7CFE29DA303 /* PaneTreeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E646AABA8ADCE8A2A5C6F55 /* PaneTreeView.swift */; };
@@ -38,6 +42,7 @@
 		A3DFE0A3135D4D16BA284852 /* AgentHookEventTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBC436F69C7759D13EFB0BF8 /* AgentHookEventTests.swift */; };
 		AB89FA6EF5785EC4026F4402 /* VisualEffectBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0656F7C1D48AE0429C1888B /* VisualEffectBackground.swift */; };
 		AC6C263FBCEAF29D274E0881 /* Barlow-SemiBold.otf in Resources */ = {isa = PBXBuildFile; fileRef = 8970AF928E9F330D5C81C2C3 /* Barlow-SemiBold.otf */; };
+		B3CA10833553B36AEA32C9B9 /* AppCommandRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A0A47FC050DC3E50EA072E /* AppCommandRegistryTests.swift */; };
 		B70CAFEBB2416E25B0FFED97 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = C48F9D3C512A0ABE8369D0F4 /* Sparkle */; };
 		C0E8D97C08BA3F0FA33F31E7 /* CommandPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 235E2D958A2244483CAA0812 /* CommandPalette.swift */; };
 		C1102E6BF39B44928974869A /* FontDefaultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE559C44534F14D1C4C817A8 /* FontDefaultsTests.swift */; };
@@ -52,6 +57,7 @@
 		D821F5498BB280D170E945F7 /* DepartureMonoNerdFont-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = BE9117F7FB3E54B8267A1843 /* DepartureMonoNerdFont-Regular.otf */; };
 		E38979E8FE4960028D4C6C8A /* Barlow-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = F9D0615395D05BE6077AC0E7 /* Barlow-Bold.otf */; };
 		E464D0233508CD31C1235054 /* AgentBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05F2CA2243872C8111048EF2 /* AgentBridge.swift */; };
+		EBD566013A406D326B3E9F9E /* AgentActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCEDEB4D8FA83ECCA5A94A15 /* AgentActivity.swift */; };
 		ED46CD7A6E09551A775AD3B8 /* PaneAgentKindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBCC04C19D745AA867D961FD /* PaneAgentKindTests.swift */; };
 		EF3ACBA990526130228FAD0B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3B64992BBD5A190DFE36D2 /* SettingsView.swift */; };
 		EF937781512647E835836F83 /* ControlBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21868C7211897C87A6CAD7C3 /* ControlBridge.swift */; };
@@ -107,6 +113,7 @@
 		829D894CF747D6BC08667239 /* AgentPaneSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentPaneSummary.swift; sourceTree = "<group>"; };
 		835C2FC636D1BDDB4AFE8A39 /* SleepAssertionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepAssertionManager.swift; sourceTree = "<group>"; };
 		83E4DF4C5180D50C381B4976 /* WorkspaceIconKindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceIconKindTests.swift; sourceTree = "<group>"; };
+		890C02C2DB94859DC9DD3190 /* AgentActivityPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentActivityPresentationTests.swift; sourceTree = "<group>"; };
 		8970AF928E9F330D5C81C2C3 /* Barlow-SemiBold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Barlow-SemiBold.otf"; sourceTree = "<group>"; };
 		89C2698EF53640338D55832D /* SleepAssertionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepAssertionTests.swift; sourceTree = "<group>"; };
 		8C8B584A039DB106E33D41EF /* CwdInheritanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CwdInheritanceTests.swift; sourceTree = "<group>"; };
@@ -114,13 +121,17 @@
 		9E67CF5D8552AE1F51386161 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A04F39D8F313EF380039FB6F /* AppIconPresetGroupingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconPresetGroupingTests.swift; sourceTree = "<group>"; };
 		A8C269A6E9AE87961C3356DC /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		A9E4596661229797DAC5F7ED /* AgentEventPlatformTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentEventPlatformTests.swift; sourceTree = "<group>"; };
 		AEFA4685C0ED722B2B86A010 /* SplitFocusDimTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitFocusDimTests.swift; sourceTree = "<group>"; };
 		BE9117F7FB3E54B8267A1843 /* DepartureMonoNerdFont-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "DepartureMonoNerdFont-Regular.otf"; sourceTree = "<group>"; };
 		C0656F7C1D48AE0429C1888B /* VisualEffectBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualEffectBackground.swift; sourceTree = "<group>"; };
+		C5A0A47FC050DC3E50EA072E /* AppCommandRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCommandRegistryTests.swift; sourceTree = "<group>"; };
 		C9E2B9ADF809766CE4278047 /* SafeJSON.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeJSON.swift; sourceTree = "<group>"; };
+		CCEDEB4D8FA83ECCA5A94A15 /* AgentActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentActivity.swift; sourceTree = "<group>"; };
 		D8CAD184E9D0547B876C8AFE /* THIRD_PARTY_FONT_LICENSES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = THIRD_PARTY_FONT_LICENSES.md; sourceTree = "<group>"; };
 		DB20921E3CAC1006A8FBD3AE /* SettingsSafety.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSafety.swift; sourceTree = "<group>"; };
 		DE559C44534F14D1C4C817A8 /* FontDefaultsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontDefaultsTests.swift; sourceTree = "<group>"; };
+		DE5A130306A61FA469CC14BA /* AgentEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentEvent.swift; sourceTree = "<group>"; };
 		E298AD81B1615CBBFD69F48A /* GhosttySurfaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttySurfaceView.swift; sourceTree = "<group>"; };
 		E94AB23640CA1E6007F8B2B4 /* GlintTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GlintTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		EBCC04C19D745AA867D961FD /* PaneAgentKindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneAgentKindTests.swift; sourceTree = "<group>"; };
@@ -131,6 +142,7 @@
 		FADAA48EED9EC6EB9662C6D1 /* AgentBusyStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBusyStatusTests.swift; sourceTree = "<group>"; };
 		FBC436F69C7759D13EFB0BF8 /* AgentHookEventTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentHookEventTests.swift; sourceTree = "<group>"; };
 		FC6FFB5185C403F6F44A1687 /* GhosttyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyManager.swift; sourceTree = "<group>"; };
+		FEFEC9D8CDC817A0E25819D6 /* AppCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCommand.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -173,9 +185,12 @@
 		5F9010EBEE9DCDE13D866A74 /* GlintTests */ = {
 			isa = PBXGroup;
 			children = (
+				890C02C2DB94859DC9DD3190 /* AgentActivityPresentationTests.swift */,
 				FADAA48EED9EC6EB9662C6D1 /* AgentBusyStatusTests.swift */,
+				A9E4596661229797DAC5F7ED /* AgentEventPlatformTests.swift */,
 				FBC436F69C7759D13EFB0BF8 /* AgentHookEventTests.swift */,
 				4EEF00CBEF45A9D60423A207 /* AgentKindResolutionTests.swift */,
+				C5A0A47FC050DC3E50EA072E /* AppCommandRegistryTests.swift */,
 				049EF5193FE5D19E86C9EC85 /* AppearanceThemeTests.swift */,
 				5008237EE4CC1A3404DAC751 /* AppIconAssetTests.swift */,
 				A04F39D8F313EF380039FB6F /* AppIconPresetGroupingTests.swift */,
@@ -218,7 +233,9 @@
 		8CD393231F7DDDDC2FC4028F /* Agent */ = {
 			isa = PBXGroup;
 			children = (
+				CCEDEB4D8FA83ECCA5A94A15 /* AgentActivity.swift */,
 				05F2CA2243872C8111048EF2 /* AgentBridge.swift */,
+				DE5A130306A61FA469CC14BA /* AgentEvent.swift */,
 				265A192AC9BD06DB09346E90 /* AgentHookInstaller.swift */,
 				829D894CF747D6BC08667239 /* AgentPaneSummary.swift */,
 				21868C7211897C87A6CAD7C3 /* ControlBridge.swift */,
@@ -269,6 +286,7 @@
 		CE6E633968E3B9EE7F187610 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				FEFEC9D8CDC817A0E25819D6 /* AppCommand.swift */,
 				9E67CF5D8552AE1F51386161 /* AppDelegate.swift */,
 				EC651B821F3C8E89A5D1F8DC /* AppFonts.swift */,
 				7CB74659D174004C620D538A /* GlintApp.swift */,
@@ -408,9 +426,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1948E0A09B32978FAAB9B196 /* AgentActivityPresentationTests.swift in Sources */,
 				13F72CF42254CD4C9ED3A64F /* AgentBusyStatusTests.swift in Sources */,
+				2338E3D40D81F7199274F1AF /* AgentEventPlatformTests.swift in Sources */,
 				A3DFE0A3135D4D16BA284852 /* AgentHookEventTests.swift in Sources */,
 				81532B36FEC3039B8EAD9CB1 /* AgentKindResolutionTests.swift in Sources */,
+				B3CA10833553B36AEA32C9B9 /* AppCommandRegistryTests.swift in Sources */,
 				F9117BBBA7223329225B694D /* AppIconAssetTests.swift in Sources */,
 				3F8C84DA957F29F442D9B82A /* AppIconPresetGroupingTests.swift in Sources */,
 				F0C9D4521F90D3DE4F02E29A /* AppearanceThemeTests.swift in Sources */,
@@ -431,9 +452,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EBD566013A406D326B3E9F9E /* AgentActivity.swift in Sources */,
 				E464D0233508CD31C1235054 /* AgentBridge.swift in Sources */,
+				20BE1D6F0A729AAF07A6EC0B /* AgentEvent.swift in Sources */,
 				3932A4CFEFF6FB81AE283645 /* AgentHookInstaller.swift in Sources */,
 				C48BD1224EA2C6D3C87B9120 /* AgentPaneSummary.swift in Sources */,
+				412ADD1D9A8133BF95782E1F /* AppCommand.swift in Sources */,
 				5157C5439862F21202BCC44D /* AppDelegate.swift in Sources */,
 				FF23A847BC5D81C090121A22 /* AppFonts.swift in Sources */,
 				C0E8D97C08BA3F0FA33F31E7 /* CommandPalette.swift in Sources */,

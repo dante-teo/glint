@@ -35,6 +35,12 @@ Glint bundles Barlow for app UI and DepartureMono Nerd Font for new terminal def
 
 Developer notes and regression checks live in [docs/appearance.md](docs/appearance.md).
 
+## Agent Activity and Integrations
+
+The sidebar's Activity mode collects approvals, failures, running turns, compaction, and unread completions across every workspace. Select an item to jump to its exact tab and pane; details are available by keyboard or click without relying on hover.
+
+Glint accepts its original `{pane, hook, agent}` hook messages and a replay-safe, versioned event envelope for newer integrations. The protocol, lifecycle behavior, and compatibility guarantees are documented in [docs/agent-integrations.md](docs/agent-integrations.md).
+
 ## App and Agent Icons
 
 The app bundle icon is a conventional macOS `AppIcon.appiconset` under `Glint/Resources/Assets.xcassets`; selectable Dock icon presets are generated from the portrait sources in `AppIconSource/`. See [docs/appearance.md](docs/appearance.md#app-icon-packaging) before changing app icon resources.
