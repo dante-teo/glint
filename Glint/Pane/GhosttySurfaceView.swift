@@ -1285,21 +1285,22 @@ final class GhosttySurfaceView: NSView, NSTextInputClient {
     private var swallowingFocusClick = false
 
     override func mouseDown(with event: NSEvent) {
+        // Always tell the model which pane was clicked. AppKit's first
+        // responder and WorkspaceStore.focusedPane can briefly disagree while
+        // SwiftUI's queued responder updates unwind after a split. Gating this
+        // notification on firstResponder meant a click could be dropped in
+        // that state, leaving the model pinned to the most recently opened
+        // pane. The store ignores redundant notifications.
+        if let paneIdentifier = paneKey {
+            NotificationCenter.default.post(
+                name: .glintPaneFocusClicked,
+                object: nil,
+                userInfo: ["pane": paneIdentifier]
+            )
+        }
+
         if window?.firstResponder !== self {
             window?.makeFirstResponder(self)
-            // Notify the store so it can update focusedPane immediately.
-            // SwiftUI's .onTapGesture on the parent ZStack does NOT fire
-            // here because this NSView handles the event before SwiftUI's
-            // gesture system sees it. Without this notification the store
-            // never learns about the click, and the dim overlay stays on
-            // the wrong pane until updateNSView fights back ~1 s later.
-            if let pk = paneKey {
-                NotificationCenter.default.post(
-                    name: .glintPaneFocusClicked,
-                    object: nil,
-                    userInfo: ["pane": pk]
-                )
-            }
             swallowingFocusClick = true
             return
         }

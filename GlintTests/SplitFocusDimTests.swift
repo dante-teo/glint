@@ -98,6 +98,44 @@ final class SplitFocusDimTests: XCTestCase {
                        "Redundant focus notification should leave focusedPane unchanged")
     }
 
+    func testSurfaceClickNotifiesWhenSurfaceIsAlreadyFirstResponder() throws {
+        let paneKey = "\(UUID().uuidString):0"
+        let surface = GhosttySurfaceView(frame: NSRect(x: 0, y: 0, width: 100, height: 100),
+                                         paneKey: paneKey)
+        let window = NSWindow(contentRect: surface.frame,
+                              styleMask: .borderless,
+                              backing: .buffered,
+                              defer: false)
+        window.contentView = surface
+        XCTAssertTrue(window.makeFirstResponder(surface))
+
+        var notifiedPane: String?
+        let token = NotificationCenter.default.addObserver(
+            forName: .glintPaneFocusClicked,
+            object: nil,
+            queue: nil
+        ) { note in
+            notifiedPane = note.userInfo?["pane"] as? String
+        }
+        defer { NotificationCenter.default.removeObserver(token) }
+
+        let event = try XCTUnwrap(NSEvent.mouseEvent(
+            with: .leftMouseDown,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: window.windowNumber,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 1,
+            pressure: 1
+        ))
+        surface.mouseDown(with: event)
+
+        XCTAssertEqual(notifiedPane, paneKey,
+                       "Every surface click must identify its pane even when AppKit focus already matches")
+    }
+
     // MARK: - Dim overlay opacity
 
     func testDimOpacityUnfocusedOpaque() {

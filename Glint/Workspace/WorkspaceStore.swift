@@ -1479,10 +1479,11 @@ final class WorkspaceStore: ObservableObject {
         clearDockBadge(for: key)
     }
 
-    /// User clicked an unfocused split pane. The NSView's mouseDown handled
-    /// the event (making it first responder) before SwiftUI's onTapGesture
-    /// could fire, so this notification is the only path back to the store.
-    /// Update focusedPane so the dim overlay follows the click immediately.
+    /// User clicked a terminal surface. The NSView's mouseDown handles the
+    /// event before SwiftUI's onTapGesture can fire, so this notification is
+    /// the path back to the store. Every surface click is reported because
+    /// AppKit's first responder can briefly drift from the model; redundant
+    /// clicks are ignored below.
     func handlePaneFocusClick(_ info: [AnyHashable: Any]?) {
         guard let info,
               let paneStr = info["pane"] as? String,
