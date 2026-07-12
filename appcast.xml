@@ -6,15 +6,18 @@
     <description>Most recent Glint changes.</description>
     <language>en</language>
     <item>
-      <title>Glint 1.8.0</title>
-      <sparkle:version>202607100058</sparkle:version>
-      <sparkle:shortVersionString>1.8.0</sparkle:shortVersionString>
-      <pubDate>Fri, 10 Jul 2026 01:01:18 +0000</pubDate>
+      <title>Glint 1.8.1</title>
+      <sparkle:version>202607122109</sparkle:version>
+      <sparkle:shortVersionString>1.8.1</sparkle:shortVersionString>
+      <pubDate>Sun, 12 Jul 2026 21:11:59 +0000</pubDate>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[<div style="font-family:-apple-system,sans-serif;"><h3>更新内容 · What's new in 1.8.0</h3><ul>
+      <description><![CDATA[<div style="font-family:-apple-system,sans-serif;"><h3>更新内容 · What's new in 1.8.1</h3><ul>
+    <li>fix(pane): keep split focus in sync on click</li>
+    <li>release: update appcast for v1.8.0</li>
+  </ul></div><!--GLINT_HISTORY_BELOW--><hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"><div style="font-family:-apple-system,sans-serif;"><h3 style="color:#666;">历史版本 · Previous releases</h3></div><div style="font-family:-apple-system,sans-serif;"><h3>更新内容 · What's new in 1.8.0</h3><ul>
     <li>feat(agent): add typed cross-workspace activity</li>
     <li>release: update appcast for v1.7.1</li>
-  </ul></div><!--GLINT_HISTORY_BELOW--><hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"><div style="font-family:-apple-system,sans-serif;"><h3 style="color:#666;">历史版本 · Previous releases</h3></div><div style="font-family:-apple-system,sans-serif;"><h3>更新内容 · What's new in 1.7.1</h3><ul>
+  </ul></div><hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"><div style="font-family:-apple-system,sans-serif;"><h3>更新内容 · What's new in 1.7.1</h3><ul>
     <li>feat(agent): add Oh My Pi pixel mascot</li>
     <li>fix(agent): remove Devin support</li>
     <li>release: update appcast for v1.7.0</li>
@@ -54,10 +57,62 @@
   </ul></div><hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"><div style="font-family:-apple-system,sans-serif;"><h3>更新内容 · What's new in 1.4.2</h3><ul>
     <li>feat(app-icon): replace flat icon grid with two-level portrait + color picker</li>
     <li>release: update appcast for v1.4.1</li>
-  </ul></div><hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"><div style="font-family:-apple-system,sans-serif;"><h3>更新内容 · What's new in 1.4.1</h3><ul>
-    <li>feat(app-icon): rework themed portrait icons</li>
-    <li>release: update appcast for v1.4.0</li>
   </ul></div>]]></description>
+      <enclosure url="https://github.com/dante-teo/glint/releases/download/v1.8.1/Glint-1.8.1.dmg" length="40596539" type="application/octet-stream" sparkle:edSignature="RUsNw6PgOw8odT+HNy0a5VDB2wypCTjeAcfBhco2dOnhY/6EwA0mCLg+x3QRw+c09UAoskL8DnFrWkbhm1iMCw==" />
+    </item>
+    <item>
+      <title>Glint 1.8.0</title>
+      <sparkle:version>202607100058</sparkle:version>
+      <sparkle:shortVersionString>1.8.0</sparkle:shortVersionString>
+      <pubDate>Fri, 10 Jul 2026 01:01:18 +0000</pubDate>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description>&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.8.0&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;feat(agent): add typed cross-workspace activity&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.7.1&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;&lt;!--GLINT_HISTORY_BELOW--&gt;&lt;hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3 style="color:#666;"&gt;历史版本 · Previous releases&lt;/h3&gt;&lt;/div&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.7.1&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;feat(agent): add Oh My Pi pixel mascot&lt;/li&gt;
+    &lt;li&gt;fix(agent): remove Devin support&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.7.0&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;&lt;hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.7.0&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;feat(agent): add Oh My Pi (omp) agent support&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.6.0&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;&lt;hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.6.0&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;release: update appcast for v1.5.3&lt;/li&gt;
+    &lt;li&gt;revert(agent): remove Devin agent pane, restore normal agent-integrated terminal&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;&lt;hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.5.3&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;fix(agent): move folder picker into composer toolbar, drop dead width hacks&lt;/li&gt;
+    &lt;li&gt;fix(agent): never auto-suggest the filesystem root as a new agent project&lt;/li&gt;
+    &lt;li&gt;fix(agent): stop test suite from leaking into real session store, harden stale tool-call sweep&lt;/li&gt;
+    &lt;li&gt;fix(agent): fix message ordering, wire up real model switching, and fix stuck-connect bugs&lt;/li&gt;
+    &lt;li&gt;fix(agent): stop composer/message overlap and fix card auto-sizing&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.5.2&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;&lt;hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.5.2&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;feat(agent): add provider-agnostic managed agent core&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.5.1&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;&lt;hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.5.1&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;feat(agent): polish composer and tool UI&lt;/li&gt;
+    &lt;li&gt;fix(agent): make ACP tool calls inspectable and recoverable&lt;/li&gt;
+    &lt;li&gt;fix(agent): fix stuck tool calls, permission protocol, and composer UX&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.5.0&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;&lt;hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.5.0&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;feat(appearance): refresh base portrait app icon&lt;/li&gt;
+    &lt;li&gt;feat(agent): wire Devin session teardown for archive/delete/quit (Phase 5)&lt;/li&gt;
+    &lt;li&gt;feat(agent): implement Devin agent pane UI (Phase 4)&lt;/li&gt;
+    &lt;li&gt;feat(agent): implement Devin ACP phase 3&lt;/li&gt;
+    &lt;li&gt;feat(agent): add inline Devin project picker&lt;/li&gt;
+    &lt;li&gt;feat(agent): add new workspace picker&lt;/li&gt;
+    &lt;li&gt;feat(workspace): add agent workspace domain model (Phase 1)&lt;/li&gt;
+    &lt;li&gt;docs: fold agent orchestration plan into AGENTS.md, drop the plan file&lt;/li&gt;
+    &lt;li&gt;docs: mark agent orchestration phase 2 complete&lt;/li&gt;
+    &lt;li&gt;docs: add agent orchestration implementation plan&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.4.2&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;&lt;hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.4.2&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;feat(app-icon): replace flat icon grid with two-level portrait + color picker&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.4.1&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;&lt;hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;"&gt;&lt;div style="font-family:-apple-system,sans-serif;"&gt;&lt;h3&gt;更新内容 · What's new in 1.4.1&lt;/h3&gt;&lt;ul&gt;
+    &lt;li&gt;feat(app-icon): rework themed portrait icons&lt;/li&gt;
+    &lt;li&gt;release: update appcast for v1.4.0&lt;/li&gt;
+  &lt;/ul&gt;&lt;/div&gt;</description>
       <enclosure url="https://github.com/dante-teo/glint/releases/download/v1.8.0/Glint-1.8.0.dmg" length="41144111" type="application/octet-stream" sparkle:edSignature="2VqjapX3uzlJCioywozB310251tTxQxtrP+aXPRVKc9KrC0vtXTsqdqbJd+SucPQpyqhUK2e+xMB9uAx/6QUCQ==" />
     </item>
     <item>
