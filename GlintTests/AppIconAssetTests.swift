@@ -9,7 +9,7 @@ final class AppIconAssetTests: XCTestCase {
             .deletingLastPathComponent()
         let resourcesRoot = repoRoot.appendingPathComponent("Glint/Resources")
         let appIconSet = resourcesRoot.appendingPathComponent("Assets.xcassets/AppIcon.appiconset")
-        let liquidGlassIconSource = repoRoot.appendingPathComponent("AppIconSource/liquid-glass/AppIcon.icon")
+        let privateIconSources = repoRoot.appendingPathComponent("AppIconSource")
         let projectYAML = try String(contentsOf: repoRoot.appendingPathComponent("project.yml"))
 
         XCTAssertFalse(
@@ -20,9 +20,9 @@ final class AppIconAssetTests: XCTestCase {
             projectYAML.contains("ASSETCATALOG_COMPILER_STANDALONE_ICON_BEHAVIOR: all"),
             "The standalone AppIcon.icns must keep all icon sizes for Launch Services."
         )
-        XCTAssertTrue(
-            FileManager.default.fileExists(atPath: liquidGlassIconSource.appendingPathComponent("icon.json").path),
-            "The Liquid Glass .icon source should stay tracked outside bundled resources."
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: privateIconSources.path),
+            "Private source photos and intermediate icon artwork must not be tracked in the repository."
         )
         XCTAssertTrue(
             FileManager.default.fileExists(atPath: appIconSet.path),

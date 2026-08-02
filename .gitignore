@@ -60,3 +60,8 @@ xhs-card-*.png
 
 # Local-only design scratch (HTML approach prototypes, not part of the app).
 _design-prototypes/
+
+# Private app-icon references and intermediate artwork. Never commit source
+# photographs or model inputs; the checked-in asset catalog contains only the
+# approved distributable icon renders.
+AppIconSource/
